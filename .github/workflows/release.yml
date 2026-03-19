@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   # ── Create the GitHub release with changelog notes ─────────────────────────
   create-release:
