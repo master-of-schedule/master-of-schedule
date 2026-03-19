@@ -15,6 +15,7 @@ export interface UseCreateWeeklyModalParams {
     baseTemplateId?: string,
     baseTemplateSchedule?: Schedule,
     daysPerWeek?: number,
+    name?: string,
   ) => void;
   setCurrentClass: (className: string) => void;
   setActiveTab: (tab: AppTab) => void;
@@ -23,6 +24,8 @@ export interface UseCreateWeeklyModalParams {
 
 export interface UseCreateWeeklyModalReturn {
   createWeeklyModalOpen: boolean;
+  createWeeklyName: string;
+  setCreateWeeklyName: (name: string) => void;
   createWeeklyMondayDate: string;
   setCreateWeeklyMondayDate: (date: string) => void;
   createWeeklyDays: number;
@@ -36,10 +39,12 @@ export function useCreateWeeklyModal(params: UseCreateWeeklyModalParams): UseCre
   const { settingsDaysPerWeek, newSchedule, setCurrentClass, setActiveTab, pickFirstClass } = params;
 
   const [createWeeklyModalOpen, setCreateWeeklyModalOpen] = useState(false);
+  const [createWeeklyName, setCreateWeeklyName] = useState<string>('');
   const [createWeeklyMondayDate, setCreateWeeklyMondayDate] = useState<string>('');
   const [createWeeklyDays, setCreateWeeklyDays] = useState<number>(5);
 
   const openCreateWeekly = useCallback(() => {
+    setCreateWeeklyName('');
     setCreateWeeklyMondayDate('');
     setCreateWeeklyDays(settingsDaysPerWeek);
     setCreateWeeklyModalOpen(true);
@@ -55,8 +60,10 @@ export function useCreateWeeklyModal(params: UseCreateWeeklyModalParams): UseCre
       activeTemplate?.id,
       activeTemplate?.schedule,
       createWeeklyDays,
+      createWeeklyName,
     );
     setCreateWeeklyModalOpen(false);
+    setCreateWeeklyName('');
     setCreateWeeklyMondayDate('');
 
     const firstClass = pickFirstClass();
@@ -64,15 +71,17 @@ export function useCreateWeeklyModal(params: UseCreateWeeklyModalParams): UseCre
       setCurrentClass(firstClass);
     }
     setActiveTab('editor');
-  }, [createWeeklyMondayDate, createWeeklyDays, newSchedule, setCurrentClass, setActiveTab, pickFirstClass]);
+  }, [createWeeklyMondayDate, createWeeklyDays, createWeeklyName, newSchedule, setCurrentClass, setActiveTab, pickFirstClass]);
 
   const closeCreateWeekly = useCallback(() => {
     setCreateWeeklyModalOpen(false);
+    setCreateWeeklyName('');
     setCreateWeeklyMondayDate('');
   }, []);
 
   return {
     createWeeklyModalOpen,
+    createWeeklyName, setCreateWeeklyName,
     createWeeklyMondayDate, setCreateWeeklyMondayDate,
     createWeeklyDays, setCreateWeeklyDays,
     openCreateWeekly,

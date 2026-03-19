@@ -71,6 +71,7 @@ describe('useCreateWeeklyModal', () => {
       undefined, // no active template
       undefined,
       6,
+      '', // name (empty = will use default)
     );
     expect(setCurrentClass).toHaveBeenCalledWith('5а');
     expect(setActiveTab).toHaveBeenCalledWith('editor');

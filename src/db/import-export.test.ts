@@ -315,8 +315,43 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.6');
+    expect(result.version).toBe('3.7');
     expect(result.scheduleVersions[0].temporaryLessons).toEqual([]);
+  });
+
+  it('should migrate 3.6 data to 3.7 preserving settings field', () => {
+    const data = {
+      version: '3.6',
+      exportedAt: new Date().toISOString(),
+      teachers: [],
+      rooms: [],
+      classes: [],
+      groups: [],
+      lessonRequirements: [],
+      scheduleVersions: [],
+    };
+    const json = JSON.stringify(data);
+
+    const result = parseExportData(json);
+    expect(result.version).toBe('3.7');
+  });
+
+  it('should preserve gapExcludedClasses through 3.7 migration', () => {
+    const data = {
+      version: '3.7',
+      exportedAt: new Date().toISOString(),
+      teachers: [],
+      rooms: [],
+      classes: [],
+      groups: [],
+      lessonRequirements: [],
+      scheduleVersions: [],
+      settings: { gapExcludedClasses: ['1а', '1б'] },
+    };
+    const json = JSON.stringify(data);
+
+    const result = parseExportData(json);
+    expect(result.settings?.gapExcludedClasses).toEqual(['1а', '1б']);
   });
 });
 

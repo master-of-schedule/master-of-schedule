@@ -1383,4 +1383,38 @@ describe('findGaps — Z27-5/Z28-1 group gap detection', () => {
     // Regular class gap still detected
     expect(gaps.filter(g => g.type === 'class' && g.lessonNum === 2)).toHaveLength(1);
   });
+
+  it('Z31-5 regression: detects group gaps using Groups table when groups never share a slot', () => {
+    // Real-world case: groups are at DIFFERENT lesson numbers (never co-appear in one slot).
+    // The dynamic slot-based discovery would miss this pair entirely.
+    // The Groups table is the only authority.
+    const schedule: Schedule = {
+      '7е': {
+        'Пн': {
+          // Lesson 1: full-class (no group)
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '101', group: undefined }] },
+          // Lesson 2: only group А (Т.В.) — group Б is absent → window for Б
+          2: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Английский', teacher: 'Петрова А.П.', room: '201', group: '7е(Т.В.)' }] },
+          // Lesson 3: only group Б (С.П.) — group А is absent (not a window — no full-class after)
+          3: { lessons: [{ id: 'l3', requirementId: 'r3', subject: 'Английский', teacher: 'Сидорова Е.В.', room: '202', group: '7е(С.П.)' }] },
+          // Lesson 4: full-class (no group)
+          4: { lessons: [{ id: 'l4', requirementId: 'r4', subject: 'Физика', teacher: 'Петрова А.П.', room: '101', group: undefined }] },
+        },
+      },
+    };
+
+    const groups: Group[] = [
+      { id: 'g1', name: '7е(Т.В.)', className: '7е', index: '(Т.В.)', parallelGroup: '7е(С.П.)' },
+      { id: 'g2', name: '7е(С.П.)', className: '7е', index: '(С.П.)', parallelGroup: '7е(Т.В.)' },
+    ];
+
+    // Without groups table — pair not discoverable, no group gaps
+    const gapsNoTable = findGaps(schedule, {});
+    expect(gapsNoTable.filter(g => g.type === 'group')).toHaveLength(0);
+
+    // With groups table — pair known, window for 7е(С.П.) at lesson 2 detected
+    const gapsWithTable = findGaps(schedule, {}, undefined, groups);
+    const groupGaps = gapsWithTable.filter(g => g.type === 'group');
+    expect(groupGaps.some(g => g.name === '7е(С.П.)' && g.lessonNum === 2)).toBe(true);
+  });
 });

@@ -79,7 +79,7 @@ export function EditorPage() {
   const hintText = useMemo(() => {
     if (movingLesson) return 'Кликните по ячейке, куда переместить занятие. Esc — отмена';
     if (absentTeacher) return 'Отметьте уроки, требующие замены';
-    if (copiedLesson) return 'Нажмите на ячейку для вставки скопированного занятия. Esc — отмена';
+    if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
     if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
       ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки. Двойной клик — авто-кабинет'
@@ -290,7 +290,7 @@ export function EditorPage() {
         }
 
         assignLesson({ className: currentClass, day, lessonNum, lesson });
-        setCopiedLesson(null);
+        // Keep copy mode active for multi-paste (Z31-4) — Esc or selecting another lesson exits
         return;
       }
 
@@ -735,8 +735,8 @@ export function EditorPage() {
                 <Button variant="primary" size="small" onClick={() => {
                   if (!currentClass) return;
                   assignLesson({ className: currentClass, day: pasteWarning.day, lessonNum: pasteWarning.lessonNum, lesson: pasteWarning.lesson });
-                  setCopiedLesson(null);
                   setPasteWarning(null);
+                  // Keep copy mode active for multi-paste (Z31-4)
                 }}>
                   Добавить
                 </Button>
@@ -744,8 +744,8 @@ export function EditorPage() {
                 <Button variant="primary" size="small" onClick={() => {
                   if (!currentClass) return;
                   assignLesson({ className: currentClass, day: pasteWarning.day, lessonNum: pasteWarning.lessonNum, lesson: pasteWarning.lessonWithoutRoom! });
-                  setCopiedLesson(null);
                   setPasteWarning(null);
+                  // Keep copy mode active for multi-paste (Z31-4)
                 }}>
                   Вставить без кабинета
                 </Button>

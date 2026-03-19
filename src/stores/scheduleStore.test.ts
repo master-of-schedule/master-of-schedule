@@ -330,15 +330,29 @@ describe('clearHistory', () => {
 // ── newSchedule ───────────────────────────────────────────────────────────────
 
 describe('newSchedule', () => {
-  it('resets schedule and clears history', () => {
+  it('resets schedule and seeds a baseline history entry', () => {
     useScheduleStore.setState({ schedule: { '5а': {} }, isDirty: true });
     useScheduleStore.getState().newSchedule('template');
     const { schedule, isDirty, history, historyIndex, versionType } = useScheduleStore.getState();
     expect(schedule).toEqual({});
     expect(isDirty).toBe(false);
-    expect(history).toHaveLength(0);
-    expect(historyIndex).toBe(-1);
+    expect(history).toHaveLength(1);
+    expect(historyIndex).toBe(0);
     expect(versionType).toBe('template');
+  });
+
+  it('first lesson placed on a new schedule can be undone (Z31-3 regression)', () => {
+    useScheduleStore.getState().newSchedule('template');
+    // Place first lesson
+    useScheduleStore.getState().assignLesson({
+      className: '5а', day: 'Пн' as Day, lessonNum: 1 as LessonNumber,
+      lesson: { subject: 'Math', teacher: 'Иванова', room: '101' } as ScheduledLesson,
+    });
+    expect(useScheduleStore.getState().historyIndex).toBe(1);
+    // Undo must revert to the empty baseline
+    useScheduleStore.getState().undo();
+    expect(useScheduleStore.getState().historyIndex).toBe(0);
+    expect(useScheduleStore.getState().schedule).toEqual({});
   });
 
   it('stores mondayDate and daysPerWeek for weekly type', () => {

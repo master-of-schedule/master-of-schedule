@@ -426,9 +426,20 @@ export interface ScheduleGap {
 export function findGaps(
   schedule: Schedule,
   _teachers: Record<string, Teacher>,
-  excludeClasses?: Set<string>
+  excludeClasses?: Set<string>,
+  groups?: Group[]
 ): ScheduleGap[] {
   const gaps: ScheduleGap[] = [];
+
+  // Pre-compute group pairs from the Groups table (authoritative source).
+  // This ensures pairs are known even when groups are scheduled at different slots.
+  const staticGroupPairs = new Map<string, Set<string>>();
+  for (const group of groups ?? []) {
+    if (group.parallelGroup) {
+      if (!staticGroupPairs.has(group.name)) staticGroupPairs.set(group.name, new Set());
+      staticGroupPairs.get(group.name)!.add(group.parallelGroup);
+    }
+  }
 
   for (const [className, days] of Object.entries(schedule)) {
     if (excludeClasses?.has(className)) continue;
@@ -450,8 +461,11 @@ export function findGaps(
       // Z28-1: Group-level gaps — only report when a single-group slot is sandwiched
       // between two "full-class" slots AND the absent group is the known partner of the present one.
 
-      // Step 1: Collect group pairs from slots where 2+ different groups appear together.
+      // Step 1: Seed group pairs from the Groups table, then augment with dynamic slot discovery.
       const groupPairs = new Map<string, Set<string>>();
+      for (const [g, partners] of staticGroupPairs) {
+        groupPairs.set(g, new Set(partners));
+      }
       for (const n of LESSON_NUMBERS) {
         const lessons = days[day]?.[n]?.lessons ?? [];
         const groupsInSlot = [...new Set(
@@ -469,7 +483,7 @@ export function findGaps(
         }
       }
 
-      if (groupPairs.size === 0) continue; // No paired groups on this day — no group gaps possible.
+      if (groupPairs.size === 0) continue; // No paired groups known — no group gaps possible.
 
       // Step 2: Find "full-class" slots: class-wide lesson OR 2+ different groups.
       const fullClassSlots = LESSON_NUMBERS.filter(n => {

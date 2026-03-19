@@ -112,7 +112,7 @@ interface ScheduleState {
   clearHistory: () => void;
 
   // Actions - Version management
-  newSchedule: (type: VersionType, mondayDate?: Date, baseTemplateId?: string, baseTemplateSchedule?: Schedule, daysPerWeek?: number) => void;
+  newSchedule: (type: VersionType, mondayDate?: Date, baseTemplateId?: string, baseTemplateSchedule?: Schedule, daysPerWeek?: number, name?: string) => void;
   loadSchedule: (params: {
     schedule: Schedule;
     versionId: string;
@@ -470,18 +470,19 @@ export const useScheduleStore = create<ScheduleState>()(
     },
 
     // Create new empty schedule
-    newSchedule: (type, mondayDate, baseTemplateId, baseTemplateSchedule, daysPerWeek) => {
+    newSchedule: (type, mondayDate, baseTemplateId, baseTemplateSchedule, daysPerWeek, name) => {
       if (useDataStore.getState().isReadOnlyYear) return;
+      const initialEntry = createHistoryEntry('import', 'Начало', {}, []);
       set({
         schedule: {},
         versionId: null,
         versionType: type,
-        versionName: 'Новое расписание',
+        versionName: name?.trim() || 'Новое расписание',
         mondayDate: mondayDate ?? null,
         versionDaysPerWeek: daysPerWeek ?? null,
         isDirty: false,
-        history: [],
-        historyIndex: -1,
+        history: [initialEntry],
+        historyIndex: 0,
         substitutions: [],
         temporaryLessons: [],
         lessonStatuses: {},

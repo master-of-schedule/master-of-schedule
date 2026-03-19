@@ -38,6 +38,7 @@ function getConflictLabel(type: ScheduleConflict['type']): string {
 export function ValidationPanel() {
   const schedule = useScheduleStore((state) => state.schedule);
   const teachers = useDataStore((state) => state.teachers);
+  const groups = useDataStore((state) => state.groups);
   const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
   const setCurrentClass = useUIStore((state) => state.setCurrentClass);
   const setFocusedCell = useUIStore((state) => state.setFocusedCell);
@@ -67,8 +68,8 @@ export function ValidationPanel() {
     [gapExcludedClasses]
   );
   const gaps = useMemo(
-    () => findGaps(schedule, teachers, excludeSet),
-    [schedule, teachers, excludeSet]
+    () => findGaps(schedule, teachers, excludeSet, Object.values(groups)),
+    [schedule, teachers, excludeSet, groups]
   );
 
   const classGaps = gaps.filter(g => g.type === 'class');

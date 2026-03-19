@@ -23,7 +23,7 @@ export function App() {
     loadData();
   }, [loadData]);
 
-  // Warn before closing tab/window with unsaved changes
+  // Browser: warn before closing tab/window with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty) {
@@ -35,6 +35,21 @@ export function App() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // Tauri exe: warn before closing the native window with unsaved changes
+  useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return;
+    let unlisten: (() => void) | undefined;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      getCurrentWindow().onCloseRequested(async (e) => {
+        e.preventDefault();
+        if (!isDirty || confirm('Есть несохранённые изменения. Закрыть приложение?')) {
+          await getCurrentWindow().destroy();
+        }
+      }).then(fn => { unlisten = fn; });
+    });
+    return () => unlisten?.();
   }, [isDirty]);
 
   // Render active tab

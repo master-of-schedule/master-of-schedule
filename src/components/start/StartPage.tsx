@@ -129,7 +129,7 @@ export function StartPage() {
   const schedule = useScheduleStore((state) => state.schedule);
   const markSaved = useScheduleStore((state) => state.markSaved);
 
-  const hasData = Object.keys(teachers).length > 0;
+  const hasData = Object.keys(teachers).length > 0 || classes.length > 0 || requirements.length > 0;
 
   // Close unsaved changes modal
   const closeUnsavedModal = useCallback(() => {
@@ -190,12 +190,18 @@ export function StartPage() {
   // ── Create Weekly modal ────────────────────────────────────────────────────
   const {
     createWeeklyModalOpen,
+    createWeeklyName, setCreateWeeklyName,
     createWeeklyMondayDate, setCreateWeeklyMondayDate,
     createWeeklyDays, setCreateWeeklyDays,
     openCreateWeekly,
     handleCreateWeekly,
     closeCreateWeekly,
   } = useCreateWeeklyModal({ settingsDaysPerWeek, newSchedule, setCurrentClass, setActiveTab, pickFirstClass });
+
+  // ── Create (template/technical) name modal ─────────────────────────────────
+  const [createNameModalOpen, setCreateNameModalOpen] = useState(false);
+  const [createNameModalType, setCreateNameModalType] = useState<'template' | 'technical'>('template');
+  const [createNameValue, setCreateNameValue] = useState('');
 
   useEffect(() => {
     loadVersions();
@@ -312,19 +318,25 @@ export function StartPage() {
       return;
     }
 
-    // For weekly type, show modal to pick Monday date first
+    // For weekly type, show modal to pick Monday date (and name)
     if (type === 'weekly') {
       openCreateWeekly();
       return;
     }
 
-    newSchedule(type);
+    // For template/technical, prompt for a name first
+    setCreateNameModalType(type as 'template' | 'technical');
+    setCreateNameValue('');
+    setCreateNameModalOpen(true);
+  }, [hasData, isDirty, openCreateWeekly]);
+
+  const handleConfirmCreateName = useCallback(() => {
+    setCreateNameModalOpen(false);
+    newSchedule(createNameModalType, undefined, undefined, undefined, undefined, createNameValue);
     const firstClass = pickFirstClass();
-    if (firstClass) {
-      setCurrentClass(firstClass);
-    }
+    if (firstClass) setCurrentClass(firstClass);
     setActiveTab('editor');
-  }, [hasData, pickFirstClass, newSchedule, setCurrentClass, setActiveTab, isDirty, openCreateWeekly]);
+  }, [createNameModalType, createNameValue, newSchedule, pickFirstClass, setCurrentClass, setActiveTab]);
 
   // Load existing version
   const handleLoadVersion = useCallback(async (loadVersionId: string) => {
@@ -551,6 +563,37 @@ export function StartPage() {
         </div>
       </main>
 
+      {/* Create (template/technical) Name Modal */}
+      <Modal
+        isOpen={createNameModalOpen}
+        onClose={() => setCreateNameModalOpen(false)}
+        title={createNameModalType === 'template' ? 'Создать шаблон' : 'Создать техническое расписание'}
+        size="small"
+      >
+        <div className={styles.saveAsForm}>
+          <label className={styles.saveAsLabel}>
+            Название:
+          </label>
+          <input
+            type="text"
+            className={styles.saveAsInput}
+            value={createNameValue}
+            onChange={(e) => setCreateNameValue(e.target.value)}
+            placeholder="Новое расписание"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmCreateName(); }}
+          />
+          <div className={styles.saveAsActions}>
+            <Button variant="ghost" onClick={() => setCreateNameModalOpen(false)} title="Отменить">
+              Отмена
+            </Button>
+            <Button variant="primary" onClick={handleConfirmCreateName} title="Создать расписание">
+              Создать
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Create Weekly Modal */}
       <Modal
         isOpen={createWeeklyModalOpen}
@@ -560,6 +603,17 @@ export function StartPage() {
       >
         <div className={styles.saveAsForm}>
           <label className={styles.saveAsLabel}>
+            Название:
+          </label>
+          <input
+            type="text"
+            className={styles.saveAsInput}
+            value={createWeeklyName}
+            onChange={(e) => setCreateWeeklyName(e.target.value)}
+            placeholder="Новое расписание"
+            autoFocus
+          />
+          <label className={styles.saveAsLabel}>
             Понедельник недели:
           </label>
           <input
@@ -567,7 +621,6 @@ export function StartPage() {
             className={styles.saveAsInput}
             value={createWeeklyMondayDate}
             onChange={(e) => setCreateWeeklyMondayDate(e.target.value)}
-            autoFocus
           />
           <label className={styles.saveAsLabel}>
             Дней в неделе:

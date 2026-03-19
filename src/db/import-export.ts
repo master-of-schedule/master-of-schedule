@@ -15,14 +15,14 @@ import type {
   Day,
   LessonNumber,
 } from '@/types';
-import { db } from './database';
+import { db, getSettings } from './database';
 import { replaceAllData, getAllData } from './data';
 import { getAllVersions, getVersion } from './versions';
 import { inferRoomShortName } from '@/utils/roomUtils';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.6';
+export const CURRENT_SCHEMA_VERSION = '3.7';
 
 export interface ExportData {
   version: string;
@@ -33,6 +33,10 @@ export interface ExportData {
   groups: Group[];
   lessonRequirements: LessonRequirement[];
   scheduleVersions: Version[];
+  settings?: {
+    gapExcludedClasses?: string[];
+    customSubjects?: string[];
+  };
 }
 
 /** Summary of an export file's contents for preview before import */
@@ -85,6 +89,11 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
     ...data,
     version: '3.6',
     // Teacher.messenger is optional — no data transformation needed
+  }),
+  '3.6': (data) => ({
+    ...data,
+    version: '3.7',
+    // settings.gapExcludedClasses is now exported — no data transformation needed
   }),
 };
 
@@ -156,6 +165,7 @@ export function getExportSummary(data: ExportData): ExportSummary {
 export async function exportToJson(): Promise<string> {
   const data = await getAllData();
   const versions = await getAllVersions();
+  const appSettings = await getSettings();
 
   // Get full version data
   const fullVersions: Version[] = [];
@@ -171,6 +181,10 @@ export async function exportToJson(): Promise<string> {
     exportedAt: new Date().toISOString(),
     ...data,
     scheduleVersions: fullVersions,
+    settings: {
+      gapExcludedClasses: appSettings.gapExcludedClasses,
+      customSubjects: appSettings.customSubjects,
+    },
   };
 
   return JSON.stringify(exportData, null, 2);
@@ -203,7 +217,7 @@ export async function importFromJson(jsonString: string): Promise<void> {
     });
   }
 
-  // Restore active template setting (use put to ensure settings exist)
+  // Restore settings (use put to ensure settings exist)
   const activeTemplate = (data.scheduleVersions ?? []).find(v => v.isActiveTemplate);
   const currentSettings = await db.settings.get('default');
   await db.settings.put({
@@ -212,6 +226,8 @@ export async function importFromJson(jsonString: string): Promise<void> {
     daysPerWeek: currentSettings?.daysPerWeek ?? 5,
     lessonsPerDay: currentSettings?.lessonsPerDay ?? 8,
     activeTemplateId: activeTemplate?.id ?? null,
+    gapExcludedClasses: data.settings?.gapExcludedClasses ?? currentSettings?.gapExcludedClasses,
+    customSubjects: data.settings?.customSubjects ?? currentSettings?.customSubjects,
   });
 }
 
