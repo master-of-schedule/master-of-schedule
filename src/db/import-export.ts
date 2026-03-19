@@ -567,9 +567,20 @@ export function pickJsonFile(): Promise<File | null> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
     input.onchange = () => {
-      resolve(input.files?.[0] ?? null);
+      const file = input.files?.[0] ?? null;
+      document.body.removeChild(input);
+      resolve(file);
     };
+
+    input.oncancel = () => {
+      document.body.removeChild(input);
+      resolve(null);
+    };
+
     input.click();
   });
 }
