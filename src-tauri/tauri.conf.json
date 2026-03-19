@@ -1,7 +1,7 @@
 {
   "productName": "РШР",
   "identifier": "com.school.timetable-editor",
-  "version": "3.24.0",
+  "version": "3.25.0",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
