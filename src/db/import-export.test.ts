@@ -257,6 +257,52 @@ describe('parseExcelWorkbook', () => {
     expect(result.teachers).toHaveLength(0);
     expect(result.classes).toHaveLength(0);
   });
+
+  it('auto-generates teachers from lesson list when Учителя sheet is absent — Z32-2', () => {
+    const workbook = createWorkbook({
+      'Список занятий': [
+        ['Класс', 'Предмет', 'Учитель', 'Занятий в неделю'],
+        ['5а', 'Математика', 'Иванова И.И.', 4],
+        ['5а', 'Русский', 'Петрова А.А.', 3],
+        ['5б', 'Математика', 'Иванова И.И.', 4], // same teacher, same subject — no dups
+        ['5б', 'История', 'Петрова А.А.', 2],    // same teacher, new subject
+      ],
+    });
+
+    const result = parseExcelWorkbook(workbook);
+
+    expect(result.teachers).toHaveLength(2);
+
+    const ivanova = result.teachers.find(t => t.name === 'Иванова И.И.');
+    expect(ivanova).toBeDefined();
+    expect(ivanova!.subjects).toEqual(['Математика']);
+    expect(ivanova!.bans).toEqual({});
+
+    const petrova = result.teachers.find(t => t.name === 'Петрова А.А.');
+    expect(petrova).toBeDefined();
+    expect(petrova!.subjects).toContain('Русский');
+    expect(petrova!.subjects).toContain('История');
+    expect(petrova!.bans).toEqual({});
+  });
+
+  it('does NOT auto-generate teachers when Учителя sheet has data — Z32-2', () => {
+    const workbook = createWorkbook({
+      'Учителя': [
+        ['Фамилия И.О.', 'Запреты', 'Предметы'],
+        ['Сидорова С.С.', '', 'Физика'],
+      ],
+      'Список занятий': [
+        ['Класс', 'Предмет', 'Учитель', 'Занятий в неделю'],
+        ['5а', 'Математика', 'Иванова И.И.', 4],
+      ],
+    });
+
+    const result = parseExcelWorkbook(workbook);
+
+    // Only the explicitly listed teacher; auto-generation skipped
+    expect(result.teachers).toHaveLength(1);
+    expect(result.teachers[0].name).toBe('Сидорова С.С.');
+  });
 });
 
 describe('parseExportData', () => {

@@ -536,6 +536,27 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
     }
   }
 
+  // Auto-generate teacher list from lesson requirements when Учителя sheet is absent or empty.
+  // Collects unique teacher names and their subjects; bans and contact info left empty.
+  if (teachers.length === 0 && lessonRequirements.length > 0) {
+    const teacherSubjects = new Map<string, Set<string>>();
+    for (const req of lessonRequirements) {
+      if (req.teacher) {
+        if (!teacherSubjects.has(req.teacher)) teacherSubjects.set(req.teacher, new Set());
+        teacherSubjects.get(req.teacher)!.add(req.subject);
+      }
+    }
+    let idx = 1;
+    for (const [name, subjects] of teacherSubjects) {
+      teachers.push({
+        id: `teacher-${idx++}`,
+        name,
+        bans: {},
+        subjects: [...subjects],
+      });
+    }
+  }
+
   return { teachers, rooms, classes, groups, lessonRequirements };
 }
 
