@@ -299,7 +299,7 @@ describe('parseExportData', () => {
     expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it('should migrate 3.0 data through 3.1 to 3.2', () => {
+  it('should migrate 3.0 data through all versions to current', () => {
     const data = {
       version: '3.0',
       exportedAt: new Date().toISOString(),
@@ -315,11 +315,11 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.7');
+    expect(result.version).toBe('3.8');
     expect(result.scheduleVersions[0].temporaryLessons).toEqual([]);
   });
 
-  it('should migrate 3.6 data to 3.7 preserving settings field', () => {
+  it('should migrate 3.6 data to current version', () => {
     const data = {
       version: '3.6',
       exportedAt: new Date().toISOString(),
@@ -333,10 +333,10 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.7');
+    expect(result.version).toBe('3.8');
   });
 
-  it('should preserve gapExcludedClasses through 3.7 migration', () => {
+  it('should preserve gapExcludedClasses through 3.7→3.8 migration', () => {
     const data = {
       version: '3.7',
       exportedAt: new Date().toISOString(),
@@ -351,7 +351,29 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
+    expect(result.version).toBe('3.8');
     expect(result.settings?.gapExcludedClasses).toEqual(['1а', '1б']);
+  });
+
+  it('should migrate 3.7 data with acknowledgedConflictKeys absent → undefined', () => {
+    const data = {
+      version: '3.7',
+      exportedAt: new Date().toISOString(),
+      teachers: [],
+      rooms: [],
+      classes: [],
+      groups: [],
+      lessonRequirements: [],
+      scheduleVersions: [
+        { id: '1', name: 'v1', type: 'technical', createdAt: new Date(), schedule: {}, substitutions: [] },
+      ],
+    };
+    const json = JSON.stringify(data);
+
+    const result = parseExportData(json);
+    expect(result.version).toBe('3.8');
+    // acknowledgedConflictKeys is optional — absent in old data is fine
+    expect(result.scheduleVersions[0].acknowledgedConflictKeys).toBeUndefined();
   });
 });
 

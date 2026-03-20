@@ -72,9 +72,6 @@ interface UIState {
     isSubstitution?: boolean;
   } | null;
 
-  // Acknowledged conflict keys (session-only, cleared when slot changes)
-  acknowledgedConflictKeys: string[];
-
   // Export page persistent state (survives tab switches within session)
   exportView: 'classes' | 'teachers' | 'rooms';
   exportSelectedDay: Day | null;
@@ -144,10 +141,6 @@ interface UIState {
   } | null) => void;
   clearMovingLesson: () => void;
 
-  // Actions - Conflict acknowledgement
-  acknowledgeConflict: (key: string) => void;
-  clearConflictAcks: (day: Day, lessonNum: LessonNumber) => void;
-
   // Actions - Export
   setExportView: (view: 'classes' | 'teachers' | 'rooms') => void;
   setExportSelectedDay: (day: Day | null) => void;
@@ -180,7 +173,6 @@ export const useUIStore = create<UIState>((set) => ({
   highlightedMovableTeacher: null,
   copiedLesson: null,
   movingLesson: null,
-  acknowledgedConflictKeys: [],
   exportView: 'classes',
   exportSelectedDay: null,
 
@@ -391,18 +383,6 @@ export const useUIStore = create<UIState>((set) => ({
     replacementForCell: null,
   }),
   clearMovingLesson: () => set({ movingLesson: null }),
-
-  // Conflict acknowledgement
-  acknowledgeConflict: (key) => set((state) => ({
-    acknowledgedConflictKeys: state.acknowledgedConflictKeys.includes(key)
-      ? state.acknowledgedConflictKeys
-      : [...state.acknowledgedConflictKeys, key],
-  })),
-  clearConflictAcks: (day, lessonNum) => set((state) => ({
-    acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
-      k => !k.includes(`|${day}|${lessonNum}|`)
-    ),
-  })),
 
   // Export
   setExportView: (view) => set({ exportView: view }),

@@ -5,7 +5,6 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { useDataStore } from './dataStore';
-import { useUIStore } from './uiStore';
 import type {
   Schedule,
   ScheduledLesson,
@@ -53,6 +52,14 @@ interface ScheduleState {
 
   // Per-lesson statuses (sick / completed) — weekly schedules only
   lessonStatuses: Record<string, 'sick' | 'completed'>;
+
+  /**
+   * Acknowledged conflict keys for the current version.
+   * Persisted to IndexedDB on save; restored on load.
+   * Cleared for a slot when a lesson is assigned to or removed from that slot.
+   * Does NOT clear on: undo/redo (history restores schedule only), room changes.
+   */
+  acknowledgedConflictKeys: string[];
 
   // Actions - Schedule modification
   assignLesson: (params: {
@@ -111,6 +118,10 @@ interface ScheduleState {
   goToHistoryEntry: (index: number) => void;
   clearHistory: () => void;
 
+  // Actions - Conflict acknowledgement
+  acknowledgeConflict: (key: string) => void;
+  clearConflictAcks: (day: Day, lessonNum: LessonNumber) => void;
+
   // Actions - Version management
   newSchedule: (type: VersionType, mondayDate?: Date, baseTemplateId?: string, baseTemplateSchedule?: Schedule, daysPerWeek?: number, name?: string) => void;
   loadSchedule: (params: {
@@ -123,6 +134,7 @@ interface ScheduleState {
     substitutions?: Substitution[];
     temporaryLessons?: LessonRequirement[];
     lessonStatuses?: Record<string, 'sick' | 'completed'>;
+    acknowledgedConflictKeys?: string[];
     baseTemplateId?: string;
     baseTemplateSchedule?: Schedule;
   }) => void;
@@ -175,6 +187,7 @@ export const useScheduleStore = create<ScheduleState>()(
     substitutions: [],
     temporaryLessons: [],
     lessonStatuses: {},
+    acknowledgedConflictKeys: [],
     baseTemplateId: null,
     baseTemplateSchedule: null,
 
@@ -197,13 +210,15 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('assign', description, newSchedule, state.substitutions));
 
-      useUIStore.getState().clearConflictAcks(day, lessonNum);
-      set({
+      set((state) => ({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-      });
+        acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
+          k => !k.includes(`|${day}|${lessonNum}|`)
+        ),
+      }));
     },
 
     // Remove a lesson from a slot
@@ -228,13 +243,15 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('remove', description, newSchedule, state.substitutions));
 
-      useUIStore.getState().clearConflictAcks(day, lessonNum);
-      set({
+      set((state) => ({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-      });
+        acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
+          k => !k.includes(`|${day}|${lessonNum}|`)
+        ),
+      }));
     },
 
     // Remove multiple lessons at once
@@ -262,12 +279,16 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('multi_remove', description, newSchedule, state.substitutions));
 
-      set({
+      const removedSlots = items.map(i => `|${i.day}|${i.lessonNum}|`);
+      set((st) => ({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-      });
+        acknowledgedConflictKeys: st.acknowledgedConflictKeys.filter(
+          k => !removedSlots.some(slot => k.includes(slot))
+        ),
+      }));
     },
 
     // Change room for a lesson
@@ -469,6 +490,19 @@ export const useScheduleStore = create<ScheduleState>()(
       });
     },
 
+    // Conflict acknowledgement
+    acknowledgeConflict: (key) => set((state) => ({
+      acknowledgedConflictKeys: state.acknowledgedConflictKeys.includes(key)
+        ? state.acknowledgedConflictKeys
+        : [...state.acknowledgedConflictKeys, key],
+      isDirty: true,
+    })),
+    clearConflictAcks: (day, lessonNum) => set((state) => ({
+      acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
+        k => !k.includes(`|${day}|${lessonNum}|`)
+      ),
+    })),
+
     // Create new empty schedule
     newSchedule: (type, mondayDate, baseTemplateId, baseTemplateSchedule, daysPerWeek, name) => {
       if (useDataStore.getState().isReadOnlyYear) return;
@@ -486,13 +520,14 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: [],
         temporaryLessons: [],
         lessonStatuses: {},
+        acknowledgedConflictKeys: [],
         baseTemplateId: baseTemplateId ?? null,
         baseTemplateSchedule: baseTemplateSchedule ? cloneSchedule(baseTemplateSchedule) : null,
       });
     },
 
     // Load existing schedule
-    loadSchedule: ({ schedule, versionId, versionType, versionName, mondayDate, versionDaysPerWeek, substitutions, temporaryLessons, lessonStatuses, baseTemplateId, baseTemplateSchedule }) => {
+    loadSchedule: ({ schedule, versionId, versionType, versionName, mondayDate, versionDaysPerWeek, substitutions, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, baseTemplateId, baseTemplateSchedule }) => {
       const initialEntry = createHistoryEntry(
         'import',
         'Загружено',
@@ -513,6 +548,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: substitutions ?? [],
         temporaryLessons: temporaryLessons ?? [],
         lessonStatuses: lessonStatuses ?? {},
+        acknowledgedConflictKeys: acknowledgedConflictKeys ?? [],
         baseTemplateId: baseTemplateId ?? null,
         baseTemplateSchedule: baseTemplateSchedule ? cloneSchedule(baseTemplateSchedule) : null,
       });

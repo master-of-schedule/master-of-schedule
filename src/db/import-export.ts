@@ -22,7 +22,7 @@ import { inferRoomShortName } from '@/utils/roomUtils';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.7';
+export const CURRENT_SCHEMA_VERSION = '3.8';
 
 export interface ExportData {
   version: string;
@@ -94,6 +94,11 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
     ...data,
     version: '3.7',
     // settings.gapExcludedClasses is now exported — no data transformation needed
+  }),
+  '3.7': (data) => ({
+    ...data,
+    version: '3.8',
+    // Version.acknowledgedConflictKeys is optional — no data transformation needed
   }),
 };
 

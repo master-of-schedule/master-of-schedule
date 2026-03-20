@@ -38,6 +38,7 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
   substitutions: import('@/types').Substitution[];
   temporaryLessons?: import('@/types').LessonRequirement[];
   lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  acknowledgedConflictKeys?: string[];
   baseTemplateId?: string;
   baseTemplateSchedule?: Schedule;
 } | null> {
@@ -69,6 +70,7 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
     substitutions: version.substitutions,
     temporaryLessons: version.temporaryLessons,
     lessonStatuses: version.lessonStatuses,
+    acknowledgedConflictKeys: version.acknowledgedConflictKeys,
     baseTemplateId: version.baseTemplateId,
     baseTemplateSchedule,
   };

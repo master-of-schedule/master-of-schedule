@@ -42,8 +42,8 @@ export function ValidationPanel() {
   const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
   const setCurrentClass = useUIStore((state) => state.setCurrentClass);
   const setFocusedCell = useUIStore((state) => state.setFocusedCell);
-  const acknowledgedConflictKeys = useUIStore((state) => state.acknowledgedConflictKeys);
-  const acknowledgeConflict = useUIStore((state) => state.acknowledgeConflict);
+  const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
+  const acknowledgeConflict = useScheduleStore((state) => state.acknowledgeConflict);
   const [showGaps, setShowGaps] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
 

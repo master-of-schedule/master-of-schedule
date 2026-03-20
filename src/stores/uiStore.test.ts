@@ -249,27 +249,5 @@ describe('selectLesson — clearing invariants', () => {
   });
 });
 
-// ─── Z27-4: conflict acknowledgement ──────────────────────────
-
-describe('acknowledgeConflict / clearConflictAcks — Z27-4', () => {
-  it('adds key and filters it from repeated calls', () => {
-    const store = useUIStore.getState();
-    const key = 'force_override_ban|Пн|1|Иванова (10а, Математика)';
-    store.acknowledgeConflict(key);
-    expect(useUIStore.getState().acknowledgedConflictKeys).toContain(key);
-    // idempotent
-    store.acknowledgeConflict(key);
-    expect(useUIStore.getState().acknowledgedConflictKeys.filter(k => k === key)).toHaveLength(1);
-  });
-
-  it('clearConflictAcks removes keys for that day+lessonNum', () => {
-    const store = useUIStore.getState();
-    store.acknowledgeConflict('force_override_ban|Вт|2|detail');
-    store.acknowledgeConflict('force_override_ban|Пн|1|other');
-    store.clearConflictAcks('Вт' as Day, 2 as LessonNumber);
-    const keys = useUIStore.getState().acknowledgedConflictKeys;
-    expect(keys.some(k => k.includes('|Вт|2|'))).toBe(false);
-    // other key preserved
-    expect(keys.some(k => k.includes('|Пн|1|'))).toBe(true);
-  });
-});
+// Note: acknowledgeConflict / clearConflictAcks moved to scheduleStore (Z32-3)
+// Tests are in scheduleStore.test.ts
