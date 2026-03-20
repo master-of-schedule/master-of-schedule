@@ -415,3 +415,91 @@ describe('forceOverride field', () => {
     expect(stored?.forceOverride).toBeUndefined();
   });
 });
+
+// ── Z32-3: acknowledgeConflict / clearConflictAcks (persisted per version) ────
+
+describe('acknowledgeConflict / clearConflictAcks — Z32-3', () => {
+  beforeEach(() => {
+    useScheduleStore.setState({ acknowledgedConflictKeys: [], isDirty: false });
+  });
+
+  it('acknowledgeConflict adds key and marks isDirty', () => {
+    const key = 'force_override_ban|Пн|1|Иванова (10а, Математика)';
+    useScheduleStore.getState().acknowledgeConflict(key);
+    const state = useScheduleStore.getState();
+    expect(state.acknowledgedConflictKeys).toContain(key);
+    expect(state.isDirty).toBe(true);
+  });
+
+  it('acknowledgeConflict is idempotent', () => {
+    const key = 'force_override_ban|Пн|1|detail';
+    useScheduleStore.getState().acknowledgeConflict(key);
+    useScheduleStore.getState().acknowledgeConflict(key);
+    expect(useScheduleStore.getState().acknowledgedConflictKeys.filter(k => k === key)).toHaveLength(1);
+  });
+
+  it('clearConflictAcks removes keys for that day+lessonNum', () => {
+    useScheduleStore.setState({
+      acknowledgedConflictKeys: [
+        'force_override_ban|Вт|2|detail',
+        'force_override_ban|Пн|1|other',
+      ],
+    });
+    useScheduleStore.getState().clearConflictAcks('Вт' as Day, 2 as LessonNumber);
+    const keys = useScheduleStore.getState().acknowledgedConflictKeys;
+    expect(keys.some(k => k.includes('|Вт|2|'))).toBe(false);
+    expect(keys.some(k => k.includes('|Пн|1|'))).toBe(true);
+  });
+
+  it('assignLesson clears acks for that slot', () => {
+    useScheduleStore.setState({
+      acknowledgedConflictKeys: [
+        'force_override_ban|Пн|1|some detail',
+        'force_override_ban|Вт|3|other detail',
+      ],
+    });
+    useScheduleStore.getState().assignLesson({ className: '5а', day: DAY, lessonNum: NUM, lesson: makeLesson() });
+    const keys = useScheduleStore.getState().acknowledgedConflictKeys;
+    expect(keys.some(k => k.includes(`|${DAY}|${NUM}|`))).toBe(false);
+    expect(keys.some(k => k.includes('|Вт|3|'))).toBe(true);
+  });
+
+  it('removeLesson clears acks for that slot', () => {
+    const lesson = makeLesson();
+    useScheduleStore.setState({
+      schedule: { '5а': { [DAY]: { [NUM]: { lessons: [lesson] } } } } as never,
+      acknowledgedConflictKeys: ['force_override_ban|Пн|1|detail'],
+    });
+    useScheduleStore.getState().removeLesson({ className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 });
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toHaveLength(0);
+  });
+
+  it('loadSchedule restores acknowledgedConflictKeys from version', () => {
+    useScheduleStore.getState().loadSchedule({
+      schedule: {},
+      versionId: 'v1',
+      versionType: 'technical',
+      versionName: 'Test',
+      substitutions: [],
+      acknowledgedConflictKeys: ['force_override_ban|Ср|4|detail'],
+    });
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toEqual(['force_override_ban|Ср|4|detail']);
+  });
+
+  it('loadSchedule defaults to [] when acknowledgedConflictKeys absent', () => {
+    useScheduleStore.getState().loadSchedule({
+      schedule: {},
+      versionId: 'v1',
+      versionType: 'technical',
+      versionName: 'Test',
+      substitutions: [],
+    });
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toEqual([]);
+  });
+
+  it('newSchedule resets acknowledgedConflictKeys to []', () => {
+    useScheduleStore.setState({ acknowledgedConflictKeys: ['some_key|Пн|1|detail'] });
+    useScheduleStore.getState().newSchedule('technical');
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toEqual([]);
+  });
+});

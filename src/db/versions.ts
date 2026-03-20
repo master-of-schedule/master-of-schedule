@@ -23,6 +23,7 @@ export async function createVersion(params: {
   substitutions?: Substitution[];
   temporaryLessons?: LessonRequirement[];
   lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  acknowledgedConflictKeys?: string[];
   comment?: string;
   mondayDate?: Date;
   baseTemplateId?: string;
@@ -37,6 +38,7 @@ export async function createVersion(params: {
     substitutions: params.substitutions ?? [],
     temporaryLessons: params.temporaryLessons ?? [],
     lessonStatuses: params.lessonStatuses,
+    acknowledgedConflictKeys: params.acknowledgedConflictKeys,
     comment: params.comment,
     mondayDate: params.mondayDate,
     isActiveTemplate: false,
@@ -103,7 +105,8 @@ export async function updateVersionSchedule(
   schedule: Schedule,
   substitutions?: Substitution[],
   temporaryLessons?: LessonRequirement[],
-  lessonStatuses?: Record<string, 'sick' | 'completed'>
+  lessonStatuses?: Record<string, 'sick' | 'completed'>,
+  acknowledgedConflictKeys?: string[]
 ): Promise<void> {
   const updates: Partial<Version> = { schedule };
   if (substitutions !== undefined) {
@@ -114,6 +117,9 @@ export async function updateVersionSchedule(
   }
   if (lessonStatuses !== undefined) {
     updates.lessonStatuses = lessonStatuses;
+  }
+  if (acknowledgedConflictKeys !== undefined) {
+    updates.acknowledgedConflictKeys = acknowledgedConflictKeys;
   }
   await db.versions.update(id, updates);
 }
@@ -210,6 +216,8 @@ export async function duplicateVersion(
     ? sourceId
     : baseTemplateId;
 
+  // Acknowledged conflicts are not inherited: the new version starts fresh,
+  // requiring the user to acknowledge any ban violations on first open.
   return createVersion({
     name: newName,
     type: newType ?? source.type,

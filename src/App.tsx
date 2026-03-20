@@ -3,20 +3,30 @@
  * Handles tab routing between start, editor, export, and settings views
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
+import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { AppHeader } from '@/components/common/AppHeader';
 import { StartPage } from '@/components/start/StartPage';
 import { EditorPage } from '@/components/editor/EditorPage';
 import { ExportPage } from '@/components/export/ExportPage';
 import { DataPage } from '@/components/data/DataPage';
 import { SettingsPage } from '@/components/settings/SettingsPage';
+import { Modal } from '@/components/common/Modal';
+import { Button } from '@/components/common/Button';
 import './styles/global.css';
 
 export function App() {
   const activeTab = useUIStore((state) => state.activeTab);
   const loadData = useDataStore((state) => state.loadData);
   const isDirty = useScheduleStore((state) => state.isDirty);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  // State for the Tauri "unsaved changes on close" dialog
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [isSavingClose, setIsSavingClose] = useState(false);
 
   // Load initial data from IndexedDB
   useEffect(() => {
@@ -37,20 +47,64 @@ export function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  // Tauri exe: warn before closing the native window with unsaved changes
+  // Tauri exe: the Rust backend intercepts CloseRequested and ExitRequested,
+  // calls prevent_close()/prevent_exit(), then calls window.eval() to invoke
+  // window.__tauriCloseRequested() directly — bypasses event routing issues.
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
-    let unlisten: (() => void) | undefined;
-    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-      getCurrentWindow().onCloseRequested(async (e) => {
-        e.preventDefault();
-        if (!isDirty || confirm('Есть несохранённые изменения. Закрыть приложение?')) {
-          await getCurrentWindow().destroy();
-        }
-      }).then(fn => { unlisten = fn; });
-    });
-    return () => unlisten?.();
-  }, [isDirty]);
+
+    (window as unknown as Record<string, unknown>).__tauriCloseRequested = () => {
+      if (!isDirtyRef.current) {
+        import('@tauri-apps/api/core').then(({ invoke }) => invoke('confirm_and_exit'));
+      } else {
+        setShowCloseDialog(true);
+      }
+    };
+
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__tauriCloseRequested;
+    };
+  }, []); // register once; uses ref for isDirty
+
+  // Close without saving
+  const handleCloseWithoutSaving = async () => {
+    setShowCloseDialog(false);
+    const { invoke } = await import('@tauri-apps/api/core');
+    invoke('confirm_and_exit');
+  };
+
+  // Save, then close
+  const handleSaveAndClose = async () => {
+    setIsSavingClose(true);
+    try {
+      const s = useScheduleStore.getState();
+      const name = s.versionName || `Расписание ${new Date().toLocaleDateString('ru-RU')}`;
+      if (s.versionId) {
+        await updateVersionSchedule(s.versionId, s.schedule, undefined, s.temporaryLessons, s.lessonStatuses, s.acknowledgedConflictKeys);
+        await updateVersionMetadata(s.versionId, { name });
+        s.markSaved(s.versionId, name);
+      } else {
+        const version = await createVersion({
+          name,
+          type: s.versionType,
+          schedule: s.schedule,
+          temporaryLessons: s.temporaryLessons,
+          lessonStatuses: s.lessonStatuses,
+          acknowledgedConflictKeys: s.acknowledgedConflictKeys,
+          mondayDate: s.mondayDate ?? undefined,
+          daysPerWeek: s.versionDaysPerWeek ?? undefined,
+        });
+        s.markSaved(version.id, name);
+      }
+    } catch (err) {
+      console.error('Save error on close:', err);
+      setIsSavingClose(false);
+      return; // Don't close if save failed
+    }
+    setShowCloseDialog(false);
+    const { invoke } = await import('@tauri-apps/api/core');
+    invoke('confirm_and_exit');
+  };
 
   // Render active tab
   const renderTab = () => {
@@ -74,6 +128,29 @@ export function App() {
     <div className="app">
       <AppHeader />
       <main className="app-content">{renderTab()}</main>
+
+      {/* Tauri: unsaved changes on window close */}
+      <Modal
+        isOpen={showCloseDialog}
+        onClose={() => setShowCloseDialog(false)}
+        title="Несохранённые изменения"
+        size="small"
+        footer={
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setShowCloseDialog(false)} disabled={isSavingClose}>
+              Отмена
+            </Button>
+            <Button variant="danger" onClick={handleCloseWithoutSaving} disabled={isSavingClose}>
+              Закрыть без сохранения
+            </Button>
+            <Button variant="primary" onClick={handleSaveAndClose} disabled={isSavingClose}>
+              {isSavingClose ? 'Сохранение…' : 'Сохранить'}
+            </Button>
+          </div>
+        }
+      >
+        <p>Есть несохранённые изменения. Что сделать перед закрытием?</p>
+      </Modal>
     </div>
   );
 }

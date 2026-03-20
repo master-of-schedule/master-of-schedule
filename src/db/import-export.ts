@@ -22,7 +22,7 @@ import { inferRoomShortName } from '@/utils/roomUtils';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.7';
+export const CURRENT_SCHEMA_VERSION = '3.8';
 
 export interface ExportData {
   version: string;
@@ -94,6 +94,11 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
     ...data,
     version: '3.7',
     // settings.gapExcludedClasses is now exported — no data transformation needed
+  }),
+  '3.7': (data) => ({
+    ...data,
+    version: '3.8',
+    // Version.acknowledgedConflictKeys is optional — no data transformation needed
   }),
 };
 
@@ -527,6 +532,27 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
       classes.push({
         id: `class-${classes.length + 1}`,
         name: req.className,
+      });
+    }
+  }
+
+  // Auto-generate teacher list from lesson requirements when Учителя sheet is absent or empty.
+  // Collects unique teacher names and their subjects; bans and contact info left empty.
+  if (teachers.length === 0 && lessonRequirements.length > 0) {
+    const teacherSubjects = new Map<string, Set<string>>();
+    for (const req of lessonRequirements) {
+      if (req.teacher) {
+        if (!teacherSubjects.has(req.teacher)) teacherSubjects.set(req.teacher, new Set());
+        teacherSubjects.get(req.teacher)!.add(req.subject);
+      }
+    }
+    let idx = 1;
+    for (const [name, subjects] of teacherSubjects) {
+      teachers.push({
+        id: `teacher-${idx++}`,
+        name,
+        bans: {},
+        subjects: [...subjects],
       });
     }
   }

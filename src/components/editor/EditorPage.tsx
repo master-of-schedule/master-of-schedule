@@ -46,6 +46,7 @@ export function EditorPage() {
   const markSaved = useScheduleStore((state) => state.markSaved);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
+  const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
   const mondayDate = useScheduleStore((state) => state.mondayDate);
   const versionDaysPerWeek = useScheduleStore((state) => state.versionDaysPerWeek);
   const requirements = useDataStore((state) => state.lessonRequirements);
@@ -209,7 +210,7 @@ export function EditorPage() {
 
       if (versionId) {
         // Update existing version
-        await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses);
+        await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses, acknowledgedConflictKeys);
         await updateVersionMetadata(versionId, { name });
         markSaved(versionId, name);
       } else {
@@ -220,6 +221,7 @@ export function EditorPage() {
           schedule,
           temporaryLessons,
           lessonStatuses,
+          acknowledgedConflictKeys,
           mondayDate: mondayDate ?? undefined,
           daysPerWeek: versionDaysPerWeek ?? undefined,
         });
@@ -232,7 +234,7 @@ export function EditorPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, mondayDate, versionDaysPerWeek, markSaved, showToast]);
+  }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek, markSaved, showToast]);
 
   // Handle cell click to assign lesson (or paste copied lesson)
   const handleAssignLesson = useCallback(

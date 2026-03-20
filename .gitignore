@@ -43,6 +43,7 @@ src-tauri/target/
 # Development-only docs (not for public repo)
 CLAUDE.md
 ROADMAP.md
+ROADMAP_ARCHIVE.md
 ARCHITECTURE.md
 GUIDELINES.md
 docs/
