@@ -35,6 +35,13 @@ export interface Version {
   temporaryLessons?: LessonRequirement[];
   /** Per-lesson statuses: 'sick' (gray, teacher on sick leave) or 'completed' (held elsewhere, hidden) */
   lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  /**
+   * Acknowledged conflict keys for this version.
+   * Conflicts acknowledged here are suppressed in the Check panel and persist across sessions.
+   * Key format: `${type}|${day}|${lessonNum}|${details}`
+   * Cleared automatically when the lesson is removed or moved (slot reassigned).
+   */
+  acknowledgedConflictKeys?: string[];
 }
 
 /**
