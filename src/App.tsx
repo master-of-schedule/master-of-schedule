@@ -47,19 +47,19 @@ export function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  // Tauri exe: the Rust backend intercepts CloseRequested, calls prevent_close(),
-  // then emits "tauri-close-requested" to JS. We listen here and either close
-  // immediately (no unsaved changes) or show the 3-button dialog.
+  // Tauri exe: the Rust backend intercepts CloseRequested and ExitRequested,
+  // calls prevent_close()/prevent_exit(), then emits "tauri-close-requested"
+  // via app_handle.emit() (global). We listen here and either exit immediately
+  // (no unsaved changes) or show the 3-button dialog.
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
     let unlisten: (() => void) | undefined;
-    Promise.all([
-      import('@tauri-apps/api/event'),
-      import('@tauri-apps/api/window'),
-    ]).then(([{ listen }, { getCurrentWindow }]) => {
+    // Use app-level listen() — matches app_handle.emit() from Rust (global event)
+    import('@tauri-apps/api/event').then(({ listen }) => {
       listen('tauri-close-requested', async () => {
         if (!isDirtyRef.current) {
-          await getCurrentWindow().destroy();
+          const { invoke } = await import('@tauri-apps/api/core');
+          invoke('confirm_and_exit');
         } else {
           setShowCloseDialog(true);
         }
@@ -71,8 +71,8 @@ export function App() {
   // Close without saving
   const handleCloseWithoutSaving = async () => {
     setShowCloseDialog(false);
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().destroy();
+    const { invoke } = await import('@tauri-apps/api/core');
+    invoke('confirm_and_exit');
   };
 
   // Save, then close
@@ -104,8 +104,8 @@ export function App() {
       return; // Don't close if save failed
     }
     setShowCloseDialog(false);
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().destroy();
+    const { invoke } = await import('@tauri-apps/api/core');
+    invoke('confirm_and_exit');
   };
 
   // Render active tab
