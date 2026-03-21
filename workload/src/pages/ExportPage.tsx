@@ -136,8 +136,10 @@ export function ExportPage() {
       const raw = JSON.parse(text);
       const snap = parseDeptSnapshot(raw);
 
-      // З9-BUG-1a: blank machine — no plan loaded yet → bootstrap from snapshot
-      const isBlank = !curriculumPlan && deptGroups.every((g) => g.tables.every((t) => t.teacherIds.length === 0));
+      // З9-BUG-1a / З14-1: bootstrap when no plan yet, OR when group ID is not in current
+      // deptGroups and no assignments exist yet (dept head who loaded план.json separately).
+      const groupExists = deptGroups.some((g) => g.id === snap.groupId);
+      const isBlank = !curriculumPlan || (!groupExists && assignments.length === 0);
       if (isBlank) {
         bootstrapFromDeptSnapshot(snap);
         notify(`Данные кафедры «${snap.groupName}» загружены`, 'success');
