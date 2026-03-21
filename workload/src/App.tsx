@@ -12,6 +12,8 @@ import { useToast } from './hooks/useToast';
 import { ToastContainer } from './components/ToastContainer';
 import styles from './App.module.css';
 
+const IS_TAURI = '__TAURI_INTERNALS__' in window;
+
 const TABS = [
   { id: 'import', label: '1. Учебный план' },
   { id: 'departments', label: '2. Кафедры' },
@@ -25,6 +27,8 @@ export function App() {
   const { activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState } = useStore();
   const { notify } = useToast();
   const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = useRef(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const isFirstRender = useRef(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -36,7 +40,23 @@ export function App() {
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     setIsDirty(true);
+    isDirtyRef.current = true;
   }, [teachers, deptGroups, assignments, homeroomAssignments, curriculumPlan]);
+
+  // Register Tauri close interceptor
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    (window as unknown as Record<string, unknown>).__tauriCloseRequested = () => {
+      if (!isDirtyRef.current) {
+        import('@tauri-apps/api/core').then(({ invoke }) => invoke('confirm_and_exit'));
+      } else {
+        setShowCloseDialog(true);
+      }
+    };
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__tauriCloseRequested;
+    };
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -86,6 +106,21 @@ export function App() {
   }
 
   async function handleSave() {
+    if (IS_TAURI) {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const path = await save({
+        defaultPath: buildFilename(),
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (!path) return; // user cancelled
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const blob = buildBackupBlob();
+      await writeTextFile(path, await blob.text());
+      setIsDirty(false);
+      isDirtyRef.current = false;
+      notify('Сохранено', 'success');
+      return;
+    }
     if (!isFileSystemAccessSupported) {
       fallbackDownload();
     } else if (folderHandle) {
@@ -105,6 +140,7 @@ export function App() {
       else return; // cancelled
     }
     setIsDirty(false);
+    isDirtyRef.current = false;
     notify('Сохранено', 'success');
   }
 
@@ -129,6 +165,7 @@ export function App() {
         homeroomAssignments: (raw.homeroomAssignments as HomeroomAssignment[]) ?? [],
       });
       setIsDirty(false);
+      isDirtyRef.current = false;
       notify('Файл загружен', 'success');
     } catch {
       notify('Ошибка при чтении файла', 'error');
@@ -141,7 +178,25 @@ export function App() {
     if (newHandle) {
       await writeToFolder(newHandle);
       setIsDirty(false);
+      isDirtyRef.current = false;
       notify('Сохранено', 'success');
+    }
+  }
+
+  async function handleCloseSave() {
+    await handleSave();
+    // After saving, allow Tauri to exit
+    if (IS_TAURI) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('confirm_and_exit');
+    }
+  }
+
+  async function handleCloseDiscard() {
+    setShowCloseDialog(false);
+    if (IS_TAURI) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('confirm_and_exit');
     }
   }
 
@@ -233,6 +288,20 @@ export function App() {
       </main>
 
       <ToastContainer />
+
+      {showCloseDialog && (
+        <div className={styles.aboutOverlay}>
+          <div className={styles.aboutModal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.closeDialogTitle}>Несохранённые изменения</h2>
+            <p className={styles.closeDialogMsg}>Сохранить перед выходом?</p>
+            <div className={styles.closeDialogActions}>
+              <button className={styles.closeDialogCancel} onClick={() => setShowCloseDialog(false)}>Отмена</button>
+              <button className={styles.closeDialogDiscard} onClick={handleCloseDiscard}>Выйти без сохранения</button>
+              <button className={styles.closeDialogSave} onClick={handleCloseSave}>Сохранить и выйти</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {aboutOpen && (
         <div className={styles.aboutOverlay} onClick={() => setAboutOpen(false)}>
