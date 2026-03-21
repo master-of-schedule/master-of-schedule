@@ -31,6 +31,7 @@ dist-ssr
 
 # Exception: Tauri app icons and favicon must be committed
 !src-tauri/icons/**/*.png
+!workload/src-tauri/icons/**/*.png
 !public/favicon.png
 !.github/assets/*.png
 
@@ -39,6 +40,11 @@ v3.*/
 
 # Tauri build cache
 src-tauri/target/
+workload/src-tauri/target/
+
+# Workload dev artifacts
+workload/gh-index.html
+workload/src-tauri/workload/
 
 # Development-only docs (not for public repo)
 CLAUDE.md
