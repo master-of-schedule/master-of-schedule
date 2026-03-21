@@ -1,0 +1,61 @@
+name: Release Workload
+
+on:
+  push:
+    tags:
+      - 'workload/v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Create the GitHub release with changelog notes ─────────────────────────
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Extract changelog section for this version
+        run: |
+          VERSION="${GITHUB_REF_NAME#workload/v}"
+          awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found" workload/CHANGELOG.md \
+            | sed '/^[[:space:]]*$/d' \
+            > /tmp/release-notes.md
+          echo "--- release notes ---"
+          cat /tmp/release-notes.md
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Редактор нагрузки $GITHUB_REF_NAME" \
+            --notes-file /tmp/release-notes.md
+
+  # ── Web build: single-file HTML app ───────────────────────────────────────
+  build-web:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: workload/package-lock.json
+
+      - run: npm ci --prefix workload
+      - run: npm run build --prefix workload
+
+      - name: Package web app
+        run: |
+          VERSION="${GITHUB_REF_NAME#workload/v}"
+          zip -j "РН-web-v${VERSION}.zip" workload/dist/index.html
+
+      - name: Upload to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#workload/v}"
+          gh release upload "$GITHUB_REF_NAME" "РН-web-v${VERSION}.zip" --clobber
