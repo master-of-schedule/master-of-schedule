@@ -237,8 +237,27 @@ export async function importFromJson(jsonString: string): Promise<void> {
 }
 
 /**
- * Download JSON file
+ * Download JSON file.
+ * In browser: triggers <a download> to the default downloads folder.
+ * In Tauri desktop: opens a native "Save as" dialog so the user can choose destination.
  */
+export async function saveJsonFile(data: string, defaultFilename: string): Promise<void> {
+  if ('__TAURI_INTERNALS__' in window) {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const path = await save({
+      defaultPath: defaultFilename,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (path) {
+      await writeTextFile(path, data);
+    }
+    return;
+  }
+  downloadJson(data, defaultFilename);
+}
+
+/** @deprecated Use saveJsonFile instead */
 export function downloadJson(data: string, filename: string): void {
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

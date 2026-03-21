@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { VersionListItem, VersionType } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
-import { pickExcelFile, importFromExcel, exportToJson, downloadJson } from '@/db/import-export';
+import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile } from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { getVersionsByType, getVersion, deleteVersion, setActiveTemplate, getActiveTemplate, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { Button } from '@/components/common/Button';
@@ -296,7 +296,7 @@ export function StartPage() {
     try {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
-      downloadJson(json, `timetable-${date}.json`);
+      await saveJsonFile(json, `timetable-${date}.json`);
       showToast('Файл скачан', 'success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка экспорта';

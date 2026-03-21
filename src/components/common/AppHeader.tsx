@@ -6,7 +6,7 @@ import { useState, useCallback } from 'react';
 import type { AppTab, VersionType } from '@/types';
 import { useUIStore, useScheduleStore, useDataStore } from '@/stores';
 import { formatWeekFull } from '@/utils/dateFormat';
-import { exportToJson, downloadJson, pickJsonFile, parseExportData, getExportSummary, importFromJson, type ExportSummary } from '@/db/import-export';
+import { exportToJson, saveJsonFile, pickJsonFile, parseExportData, getExportSummary, importFromJson, type ExportSummary } from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { ImportConfirmModal } from './ImportConfirmModal';
 import styles from './AppHeader.module.css';
@@ -73,7 +73,7 @@ export function AppHeader() {
   const handleExportJson = useCallback(async () => {
     const json = await exportToJson();
     const date = new Date().toISOString().slice(0, 10);
-    downloadJson(json, `timetable-${date}.json`);
+    await saveJsonFile(json, `timetable-${date}.json`);
   }, []);
 
   const handleImportJsonStart = useCallback(async () => {

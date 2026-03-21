@@ -7,7 +7,7 @@ import { useDataStore, usePartnerStore, useUIStore } from '@/stores';
 import { clearDatabase, pickJsonFile } from '@/db';
 import { getYearSnapshots, addYearSnapshot, deleteYearSnapshot } from '@/db/yearSnapshots';
 import type { YearSnapshot } from '@/db/database';
-import { downloadJson, parseExportData } from '@/db/import-export';
+import { saveJsonFile, parseExportData } from '@/db/import-export';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { useToast } from '@/components/common/Toast';
@@ -47,7 +47,7 @@ export function SettingsPage() {
   }, [loadYearSnapshot, setActiveTab]);
 
   const handleDownloadSnapshot = useCallback((snapshot: YearSnapshot) => {
-    downloadJson(snapshot.data, `год-${snapshot.yearLabel}.json`);
+    void saveJsonFile(snapshot.data, `год-${snapshot.yearLabel}.json`);
   }, []);
 
   const handleDeleteSnapshot = useCallback(async (id: number) => {
