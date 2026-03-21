@@ -48,7 +48,11 @@ jobs:
       - run: npm run build
 
       - name: Package web app
-        run: zip -j "РШР-web-${GITHUB_REF_NAME}.zip" dist/index.html
+        run: |
+          FOLDER="РШР-web-${GITHUB_REF_NAME}"
+          mkdir -p "$FOLDER"
+          cp dist/index.html "$FOLDER/index.html"
+          zip -r "${FOLDER}.zip" "$FOLDER/"
 
       - name: Upload to release
         env:
