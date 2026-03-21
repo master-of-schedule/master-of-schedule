@@ -122,7 +122,7 @@ jobs:
       - run: npm ci --prefix workload
 
       - name: Build Tauri app (Windows)
-        run: npm run tauri:build --prefix workload
+        run: npm run tauri:build --prefix workload -- --bundles nsis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
