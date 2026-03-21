@@ -51,7 +51,10 @@ jobs:
       - name: Package web app
         run: |
           VERSION="${GITHUB_REF_NAME#workload/v}"
-          zip -j "РН-web-v${VERSION}.zip" workload/dist/index.html
+          FOLDER="РН-web-v${VERSION}"
+          mkdir -p "$FOLDER"
+          cp workload/dist/index.html "$FOLDER/index.html"
+          zip -r "${FOLDER}.zip" "$FOLDER/"
 
       - name: Upload to release
         env:
