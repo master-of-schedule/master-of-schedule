@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTeacherBlocked, computeDeptPlanned, buildWorkloadEntry } from './assignHelpers';
+import { isTeacherBlocked, computeDeptPlanned, buildWorkloadEntry, visibleClassesForTable } from './assignHelpers';
 
 describe('isTeacherBlocked (З6-5)', () => {
   it('blocks non-split subject when someone else is assigned', () => {
@@ -88,6 +88,46 @@ describe('computeDeptPlanned (З6-7)', () => {
       2,
     );
     expect(result).toBe(6); // 3×2 + 0×2
+  });
+});
+
+describe('visibleClassesForTable (З15-2)', () => {
+  const upHours = (cn: string, s: string) => {
+    const map: Record<string, Record<string, number>> = {
+      '7а': { 'Физика': 2, 'Химия': 1 },
+      '7б': { 'Физика': 2, 'Химия': 0 },
+      '5а': { 'Физика': 0, 'Химия': 0 },
+      '10а': { 'Физика': 3, 'Химия': 0 },
+    };
+    return map[cn]?.[s] ?? 0;
+  };
+  const classNames = ['5а', '7а', '7б', '10а'];
+  const subjects = ['Физика', 'Химия'];
+
+  it('hides classes with no hours for any subject in filtered table', () => {
+    const result = visibleClassesForTable(classNames, false, subjects, upHours);
+    expect(result).toEqual(['7а', '7б', '10а']); // 5а has 0 for both
+  });
+
+  it('shows all classes for catch-all table (empty subjectFilter)', () => {
+    const result = visibleClassesForTable(classNames, true, subjects, upHours);
+    expect(result).toEqual(classNames);
+  });
+
+  it('returns empty array when no class has subjects', () => {
+    const result = visibleClassesForTable(['5а'], false, subjects, upHours);
+    expect(result).toEqual([]);
+  });
+
+  it('includes class if at least one subject has non-zero hours', () => {
+    // 7б has Физика=2 but Химия=0 — should still be visible
+    const result = visibleClassesForTable(['7б'], false, subjects, upHours);
+    expect(result).toEqual(['7б']);
+  });
+
+  it('returns all classes when subjectNames is empty (catch-all table)', () => {
+    const result = visibleClassesForTable(classNames, true, [], upHours);
+    expect(result).toEqual(classNames);
   });
 });
 

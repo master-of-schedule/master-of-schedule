@@ -52,6 +52,20 @@ export function buildWorkloadEntry(
 }
 
 /**
+ * З15-2: Filter class names to those that have at least one subject with non-zero hours
+ * for the given table. Catch-all tables (empty subjectFilter) show all classes.
+ */
+export function visibleClassesForTable(
+  classNames: string[],
+  isCatchAll: boolean,
+  uniqueSubjectNames: string[],
+  upHours: (cn: string, subj: string) => number,
+): string[] {
+  if (isCatchAll) return classNames;
+  return classNames.filter((cn) => uniqueSubjectNames.some((s) => upHours(cn, s) > 0));
+}
+
+/**
  * З6-7: Compute total planned hours for a set of subjects in one class.
  * For split subjects (groupSplit=true), multiply upHours by groupCount.
  */

@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { validateWorkload } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { shortTeacherName } from '../logic/groupNames';
-import { isTeacherBlocked, computeDeptPlanned } from '../logic/assignHelpers';
+import { isTeacherBlocked, computeDeptPlanned, visibleClassesForTable } from '../logic/assignHelpers';
 import { detectGroupPairs } from '../logic/outputGenerator';
 import { useToast } from '../hooks/useToast';
 import type { CurriculumPlan, Assignment, GroupPair, DeptTable, RNTeacher, ValidationIssue } from '../types';
@@ -321,6 +321,12 @@ function DeptTableSection({
     ? allSubjects.filter((s) => table.subjectFilter.includes(s.name))
     : allSubjects;
   const uniqueSubjectNames = [...new Set(tableSubjects.map((s) => s.name))];
+  const visibleClassNames = visibleClassesForTable(
+    plan.classNames,
+    table.subjectFilter.length === 0,
+    uniqueSubjectNames,
+    upHours,
+  );
   const hasGroupSplitSubjects = uniqueSubjectNames.some((name) => isGroupSplit(name));
 
   // Show "Все классы" button when the table has exactly one non-split subject
@@ -453,6 +459,15 @@ function DeptTableSection({
     );
   }
 
+  if (visibleClassNames.length === 0) {
+    return (
+      <div id={anchorId} className={styles.tableSection}>
+        {table.name && <h3 className={styles.tableSectionHeading}>{table.name}</h3>}
+        <p className={styles.empty}>Нет предметов в учебном плане для данной таблицы.</p>
+      </div>
+    );
+  }
+
   return (
     <div id={anchorId} className={styles.tableSection}>
       {table.name && <h3 className={styles.tableSectionHeading}>{table.name}</h3>}
@@ -464,7 +479,7 @@ function DeptTableSection({
               <th className={styles.workloadCol}>Нагрузка</th>
               <th className={styles.deptTotalCol}>Итого<br />предмет</th>
               <th className={styles.allTotalCol}>Всего<br />у учит.</th>
-              {plan.classNames.map((cn) => {
+              {visibleClassNames.map((cn) => {
                 const total = classTotal(cn);
                 const max = sanpinMaxForClass(cn);
                 const over = max !== null && total > max;
@@ -500,7 +515,7 @@ function DeptTableSection({
               <td className={styles.workloadCell}></td>
               <td className={styles.deptTotalCol}></td>
               <td className={styles.allTotalCol}></td>
-              {plan.classNames.map((cn) => {
+              {visibleClassNames.map((cn) => {
                 const assigned = deptAssigned(cn);
                 const planned = deptPlanned(cn);
                 const complete = planned > 0 && assigned >= planned;
@@ -543,7 +558,7 @@ function DeptTableSection({
                   <td className={`${styles.allTotalCell} ${over ? styles.totalOver : ''}`}>
                     {total}
                   </td>
-                  {plan.classNames.map((cn) => {
+                  {visibleClassNames.map((cn) => {
                     const cellKey = `${table.id}:${teacher.id}:${cn}`;
                     const pairsForClass = pairsForTeacher.filter((p) => p.className === cn);
                     return (
@@ -578,11 +593,11 @@ function DeptTableSection({
             <tr className={styles.unassignedRow}>
               <td className={`${styles.teacherCol} ${styles.unassignedLabel}`}>Не распределено</td>
               <td className={styles.workloadCell}></td>
-              <td className={`${styles.deptTotalCol} ${styles.unassignedCell} ${plan.classNames.reduce((sum, cn) => sum + deptUnassigned(cn), 0) > 0 ? styles.unassignedNonZero : ''}`}>
-                {plan.classNames.reduce((sum, cn) => sum + deptUnassigned(cn), 0) || '—'}
+              <td className={`${styles.deptTotalCol} ${styles.unassignedCell} ${visibleClassNames.reduce((sum, cn) => sum + deptUnassigned(cn), 0) > 0 ? styles.unassignedNonZero : ''}`}>
+                {visibleClassNames.reduce((sum, cn) => sum + deptUnassigned(cn), 0) || '—'}
               </td>
               <td className={styles.allTotalCol}></td>
-              {plan.classNames.map((cn) => {
+              {visibleClassNames.map((cn) => {
                 const hrs = deptUnassigned(cn);
                 return (
                   <td key={cn} className={`${styles.unassignedCell} ${hrs > 0 ? styles.unassignedNonZero : ''}`}>
