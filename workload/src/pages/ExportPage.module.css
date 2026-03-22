@@ -237,3 +237,49 @@
   text-decoration: underline;
 }
 .folderChangeBtn:hover { color: #4444aa; }
+
+/* З15-1: Форма нагрузки */
+.reportSection {
+  border: 1px solid #c8d8c0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 24px 0 16px;
+  background: #f6fbf4;
+}
+
+.reportHeading { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #1a1a2e; }
+
+.variantRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.variantDate {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+}
+.variantDate:focus { outline: none; border-color: #1a1a2e; }
+
+.variantLabel {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 200px;
+  background: #fff;
+}
+.variantLabel:focus { outline: none; border-color: #1a1a2e; }
+
+.reportBtns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
