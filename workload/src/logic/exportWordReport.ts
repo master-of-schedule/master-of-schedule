@@ -19,6 +19,7 @@ import {
   AlignmentType,
   BorderStyle,
 } from 'docx';
+import type { TableVerticalAlign } from 'docx';
 import type { OfficialReport, ReportSubjectGroup } from './officialReport';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ function plainCell(
     rowSpan?: number;
     colSpan?: number;
     align?: (typeof AlignmentType)[keyof typeof AlignmentType];
-    vertAlign?: (typeof VerticalAlign)[keyof typeof VerticalAlign];
+    vertAlign?: TableVerticalAlign;
     fontSize?: number;
   } = {},
 ): TableCell {
@@ -65,7 +66,7 @@ function plainCell(
     rowSpan,
     colSpan,
     align = AlignmentType.LEFT,
-    vertAlign = VerticalAlign.TOP,
+    vertAlign = VerticalAlign.TOP as TableVerticalAlign,
     fontSize = 20,
   } = opts;
 
@@ -84,47 +85,6 @@ function plainCell(
         ],
       }),
     ],
-  });
-}
-
-function multilineCell(
-  lines: string[],
-  opts: {
-    width?: number;
-    fill?: string;
-    rowSpan?: number;
-    firstLineBold?: boolean;
-    fontSize?: number;
-  } = {},
-): TableCell {
-  const { width, fill, rowSpan, firstLineBold = false, fontSize = 20 } = opts;
-
-  return new TableCell({
-    ...(rowSpan ? { rowSpan } : {}),
-    ...(width ? { width: dxaCell(width) } : {}),
-    verticalAlign: VerticalAlign.TOP,
-    shading: fill ? { fill, type: ShadingType.SOLID, color: fill } : undefined,
-    borders: CELL_BORDER,
-    children: lines.map((line, i) =>
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: line,
-            bold: i === 0 && firstLineBold,
-            underline: i === 0 && firstLineBold ? {} : undefined,
-            size: fontSize,
-          }),
-        ],
-      }),
-    ),
-  });
-}
-
-function emptyCell(width?: number): TableCell {
-  return new TableCell({
-    ...(width ? { width: dxaCell(width) } : {}),
-    borders: CELL_BORDER,
-    children: [new Paragraph({ children: [] })],
   });
 }
 

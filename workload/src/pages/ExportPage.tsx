@@ -7,6 +7,9 @@ import { validateWorkload } from '../logic/validation';
 import { generateWorkloadReport } from '../logic/workloadReport';
 import { printWorkloadReport } from '../logic/printReport';
 import { buildDeptReportData, printDeptReport } from '../logic/deptReport';
+import { buildOfficialReport } from '../logic/officialReport';
+import { printOfficialReport } from '../logic/exportPdfReport';
+import { downloadWordReport } from '../logic/exportWordReport';
 import { shortTeacherName } from '../logic/groupNames';
 import { parseUPSnapshot, detectOrphanedSubjects } from '../logic/upSnapshot';
 import {
@@ -30,6 +33,12 @@ export function ExportPage() {
   // З11-8: independent folder per export button
   const exportFolder = useDownloadFolder('export');
   const deptFileFolder = useDownloadFolder('dept-file');
+
+  // З15-1: official workload report variant
+  const [variantDate, setVariantDate] = useState<string>(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
+  const [variantLabel, setVariantLabel] = useState('');
 
   // MU-1: dept export
   const [selectedGroupId, setSelectedGroupId] = useState('');
@@ -170,6 +179,18 @@ export function ExportPage() {
     }
   }
 
+  function handleDownloadPdf() {
+    if (!curriculumPlan) return;
+    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel);
+    printOfficialReport(report);
+  }
+
+  async function handleDownloadWord() {
+    if (!curriculumPlan) return;
+    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel);
+    await downloadWordReport(report);
+  }
+
   function handlePrintReport() {
     const blocks = generateWorkloadReport(assignments, teachers, homeroomAssignments);
     printWorkloadReport(blocks);
@@ -304,6 +325,44 @@ export function ExportPage() {
             Печатать нагрузку кафедры
           </button>
         )}
+      </div>
+
+      {/* З15-1: official workload report */}
+      <div className={styles.reportSection}>
+        <h3 className={styles.reportHeading}>Форма нагрузки</h3>
+        <div className={styles.variantRow}>
+          <input
+            type="date"
+            className={styles.variantDate}
+            value={variantDate}
+            onChange={(e) => setVariantDate(e.target.value)}
+          />
+          <input
+            type="text"
+            className={styles.variantLabel}
+            placeholder="метка (необязательно)"
+            value={variantLabel}
+            onChange={(e) => setVariantLabel(e.target.value)}
+          />
+        </div>
+        <div className={styles.reportBtns}>
+          <button
+            className={styles.printBtn}
+            onClick={handleDownloadWord}
+            disabled={!curriculumPlan || assignments.length === 0}
+            title="Скачать документ нагрузки в формате Word (.docx)"
+          >
+            Скачать Word
+          </button>
+          <button
+            className={styles.printBtn}
+            onClick={handleDownloadPdf}
+            disabled={!curriculumPlan || assignments.length === 0}
+            title="Открыть форму нагрузки для печати / сохранения PDF"
+          >
+            Скачать PDF
+          </button>
+        </div>
       </div>
 
       <div className={styles.upImportSection}>

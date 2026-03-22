@@ -220,7 +220,7 @@ export function buildOfficialReport(
 
   const compoundGroups: ReportSubjectGroup[] = [];
 
-  for (const [ci, def] of COMPOUND_DEFS.entries()) {
+  for (const [ci] of COMPOUND_DEFS.entries()) {
     const actualSubjects = compoundSubjectNames.get(ci)!;
     if (actualSubjects.length === 0) continue;
 
@@ -364,23 +364,23 @@ export function buildOfficialReport(
     let hours10to11 = 0;
 
     const teacherRows: ReportTeacherRow[] = homeroomAssignments
-      .map((h) => {
+      .flatMap((h) => {
         const teacher = teacherMap.get(h.teacherId);
-        if (!teacher) return null;
+        if (!teacher) return [];
         const grade = gradeFromClassName(h.className);
         const entries = [{ className: h.className, hours: 1 }];
         totalHours += 1;
         if (grade <= 9) hours5to9 += 1;
         else hours10to11 += 1;
-        return {
+        const row: ReportTeacherRow = {
           teacherName: teacher.name,
           homeroomClass: h.className,
           cells5to9: grade <= 9 ? formatSimpleClasses(entries, '5-9') : '',
           cells10to11: grade >= 10 ? formatSimpleClasses(entries, '10-11') : '',
           totalHours: 1,
         };
+        return [row];
       })
-      .filter((r): r is ReportTeacherRow => r !== null)
       .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ru'));
 
     if (teacherRows.length > 0) {
