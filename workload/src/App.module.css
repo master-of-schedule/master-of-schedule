@@ -127,6 +127,18 @@
 
 .splitDropdownItem:hover { background: #f0f0f0; }
 
+.splitDropdownDivider {
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid #e0e0e0;
+}
+
+.splitDropdownDanger { color: #c62828; }
+.splitDropdownDanger:hover { background: #fff5f5; }
+
+/* З16-3: fallback clear button */
+.clearDataBtn { color: #c62828; }
+
 .title {
   font-size: 18px;
   font-weight: 600;

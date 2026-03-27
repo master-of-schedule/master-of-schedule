@@ -26,7 +26,7 @@ const TABS = [
 export function App() {
   const {
     activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState,
-    importConflictBanner, setImportConflictBanner,
+    importConflictBanner, setImportConflictBanner, resetAll,
   } = useStore();
   const { notify } = useToast();
   const [isDirty, setIsDirty] = useState(false);
@@ -175,6 +175,14 @@ export function App() {
     }
   }
 
+  function handleClearData() {
+    setDropdownOpen(false);
+    if (!confirm('Очистить все данные и начать заново? Это действие нельзя отменить.')) return;
+    resetAll();
+    setIsDirty(false);
+    isDirtyRef.current = false;
+  }
+
   async function handlePickOtherFolder() {
     setDropdownOpen(false);
     const newHandle = await pickFolder();
@@ -246,6 +254,10 @@ export function App() {
                   <button className={styles.splitDropdownItem} onClick={() => { setDropdownOpen(false); loadInputRef.current?.click(); }}>
                     Загрузить файл…
                   </button>
+                  <hr className={styles.splitDropdownDivider} />
+                  <button className={`${styles.splitDropdownItem} ${styles.splitDropdownDanger}`} onClick={handleClearData}>
+                    Очистить данные…
+                  </button>
                 </div>
               )}
             </div>
@@ -262,6 +274,12 @@ export function App() {
                 onClick={() => loadInputRef.current?.click()}
               >
                 Загрузить
+              </button>
+              <button
+                className={`${styles.saveBtn} ${styles.clearDataBtn}`}
+                onClick={handleClearData}
+              >
+                Очистить…
               </button>
             </div>
           )}

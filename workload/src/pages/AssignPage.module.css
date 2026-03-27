@@ -356,6 +356,21 @@ tr:hover .teacherCell { background: #f5f5ff; }
 .dropdownRowBlocked { opacity: 0.5; cursor: not-allowed; }
 .dropdownBlocked { font-size: 11px; color: #c0392b; margin-left: 4px; }
 
+/* З16-2: "Отменить все" in class column header */
+.clearAllBtn {
+  display: block;
+  margin: 3px auto 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 4px;
+  border: 1px solid #e57373;
+  background: #fff5f5;
+  color: #c62828;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.clearAllBtn:hover { background: #ffebee; border-color: #c62828; }
+
 .groupCountBtn {
   display: inline-block;
   margin-top: 3px;
