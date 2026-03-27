@@ -16,6 +16,7 @@ import {
   createDeptSnapshot,
   parseDeptSnapshot,
   validateDeptSnapshot,
+  detectSnapshotConflicts,
   getGroupSubjects,
 } from '../logic/deptSnapshot';
 import { useToast } from '../hooks/useToast';
@@ -26,6 +27,7 @@ export function ExportPage() {
   const {
     curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments,
     setCurriculumPlan, pruneOrphanedAssignments, applyDeptSnapshot, bootstrapFromDeptSnapshot,
+    bulkSetAssignments, setImportConflictBanner,
   } = useStore();
   const { notify } = useToast();
   const upInputRef = useRef<HTMLInputElement>(null);
@@ -156,24 +158,43 @@ export function ExportPage() {
       }
 
       const validationErr = validateDeptSnapshot(snap, { deptGroups, curriculumPlan });
-      if (validationErr) {
+      // З16-1: plan-hash-mismatch is no longer a hard block — import proceeds with conflict detection.
+      // All other errors (unknown-group, empty-subject-filter) still block.
+      if (validationErr && validationErr.kind !== 'plan-hash-mismatch') {
         const messages: Record<string, string> = {
           'not-dept-snapshot': 'Это не файл кафедры. Загрузите файл, экспортированный кнопкой «Выгрузить файл завуча».',
           'unknown-group': `Кафедра «${snap.groupId}» не найдена в текущих данных.`,
-          'plan-hash-mismatch': 'Учебный план изменился с момента создания этого файла. Сначала разошлите обновлённый УП кафедрам, дождитесь пересоставления назначений, затем импортируйте снова.',
           'empty-subject-filter': 'У кафедры нет предметов — невозможно определить границы слияния.',
         };
         notify(messages[validationErr.kind] ?? `Ошибка: ${validationErr.kind}`, 'error', 0);
         return;
       }
+      const hasMismatch = validationErr?.kind === 'plan-hash-mismatch';
+
       const masterGroup = deptGroups.find((g) => g.id === snap.groupId)!;
       const masterSubjects = getGroupSubjects(masterGroup);
       const replacedCount = assignments.filter((a) => masterSubjects.includes(a.subject)).length;
       applyDeptSnapshot(snap);
-      notify(
-        `Назначения для «${snap.groupName}» обновлены — импортировано ${snap.assignments.length} (заменено ${replacedCount})`,
-        'success',
-      );
+
+      if (hasMismatch) {
+        const conflicts = detectSnapshotConflicts(snap, curriculumPlan!);
+        if (conflicts.orphanedCount > 0) {
+          // Auto-prune: orphaned assignments are invisible in AssignPage — the grid is built from
+          // current plan subjects/classNames only. Use post-apply state from the store.
+          const badSubjects = new Set(conflicts.unknownSubjects);
+          const badClasses = new Set(conflicts.unknownClassNames);
+          const fresh = useStore.getState().assignments;
+          bulkSetAssignments(fresh.filter((a) => !badSubjects.has(a.subject) && !badClasses.has(a.className)));
+          setImportConflictBanner({ groupName: snap.groupName, conflicts });
+        } else {
+          notify(`Назначения для «${snap.groupName}» импортированы (план изменился, конфликтов нет)`, 'success');
+        }
+      } else {
+        notify(
+          `Назначения для «${snap.groupName}» обновлены — импортировано ${snap.assignments.length} (заменено ${replacedCount})`,
+          'success',
+        );
+      }
     } catch (err) {
       notify(`Ошибка: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }

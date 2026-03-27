@@ -1,6 +1,48 @@
 import { computePlanHash } from './planHash';
 import type { CurriculumPlan, RNTeacher, DeptGroup, Assignment } from '../types';
 
+// ── Conflict detection ────────────────────────────────────────────────────────
+
+export interface SnapshotConflicts {
+  /** Subjects in the snapshot that are not in the master plan */
+  unknownSubjects: string[];
+  /** Class names in the snapshot that are not in the master plan */
+  unknownClassNames: string[];
+  /** Total number of assignments with at least one unknown field */
+  orphanedCount: number;
+}
+
+/**
+ * Detects assignments in the snapshot that cannot be displayed or edited in
+ * the current master plan (because the plan changed after the snapshot was created).
+ * These orphaned assignments are invisible in AssignPage — the grid is built
+ * from the current plan's subjects and classNames only.
+ */
+export function detectSnapshotConflicts(
+  snapshot: DeptSnapshotFile,
+  masterPlan: CurriculumPlan,
+): SnapshotConflicts {
+  const masterSubjects = new Set(
+    masterPlan.grades.flatMap((g) => g.subjects.map((s) => s.name)),
+  );
+  const masterClassNames = new Set(masterPlan.classNames);
+  const unknownSubjects = new Set<string>();
+  const unknownClassNames = new Set<string>();
+  let orphanedCount = 0;
+  for (const a of snapshot.assignments) {
+    const badSubject = !masterSubjects.has(a.subject);
+    const badClass = !masterClassNames.has(a.className);
+    if (badSubject) unknownSubjects.add(a.subject);
+    if (badClass) unknownClassNames.add(a.className);
+    if (badSubject || badClass) orphanedCount++;
+  }
+  return {
+    unknownSubjects: [...unknownSubjects],
+    unknownClassNames: [...unknownClassNames],
+    orphanedCount,
+  };
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface DeptSnapshotFile {
