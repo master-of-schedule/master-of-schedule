@@ -24,7 +24,10 @@ const TABS = [
 ] as const;
 
 export function App() {
-  const { activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState } = useStore();
+  const {
+    activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState,
+    importConflictBanner, setImportConflictBanner, resetAll,
+  } = useStore();
   const { notify } = useToast();
   const [isDirty, setIsDirty] = useState(false);
   const isDirtyRef = useRef(false);
@@ -172,6 +175,14 @@ export function App() {
     }
   }
 
+  function handleClearData() {
+    setDropdownOpen(false);
+    if (!confirm('Очистить все данные и начать заново? Это действие нельзя отменить.')) return;
+    resetAll();
+    setIsDirty(false);
+    isDirtyRef.current = false;
+  }
+
   async function handlePickOtherFolder() {
     setDropdownOpen(false);
     const newHandle = await pickFolder();
@@ -243,6 +254,10 @@ export function App() {
                   <button className={styles.splitDropdownItem} onClick={() => { setDropdownOpen(false); loadInputRef.current?.click(); }}>
                     Загрузить файл…
                   </button>
+                  <hr className={styles.splitDropdownDivider} />
+                  <button className={`${styles.splitDropdownItem} ${styles.splitDropdownDanger}`} onClick={handleClearData}>
+                    Очистить данные…
+                  </button>
                 </div>
               )}
             </div>
@@ -260,6 +275,12 @@ export function App() {
               >
                 Загрузить
               </button>
+              <button
+                className={`${styles.saveBtn} ${styles.clearDataBtn}`}
+                onClick={handleClearData}
+              >
+                Очистить…
+              </button>
             </div>
           )}
         </div>
@@ -276,6 +297,27 @@ export function App() {
           </button>
         ))}
       </nav>
+
+      {importConflictBanner && (
+        <div className={styles.conflictBanner}>
+          <div className={styles.conflictBannerText}>
+            <strong>Файл кафедры «{importConflictBanner.groupName}» импортирован.</strong>{' '}
+            Учебный план изменился — {importConflictBanner.conflicts.orphanedCount} назначений
+            не совпадают с текущим планом и удалены. Заново назначьте их в таблице.
+            {importConflictBanner.conflicts.unknownSubjects.length > 0 && (
+              <> Предметы: {importConflictBanner.conflicts.unknownSubjects.join(', ')}.</>
+            )}
+            {importConflictBanner.conflicts.unknownClassNames.length > 0 && (
+              <> Классы: {importConflictBanner.conflicts.unknownClassNames.join(', ')}.</>
+            )}
+          </div>
+          <button
+            className={styles.conflictBannerClose}
+            onClick={() => setImportConflictBanner(null)}
+            title="Закрыть"
+          >×</button>
+        </div>
+      )}
 
       <main className={styles.content}>
         {/* ImportPage and AssignPage are always mounted so their undo stacks (refs) survive tab switches */}

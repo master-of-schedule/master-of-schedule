@@ -106,6 +106,14 @@ export function AssignPage({ plan }: Props) {
     removeAssignment(tid, cn, subj);
   }
 
+  function wrappedClearAllForClass(cn: string, tableSubjects: string[]) {
+    pushHistory(`снятие всех назначений — ${cn}`);
+    const subjectSet = new Set(tableSubjects);
+    bulkSetAssignments(
+      assignmentsRef.current.filter((a) => !(a.className === cn && subjectSet.has(a.subject))),
+    );
+  }
+
   if (!plan) {
     return (
       <div className={styles.placeholder}>
@@ -261,6 +269,7 @@ export function AssignPage({ plan }: Props) {
               removeAssignment={wrappedRemoveAssignment}
               batchSetAssignment={setAssignment}
               onBeforeAssignAll={() => pushHistory('назначение на все классы')}
+              onClearAllForClass={wrappedClearAllForClass}
               setGroupNameOverride={setGroupNameOverride}
               isGroupSplit={isGroupSplit}
               groupCount={groupCount}
@@ -293,6 +302,8 @@ interface DeptTableSectionProps {
   removeAssignment: (tid: string, cn: string, subj: string) => void;
   batchSetAssignment: (a: Assignment) => void;
   onBeforeAssignAll: () => void;
+  /** З16-2: Clear all assignments for a class in this table. tableSubjects = uniqueSubjectNames computed here. */
+  onClearAllForClass: (cn: string, tableSubjects: string[]) => void;
   setGroupNameOverride: (cn: string, subj: string, names: [string, string]) => void;
   isGroupSplit: (subj: string) => boolean;
   groupCount: (cn: string) => 1 | 2;
@@ -308,6 +319,7 @@ interface DeptTableSectionProps {
 function DeptTableSection({
   anchorId, table, plan, teachers, assignments,
   expandedKey, onExpandKey, setAssignment, removeAssignment, batchSetAssignment, onBeforeAssignAll,
+  onClearAllForClass,
   setGroupNameOverride, isGroupSplit, groupCount, upHours, getShortName,
   assignedCount, isAssigned, classTotal, teacherTotal, allGroupPairs,
 }: DeptTableSectionProps) {
@@ -356,6 +368,11 @@ function DeptTableSection({
       // Use raw store setAssignment (no history push) — history already pushed above
       batchSetAssignment({ teacherId, className, subject: s, hoursPerWeek: upHours(className, s) });
     }
+  }
+
+  function handleClearAllForClass(cn: string) {
+    onClearAllForClass(cn, uniqueSubjectNames);
+    notify(`Все назначения для класса ${cn} сняты`, 'error');
   }
 
   function toggleAssign(teacherId: string, className: string, subject: string) {
@@ -505,6 +522,15 @@ function DeptTableSection({
                       >
                         {gc} гр
                       </span>
+                    )}
+                    {deptAssigned(cn) > 0 && (
+                      <button
+                        className={styles.clearAllBtn}
+                        onClick={() => handleClearAllForClass(cn)}
+                        title={`Снять все назначения для класса ${cn} в этой таблице`}
+                      >
+                        Отменить все
+                      </button>
                     )}
                   </th>
                 );

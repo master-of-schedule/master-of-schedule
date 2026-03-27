@@ -5,6 +5,8 @@ import {
   validateDeptSnapshot,
   applyDeptMerge,
   getGroupSubjects,
+  detectSnapshotConflicts,
+  type DeptSnapshotFile,
 } from './deptSnapshot';
 import { computePlanHash } from './planHash';
 import type { CurriculumPlan, RNTeacher, DeptGroup, Assignment } from '../types';
@@ -228,5 +230,81 @@ describe('applyDeptMerge', () => {
     const snap = createDeptSnapshot('math', BASE_STATE);
     const { replacedCount } = applyDeptMerge(snap, [], MATH_GROUP);
     expect(replacedCount).toBe(0);
+  });
+});
+
+// ── detectSnapshotConflicts ───────────────────────────────────────────────────
+
+describe('detectSnapshotConflicts', () => {
+  const MASTER_PLAN: CurriculumPlan = {
+    classNames: ['5а', '5б'],
+    grades: [
+      {
+        grade: 5,
+        subjects: [
+          { name: 'Математика', shortName: 'Мат', hoursPerClass: { '5а': 4, '5б': 4 }, groupSplit: false, part: 'mandatory' },
+        ],
+      },
+    ],
+  };
+
+  // Override assignments directly — createDeptSnapshot filters by group scope,
+  // which would strip assignments with subjects outside the group (e.g. 'Физика').
+  function makeSnap(assignments: Assignment[]): DeptSnapshotFile {
+    return { ...createDeptSnapshot('math', BASE_STATE), assignments };
+  }
+
+  it('returns zeros when all assignments match the master plan', () => {
+    const snap = makeSnap([
+      { teacherId: 't1', className: '5а', subject: 'Математика', hoursPerWeek: 4 },
+    ]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result).toEqual({ unknownSubjects: [], unknownClassNames: [], orphanedCount: 0 });
+  });
+
+  it('detects unknown subject', () => {
+    const snap = makeSnap([
+      { teacherId: 't1', className: '5а', subject: 'Физика', hoursPerWeek: 3 },
+    ]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result.unknownSubjects).toEqual(['Физика']);
+    expect(result.unknownClassNames).toEqual([]);
+    expect(result.orphanedCount).toBe(1);
+  });
+
+  it('detects unknown className', () => {
+    const snap = makeSnap([
+      { teacherId: 't1', className: '7в', subject: 'Математика', hoursPerWeek: 4 },
+    ]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result.unknownSubjects).toEqual([]);
+    expect(result.unknownClassNames).toEqual(['7в']);
+    expect(result.orphanedCount).toBe(1);
+  });
+
+  it('counts once when both subject and className are unknown', () => {
+    const snap = makeSnap([
+      { teacherId: 't1', className: '7в', subject: 'Физика', hoursPerWeek: 3 },
+    ]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result.unknownSubjects).toEqual(['Физика']);
+    expect(result.unknownClassNames).toEqual(['7в']);
+    expect(result.orphanedCount).toBe(1);
+  });
+
+  it('deduplicates the same unknown subject across multiple assignments', () => {
+    const snap = makeSnap([
+      { teacherId: 't1', className: '5а', subject: 'Физика', hoursPerWeek: 3 },
+      { teacherId: 't2', className: '5б', subject: 'Физика', hoursPerWeek: 3 },
+    ]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result.unknownSubjects).toEqual(['Физика']);
+    expect(result.orphanedCount).toBe(2);
+  });
+
+  it('returns zeros for empty assignments array', () => {
+    const snap = makeSnap([]);
+    const result = detectSnapshotConflicts(snap, MASTER_PLAN);
+    expect(result).toEqual({ unknownSubjects: [], unknownClassNames: [], orphanedCount: 0 });
   });
 });
