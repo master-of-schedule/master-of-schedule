@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { migrateInitials } from './logic/groupNames';
+import type { SnapshotConflicts } from './logic/deptSnapshot';
 import type {
   CurriculumPlan,
   RNTeacher,
@@ -110,6 +111,13 @@ interface RNState {
   }) => void;
 
   resetAll: () => void;
+
+  /**
+   * З16-1: Transient banner shown after a dept import with plan-hash-mismatch.
+   * NOT persisted to localStorage (excluded via partialize).
+   */
+  importConflictBanner: { groupName: string; conflicts: SnapshotConflicts } | null;
+  setImportConflictBanner: (data: { groupName: string; conflicts: SnapshotConflicts } | null) => void;
 }
 
 // З7-3: Default structure — 8 DeptGroups × 16 DeptTables
@@ -188,6 +196,7 @@ const initialState = {
   homeroomAssignments: [],
   activeTab: 'import' as const,
   subjectShortNames: {} as Record<string, string>,
+  importConflictBanner: null as { groupName: string; conflicts: SnapshotConflicts } | null,
 };
 
 /** З9-BUG-2: Collapse multiple spaces / trim in subject names to prevent duplicates from Excel typos. */
@@ -420,10 +429,18 @@ export const useStore = create<RNState>()(
         })),
 
       resetAll: () => set({ ...initialState, deptGroups: DEFAULT_DEPT_GROUPS }),
+
+      setImportConflictBanner: (data) => set({ importConflictBanner: data }),
     }),
     {
       name: 'rn-store',
       version: 4,
+      // З16-1: Exclude transient UI state from localStorage persistence
+      partialize: (state) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { importConflictBanner: _banner, setImportConflictBanner: _setter, ...rest } = state;
+        return rest;
+      },
       migrate: (persistedState: unknown, version: number) => {
         const s = persistedState as Record<string, unknown> & {
           teachers?: RNTeacher[];

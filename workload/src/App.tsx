@@ -24,7 +24,10 @@ const TABS = [
 ] as const;
 
 export function App() {
-  const { activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState } = useStore();
+  const {
+    activeTab, setActiveTab, curriculumPlan, teachers, deptGroups, assignments, homeroomAssignments, loadFullState,
+    importConflictBanner, setImportConflictBanner,
+  } = useStore();
   const { notify } = useToast();
   const [isDirty, setIsDirty] = useState(false);
   const isDirtyRef = useRef(false);
@@ -276,6 +279,27 @@ export function App() {
           </button>
         ))}
       </nav>
+
+      {importConflictBanner && (
+        <div className={styles.conflictBanner}>
+          <div className={styles.conflictBannerText}>
+            <strong>Файл кафедры «{importConflictBanner.groupName}» импортирован.</strong>{' '}
+            Учебный план изменился — {importConflictBanner.conflicts.orphanedCount} назначений
+            не совпадают с текущим планом и удалены. Заново назначьте их в таблице.
+            {importConflictBanner.conflicts.unknownSubjects.length > 0 && (
+              <> Предметы: {importConflictBanner.conflicts.unknownSubjects.join(', ')}.</>
+            )}
+            {importConflictBanner.conflicts.unknownClassNames.length > 0 && (
+              <> Классы: {importConflictBanner.conflicts.unknownClassNames.join(', ')}.</>
+            )}
+          </div>
+          <button
+            className={styles.conflictBannerClose}
+            onClick={() => setImportConflictBanner(null)}
+            title="Закрыть"
+          >×</button>
+        </div>
+      )}
 
       <main className={styles.content}>
         {/* ImportPage and AssignPage are always mounted so their undo stacks (refs) survive tab switches */}

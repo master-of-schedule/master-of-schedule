@@ -249,6 +249,37 @@
   border-bottom-color: #1a1a2e;
 }
 
+.conflictBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #fff7e6;
+  border-bottom: 2px solid #f59e0b;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conflictBannerText {
+  flex: 1;
+}
+
+.conflictBannerClose {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #92400e;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.conflictBannerClose:hover {
+  opacity: 0.6;
+}
+
 .content {
   flex: 1;
   padding: 24px;
