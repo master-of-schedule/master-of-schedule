@@ -480,15 +480,25 @@ export function ExportPage() {
     return getReplacementEntries(schedule, selectedDay);
   }, [versionType, selectedDay, schedule]);
 
-  // Download замены image
-  const handleDownloadReplacements = useCallback(async () => {
-    if (!selectedDay || replacementEntries.length === 0) return;
+  const budgetReplacementEntries = useMemo(
+    () => replacementEntries.filter((e) => !e.isUnionSubstitution),
+    [replacementEntries]
+  );
+
+  const unionReplacementEntries = useMemo(
+    () => replacementEntries.filter((e) => e.isUnionSubstitution),
+    [replacementEntries]
+  );
+
+  // Download замены image (budget or union)
+  const downloadReplacementsImage = useCallback(async (entries: typeof replacementEntries, label: string) => {
+    if (!selectedDay || entries.length === 0) return;
     const dayIndex = DAYS.indexOf(selectedDay);
     const titleStr = formatDayFullWithDate(selectedDay, mondayDate ?? undefined, dayIndex);
     const now = new Date();
     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    const canvas = buildReplacementsImage(replacementEntries, titleStr);
-    const filename = `${ts}_replacements_${selectedDay}.png`;
+    const canvas = buildReplacementsImage(entries, titleStr);
+    const filename = `${ts}_${label}_${selectedDay}.png`;
 
     if (fsFolderSupported && folderHandle) {
       const dir = await ensurePermission(folderHandle);
@@ -500,7 +510,17 @@ export function ExportPage() {
     }
     downloadCanvasAsPng(canvas, filename);
     showToast('Замены скачаны', 'success');
-  }, [selectedDay, replacementEntries, mondayDate, fsFolderSupported, folderHandle, ensurePermission, showToast]);
+  }, [selectedDay, mondayDate, fsFolderSupported, folderHandle, ensurePermission, showToast]);
+
+  const handleDownloadReplacements = useCallback(
+    () => downloadReplacementsImage(budgetReplacementEntries, 'replacements'),
+    [downloadReplacementsImage, budgetReplacementEntries]
+  );
+
+  const handleDownloadUnionReplacements = useCallback(
+    () => downloadReplacementsImage(unionReplacementEntries, 'replacements_union'),
+    [downloadReplacementsImage, unionReplacementEntries]
+  );
 
   // Clear selection when switching views
   const handleViewChange = useCallback((view: GridView) => {
@@ -645,15 +665,26 @@ export function ExportPage() {
             </div>
           )}
           {versionType === 'weekly' && selectedDay && (
-            <Button
-              variant="secondary"
-              size="small"
-              onClick={handleDownloadReplacements}
-              disabled={replacementEntries.length === 0}
-              title={replacementEntries.length === 0 ? 'Нет замен на этот день' : 'Скачать список замен для мессенджера'}
-            >
-              Скачать Замены
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={handleDownloadReplacements}
+                disabled={budgetReplacementEntries.length === 0}
+                title={budgetReplacementEntries.length === 0 ? 'Нет замен на этот день' : 'Скачать список замен для мессенджера'}
+              >
+                Скачать Замены
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={handleDownloadUnionReplacements}
+                disabled={unionReplacementEntries.length === 0}
+                title={unionReplacementEntries.length === 0 ? 'Нет профсоюзных замен на этот день' : 'Скачать профсоюзные замены для мессенджера'}
+              >
+                Замены (проф.)
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="small" onClick={handleExportAvailability} title="Экспорт занятости учителей для партнёра">
             Занятость

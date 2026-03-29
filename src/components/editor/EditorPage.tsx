@@ -64,7 +64,7 @@ export function EditorPage() {
   const { showToast } = useToast();
 
   // Track substitution metadata across the replacement → room picker flow
-  const substitutionRef = useRef<{ originalTeacher: string } | null>(null);
+  const substitutionRef = useRef<{ originalTeacher: string; isUnionSubstitution?: boolean } | null>(null);
 
   // Track force-override flag across the shift+click → room picker flow
   const forceOverrideRef = useRef(false);
@@ -182,6 +182,7 @@ export function EditorPage() {
         const opts = {
           originalTeacher: substitutionRef.current?.originalTeacher,
           isSubstitution: substitutionRef.current ? true : undefined,
+          isUnionSubstitution: substitutionRef.current?.isUnionSubstitution ? true : undefined,
           forceOverride: forceOverrideRef.current ? true : undefined,
         };
         substitutionRef.current = null;
@@ -560,6 +561,44 @@ export function EditorPage() {
     [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
   );
 
+  // Handle union (профсоюз) substitute teacher selection — same flow but marks isUnionSubstitution
+  const handleUnionSubstituteSelect = useCallback(
+    (teacher: Teacher) => {
+      if (!replacementPicker.data || !currentClass) return;
+
+      substitutionRef.current = {
+        originalTeacher: replacementPicker.data.currentLesson?.teacher ?? '',
+        isUnionSubstitution: true,
+      };
+
+      removeLesson({
+        className: currentClass,
+        day: replacementPicker.data.day,
+        lessonNum: replacementPicker.data.lessonNum,
+        lessonIndex: replacementPicker.data.lessonIndex,
+      });
+
+      const group = replacementPicker.data.currentLesson?.group;
+      const syntheticReq: LessonRequirement = {
+        id: `union-substitute-${teacher.name}`,
+        type: group ? 'group' : 'class',
+        classOrGroup: group ?? currentClass,
+        subject: replacementPicker.data.currentLesson?.subject ?? '',
+        teacher: teacher.name,
+        countPerWeek: 1,
+        ...(group ? { className: currentClass } : {}),
+      };
+
+      selectLesson(syntheticReq);
+      roomPicker.open({
+        day: replacementPicker.data.day,
+        lessonNum: replacementPicker.data.lessonNum,
+      });
+      replacementPicker.close();
+    },
+    [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
+  );
+
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
     if (!selectedLesson || selectedCells.length === 0) return;
@@ -639,6 +678,7 @@ export function EditorPage() {
             currentLesson={replacementPicker.data.currentLesson}
             onSelect={handleReplacementSelect}
             onSubstituteSelect={handleSubstituteSelect}
+            onUnionSubstituteSelect={handleUnionSubstituteSelect}
             onClose={replacementPicker.close}
           />
         )}

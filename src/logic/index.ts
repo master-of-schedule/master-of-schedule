@@ -86,6 +86,7 @@ export {
   isRoomAvailable,
   getAvailableLessonsForSlot,
   getSubstituteTeachers,
+  getFreeTeachersAtSlot,
   getTeacherClassesAtTime,
 } from './availability';
 export type { AvailableLessonsResult } from './availability';

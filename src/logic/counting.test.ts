@@ -484,9 +484,9 @@ describe('getTeacherLessonsOnDay', () => {
 describe('getRoomLessonsOnDay', () => {
   it('returns lessons using the room on the specified day', () => {
     const schedule: Schedule = {
-      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
-      '5б': { Пн: { 2: { lessons: [{ subject: 'Физика', teacher: 'Петров', room: '101', id: 'b', type: 'regular' }] } } },
-      '6а': { Пн: { 1: { lessons: [{ subject: 'Биология', teacher: 'Сидоров', room: '202', id: 'c', type: 'regular' }] } } },
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', requirementId: 'r1' }] } } },
+      '5б': { Пн: { 2: { lessons: [{ subject: 'Физика', teacher: 'Петров', room: '101', id: 'b', requirementId: 'r2' }] } } },
+      '6а': { Пн: { 1: { lessons: [{ subject: 'Биология', teacher: 'Сидоров', room: '202', id: 'c', requirementId: 'r3' }] } } },
     };
     const result = getRoomLessonsOnDay(schedule, '101', 'Пн');
     expect(result).toHaveLength(2);
@@ -496,22 +496,22 @@ describe('getRoomLessonsOnDay', () => {
 
   it('returns empty for a day with no lessons in that room', () => {
     const schedule: Schedule = {
-      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', requirementId: 'r1' }] } } },
     };
     expect(getRoomLessonsOnDay(schedule, '101', 'Вт')).toHaveLength(0);
   });
 
   it('returns empty for unknown room', () => {
     const schedule: Schedule = {
-      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', requirementId: 'r1' }] } } },
     };
     expect(getRoomLessonsOnDay(schedule, '999', 'Пн')).toHaveLength(0);
   });
 
   it('sorts by lessonNum then className', () => {
     const schedule: Schedule = {
-      '10б': { Пн: { 1: { lessons: [{ subject: 'Хим', teacher: 'А', room: '5', id: 'x', type: 'regular' }] } } },
-      '10а': { Пн: { 1: { lessons: [{ subject: 'Физ', teacher: 'Б', room: '5', id: 'y', type: 'regular' }] } } },
+      '10б': { Пн: { 1: { lessons: [{ subject: 'Хим', teacher: 'А', room: '5', id: 'x', requirementId: 'rx' }] } } },
+      '10а': { Пн: { 1: { lessons: [{ subject: 'Физ', teacher: 'Б', room: '5', id: 'y', requirementId: 'ry' }] } } },
     };
     const result = getRoomLessonsOnDay(schedule, '5', 'Пн');
     expect(result[0].className).toBe('10а');

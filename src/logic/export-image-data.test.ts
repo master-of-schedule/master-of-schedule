@@ -320,6 +320,21 @@ describe('getReplacementEntries', () => {
     expect(entries[0].className).toBe('10а');
     expect(entries[1].className).toBe('10б');
   });
+
+  it('propagates isUnionSubstitution flag from lesson', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Петрова', room: '-114-', originalTeacher: 'Иванова', isUnionSubstitution: true }] },
+          2: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Сидоров', room: '-115-', originalTeacher: 'Козлов' }] },
+        },
+      },
+    };
+    const entries = getReplacementEntries(schedule, 'Пн' as never);
+    expect(entries).toHaveLength(2);
+    expect(entries[0].isUnionSubstitution).toBe(true);
+    expect(entries[1].isUnionSubstitution).toBeUndefined();
+  });
 });
 
 // ─── QI-13: getChangedClassesData — class view high-risk ───────
