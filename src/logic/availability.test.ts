@@ -10,6 +10,7 @@ import {
   getTeacherClassesAtTime,
   getAvailableLessonsForSlot,
   getSubstituteTeachers,
+  getFreeTeachersAtSlot,
 } from './availability';
 import type { Schedule, Room, Teacher, LessonRequirement, SchoolClass } from '@/types';
 
@@ -1020,5 +1021,74 @@ describe('getSubstituteTeachers', () => {
     expect(names).not.toContain('Иванова Т.С.');
     expect(names).toContain('Петрова А.П.');
     expect(names).toContain('Рыбина А.А.');
+  });
+});
+
+describe('getFreeTeachersAtSlot', () => {
+  const makeTeacher = (name: string): Teacher => ({
+    id: name,
+    name,
+    subjects: ['Физика'],
+    bans: {},
+  });
+
+  it('returns all teachers free at the slot', () => {
+    const schedule: Schedule = {};
+    const teachers = {
+      t1: makeTeacher('Иванов'),
+      t2: makeTeacher('Петров'),
+    };
+    const result = getFreeTeachersAtSlot(schedule, teachers, 'Пн', 1);
+    expect(result.map(t => t.name)).toContain('Иванов');
+    expect(result.map(t => t.name)).toContain('Петров');
+  });
+
+  it('excludes the specified teacher', () => {
+    const schedule: Schedule = {};
+    const teachers = { t1: makeTeacher('Иванов'), t2: makeTeacher('Петров') };
+    const result = getFreeTeachersAtSlot(schedule, teachers, 'Пн', 1, 'Иванов');
+    expect(result.map(t => t.name)).not.toContain('Иванов');
+    expect(result.map(t => t.name)).toContain('Петров');
+  });
+
+  it('excludes teachers in substituteTeacherNames', () => {
+    const schedule: Schedule = {};
+    const teachers = {
+      t1: makeTeacher('Иванов'),
+      t2: makeTeacher('Петров'),
+      t3: makeTeacher('Сидоров'),
+    };
+    const result = getFreeTeachersAtSlot(schedule, teachers, 'Пн', 1, undefined, ['Петров']);
+    const names = result.map(t => t.name);
+    expect(names).toContain('Иванов');
+    expect(names).not.toContain('Петров');
+    expect(names).toContain('Сидоров');
+  });
+
+  it('excludes teachers busy at the slot', () => {
+    const schedule: Schedule = {
+      '5а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Иванов', room: '101' }] },
+        },
+      },
+    };
+    const teachers = { t1: makeTeacher('Иванов'), t2: makeTeacher('Петров') };
+    const result = getFreeTeachersAtSlot(schedule, teachers, 'Пн', 1);
+    expect(result.map(t => t.name)).not.toContain('Иванов');
+    expect(result.map(t => t.name)).toContain('Петров');
+  });
+
+  it('returns results sorted by name', () => {
+    const schedule: Schedule = {};
+    const teachers = {
+      t1: makeTeacher('Яковлев'),
+      t2: makeTeacher('Аввакумов'),
+      t3: makeTeacher('Михайлов'),
+    };
+    const result = getFreeTeachersAtSlot(schedule, teachers, 'Пн', 1);
+    const names = result.map(t => t.name);
+    expect(names[0]).toBe('Аввакумов');
+    expect(names[names.length - 1]).toBe('Яковлев');
   });
 });

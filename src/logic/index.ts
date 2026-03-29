@@ -55,6 +55,7 @@ export {
   getTeacherLessonsPerDay,
   getTeachersOnDay,
   getTeacherLessonsOnDay,
+  getRoomLessonsOnDay,
   mergeWithTemporaryLessons,
 } from './counting';
 export type { ClassProgress } from './counting';
@@ -85,6 +86,7 @@ export {
   isRoomAvailable,
   getAvailableLessonsForSlot,
   getSubstituteTeachers,
+  getFreeTeachersAtSlot,
   getTeacherClassesAtTime,
 } from './availability';
 export type { AvailableLessonsResult } from './availability';

@@ -30,6 +30,10 @@ interface LessonSelectionListProps {
   substituteTeachers?: Teacher[];
   /** Callback when a substitute teacher is selected */
   onSubstituteSelect?: (teacher: Teacher) => void;
+  /** Free teachers who can't teach the subject — union (профсоюз) substitutions */
+  unionTeachers?: Teacher[];
+  /** Callback when a union teacher is selected */
+  onUnionSubstituteSelect?: (teacher: Teacher) => void;
 }
 
 export function LessonSelectionList({
@@ -45,6 +49,8 @@ export function LessonSelectionList({
   isOpen = true,
   substituteTeachers,
   onSubstituteSelect,
+  unionTeachers,
+  onUnionSubstituteSelect,
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const teachers = useDataStore((state) => state.teachers);
@@ -79,7 +85,8 @@ export function LessonSelectionList({
   };
 
   const hasSubstitutes = (substituteTeachers?.length ?? 0) > 0;
-  const hasOptions = availableLessons.unscheduled.length > 0 || availableLessons.movable.length > 0 || hasSubstitutes;
+  const hasUnion = (unionTeachers?.length ?? 0) > 0;
+  const hasOptions = availableLessons.unscheduled.length > 0 || availableLessons.movable.length > 0 || hasSubstitutes || hasUnion;
 
   if (!hasOptions) {
     return <div className={styles.empty}>Нет доступных уроков для замены</div>;
@@ -156,6 +163,26 @@ export function LessonSelectionList({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {hasUnion && onUnionSubstituteSelect && (
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>Другие (проф.)</h4>
+          <div className={styles.list}>
+            {unionTeachers!.map((teacher) => (
+              <button
+                key={teacher.id}
+                className={`${styles.item} ${styles.unionItem}`}
+                onClick={() => onUnionSubstituteSelect(teacher)}
+              >
+                <span className={styles.teacher}>{teacher.name}</span>
+                {teacher.defaultRoom && (
+                  <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}

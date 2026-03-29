@@ -210,15 +210,12 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('assign', description, newSchedule, state.substitutions));
 
-      set((state) => ({
+      set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-        acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
-          k => !k.includes(`|${day}|${lessonNum}|`)
-        ),
-      }));
+      });
     },
 
     // Remove a lesson from a slot
@@ -243,15 +240,12 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('remove', description, newSchedule, state.substitutions));
 
-      set((state) => ({
+      set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-        acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
-          k => !k.includes(`|${day}|${lessonNum}|`)
-        ),
-      }));
+      });
     },
 
     // Remove multiple lessons at once
@@ -279,16 +273,12 @@ export const useScheduleStore = create<ScheduleState>()(
 
       newHistory.push(createHistoryEntry('multi_remove', description, newSchedule, state.substitutions));
 
-      const removedSlots = items.map(i => `|${i.day}|${i.lessonNum}|`);
-      set((st) => ({
+      set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
-        acknowledgedConflictKeys: st.acknowledgedConflictKeys.filter(
-          k => !removedSlots.some(slot => k.includes(slot))
-        ),
-      }));
+      });
     },
 
     // Change room for a lesson
