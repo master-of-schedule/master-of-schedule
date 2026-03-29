@@ -80,7 +80,7 @@ export function AbsentPanel() {
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <h3 className={styles.title}>Отсутствует</h3>
+        <h3 className={styles.title}>Учитель</h3>
         {markedCount > 0 && (
           <button className={styles.clearButton} onClick={clearAbsentMarked} title="Очистить все отметки">
             Сброс ({markedCount})

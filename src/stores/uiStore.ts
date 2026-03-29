@@ -46,6 +46,12 @@ interface UIState {
   absentMarkedCells: Set<string>;
   absentLessons: Array<{ className: string; lessonNum: LessonNumber; subjects: string[] }>;
 
+  // Room schedule panel (session-only)
+  roomPanelRoom: string | null;
+  roomPanelDay: Day | null;
+  roomPanelMarkedCells: Set<string>;
+  roomPanelLessons: Array<{ className: string; lessonNum: LessonNumber; subjects: string[] }>;
+
   // Keyboard navigation
   focusedCell: { day: Day; lessonNum: number } | null;
 
@@ -112,6 +118,12 @@ interface UIState {
   toggleAbsentCell: (className: string, day: Day, lessonNum: number) => void;
   clearAbsentMarked: () => void;
 
+  // Actions - Room panel
+  setRoomPanel: (room: string | null, day: Day | null) => void;
+  setRoomPanelLessons: (lessons: Array<{ className: string; lessonNum: LessonNumber; subjects: string[] }>) => void;
+  toggleRoomPanelCell: (className: string, day: Day, lessonNum: number) => void;
+  clearRoomPanelMarked: () => void;
+
   // Actions - Keyboard navigation
   setFocusedCell: (day: Day, lessonNum: number) => void;
   clearFocusedCell: () => void;
@@ -168,6 +180,10 @@ export const useUIStore = create<UIState>((set) => ({
   absentDay: null,
   absentMarkedCells: new Set<string>(),
   absentLessons: [],
+  roomPanelRoom: null,
+  roomPanelDay: null,
+  roomPanelMarkedCells: new Set<string>(),
+  roomPanelLessons: [],
   focusedCell: null,
   highlightedMovableCell: null,
   highlightedMovableTeacher: null,
@@ -312,6 +328,33 @@ export const useUIStore = create<UIState>((set) => ({
     absentDay: null,
     absentMarkedCells: new Set<string>(),
     absentLessons: [],
+  }),
+
+  // Room panel
+  setRoomPanel: (room, day) => set({
+    roomPanelRoom: room,
+    roomPanelDay: day,
+    roomPanelLessons: [],
+  }),
+
+  setRoomPanelLessons: (lessons) => set({ roomPanelLessons: lessons }),
+
+  toggleRoomPanelCell: (className, day, lessonNum) => set((state) => {
+    const key = `${className}|${day}|${lessonNum}`;
+    const next = new Set(state.roomPanelMarkedCells);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    return { roomPanelMarkedCells: next };
+  }),
+
+  clearRoomPanelMarked: () => set({
+    roomPanelRoom: null,
+    roomPanelDay: null,
+    roomPanelMarkedCells: new Set<string>(),
+    roomPanelLessons: [],
   }),
 
   // Keyboard navigation

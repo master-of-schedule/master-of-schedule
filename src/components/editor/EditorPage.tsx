@@ -14,6 +14,7 @@ import { ProtocolPanel } from './ProtocolPanel';
 import { RoomPicker } from './RoomPicker';
 import { ReplacementPanel } from './ReplacementPanel';
 import { AbsentPanel } from './AbsentPanel';
+import { RoomPanel } from './RoomPanel';
 import { ValidationPanel } from './ValidationPanel';
 import { ContextMenu, ContextMenuItem, ContextMenuDivider } from '@/components/common/ContextMenu';
 import { Button } from '@/components/common/Button';
@@ -628,6 +629,7 @@ export function EditorPage() {
       <div className={styles.rightPanel}>
         {currentClass && <UnscheduledPanel className={currentClass} />}
         {(versionType === 'weekly' || versionType === 'technical') && <AbsentPanel />}
+        {(versionType === 'weekly' || versionType === 'technical') && <RoomPanel />}
         {replacementPicker.isOpen && currentClass && replacementPicker.data && (
           <ReplacementPanel
             className={currentClass}

@@ -13,6 +13,7 @@ import {
   getLessonsPerDay,
   getTeacherLessonsPerDay,
   getTeacherLessonsOnDay,
+  getRoomLessonsOnDay,
   getTeachersOnDay,
   mergeWithTemporaryLessons,
 } from './counting';
@@ -477,6 +478,44 @@ describe('getTeacherLessonsOnDay', () => {
     expect(result).toHaveLength(1);
     expect(result[0].className).toBe('10а');
     expect(result[0].lessonNum).toBe(1);
+  });
+});
+
+describe('getRoomLessonsOnDay', () => {
+  it('returns lessons using the room on the specified day', () => {
+    const schedule: Schedule = {
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
+      '5б': { Пн: { 2: { lessons: [{ subject: 'Физика', teacher: 'Петров', room: '101', id: 'b', type: 'regular' }] } } },
+      '6а': { Пн: { 1: { lessons: [{ subject: 'Биология', teacher: 'Сидоров', room: '202', id: 'c', type: 'regular' }] } } },
+    };
+    const result = getRoomLessonsOnDay(schedule, '101', 'Пн');
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ className: '5а', lessonNum: 1 });
+    expect(result[1]).toMatchObject({ className: '5б', lessonNum: 2 });
+  });
+
+  it('returns empty for a day with no lessons in that room', () => {
+    const schedule: Schedule = {
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
+    };
+    expect(getRoomLessonsOnDay(schedule, '101', 'Вт')).toHaveLength(0);
+  });
+
+  it('returns empty for unknown room', () => {
+    const schedule: Schedule = {
+      '5а': { Пн: { 1: { lessons: [{ subject: 'Математика', teacher: 'Иванов', room: '101', id: 'a', type: 'regular' }] } } },
+    };
+    expect(getRoomLessonsOnDay(schedule, '999', 'Пн')).toHaveLength(0);
+  });
+
+  it('sorts by lessonNum then className', () => {
+    const schedule: Schedule = {
+      '10б': { Пн: { 1: { lessons: [{ subject: 'Хим', teacher: 'А', room: '5', id: 'x', type: 'regular' }] } } },
+      '10а': { Пн: { 1: { lessons: [{ subject: 'Физ', teacher: 'Б', room: '5', id: 'y', type: 'regular' }] } } },
+    };
+    const result = getRoomLessonsOnDay(schedule, '5', 'Пн');
+    expect(result[0].className).toBe('10а');
+    expect(result[1].className).toBe('10б');
   });
 });
 

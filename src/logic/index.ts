@@ -55,6 +55,7 @@ export {
   getTeacherLessonsPerDay,
   getTeachersOnDay,
   getTeacherLessonsOnDay,
+  getRoomLessonsOnDay,
   mergeWithTemporaryLessons,
 } from './counting';
 export type { ClassProgress } from './counting';
