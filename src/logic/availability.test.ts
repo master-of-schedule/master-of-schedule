@@ -1029,7 +1029,7 @@ describe('getFreeTeachersAtSlot', () => {
     id: name,
     name,
     subjects: ['Физика'],
-    bans: [],
+    bans: {},
   });
 
   it('returns all teachers free at the slot', () => {

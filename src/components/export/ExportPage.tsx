@@ -3,17 +3,18 @@
  * Supports three views: Classes, Teachers, Rooms
  */
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useGridSelection } from '@/hooks/useGridSelection';
 import type { GridSelection } from '@/hooks/useGridSelection';
-import { useDownloadFolder } from '@/hooks/useDownloadFolder';
+import { useMultiFolders } from '@/hooks/useMultiFolders';
+import { FolderSettingsDialog } from './FolderSettingsDialog';
 import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability } from '@/logic';
 import { buildTeacherScheduleMap, buildRoomScheduleMap } from '@/logic/exportMaps';
 import type { ScheduleEntry } from '@/logic/exportMaps';
-import { downloadJson } from '@/db';
+import { downloadJson, exportToJson, saveJsonStringToFolder } from '@/db';
 import { formatDayFullWithDate } from '@/utils/dateFormat';
 import { Button } from '@/components/common/Button';
 import { HintBar } from '@/components/common/HintBar';
@@ -68,22 +69,12 @@ export function ExportPage() {
   // Grid selection state
   const { selection, isInSelection, handleGridMouseDown, handleGridMouseMove, handleGridMouseUp, clearSelection } = useGridSelection();
 
-  // Download folder (File System Access API)
-  const { folderHandle, folderName, isSupported: fsFolderSupported, pickFolder, pickFolderOnce, ensurePermission } = useDownloadFolder();
-  const [folderMenuOpen, setFolderMenuOpen] = useState(false);
-  const folderMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close folder menu on outside click
-  useEffect(() => {
-    if (!folderMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (folderMenuRef.current && !folderMenuRef.current.contains(e.target as Node)) {
-        setFolderMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [folderMenuOpen]);
+  // Multi-folder management (File System Access API)
+  const folders = useMultiFolders();
+  const { handles: folderHandles, names: folderNames, isSupported: fsFolderSupported, pickFolder, ensurePermission } = folders;
+  const folderHandle = folderHandles['telegram'] ?? null;
+  const folderName = folderNames['telegram'] ?? null;
+  const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
 
   // Get day name with date for weekly schedules
   const getDayName = useCallback((day: string, dayIndex: number): string => {
@@ -436,44 +427,6 @@ export function ExportPage() {
     showToast('Изображения скачаны', 'success');
   }, [buildTelegramCanvases, showToast]);
 
-  // Download Telegram images — resolves folder on first use, uses stored folder thereafter
-  const handleDownloadTelegram = useCallback(async () => {
-    if (!selectedDay || !baseTemplateSchedule) return;
-
-    if (!fsFolderSupported) {
-      // Browser doesn't support File System Access API — use classic blob downloads
-      await saveCanvases(null);
-      return;
-    }
-
-    let dir = folderHandle;
-
-    if (!dir) {
-      // First time: pick folder and save as default
-      dir = await pickFolder();
-      if (!dir) return; // user cancelled picker
-    } else {
-      // Have stored handle: verify permission (may need user re-grant after browser restart)
-      dir = await ensurePermission(dir);
-      if (!dir) {
-        // Permission denied — pick a new folder
-        dir = await pickFolder();
-        if (!dir) return;
-      }
-    }
-
-    await saveCanvases(dir);
-  }, [selectedDay, baseTemplateSchedule, fsFolderSupported, folderHandle, pickFolder, ensurePermission, saveCanvases]);
-
-  // One-time save to a different folder (doesn't change the default)
-  const handleSaveToOtherFolder = useCallback(async () => {
-    setFolderMenuOpen(false);
-    if (!selectedDay || !baseTemplateSchedule) return;
-    const dir = await pickFolderOnce();
-    if (!dir) return;
-    await saveCanvases(dir);
-  }, [selectedDay, baseTemplateSchedule, pickFolderOnce, saveCanvases]);
-
   // Replacement entries for selected day (weekly mode)
   const replacementEntries = useMemo(() => {
     if (versionType !== 'weekly' || !selectedDay) return [];
@@ -489,6 +442,78 @@ export function ExportPage() {
     () => replacementEntries.filter((e) => e.isUnionSubstitution),
     [replacementEntries]
   );
+
+  // Download Telegram images + autosave to all 4 configured folders
+  const handleDownloadTelegram = useCallback(async () => {
+    if (!selectedDay || !baseTemplateSchedule) return;
+
+    if (!fsFolderSupported) {
+      // Browser doesn't support File System Access API — use classic blob downloads
+      await saveCanvases(null);
+      return;
+    }
+
+    // Resolve telegram folder (pick on first use, re-check permission otherwise)
+    let telegramDir: FileSystemDirectoryHandle | null = folderHandle;
+    if (!telegramDir) {
+      telegramDir = await pickFolder('telegram');
+      if (!telegramDir) return;
+    } else {
+      telegramDir = await ensurePermission(telegramDir);
+      if (!telegramDir) {
+        telegramDir = await pickFolder('telegram');
+        if (!telegramDir) return;
+      }
+    }
+
+    // 1. Save PNG images to telegram folder
+    await saveCanvases(telegramDir);
+
+    // 2. Save замены image to deputy folder (weekly mode only)
+    const deputyDir = folderHandles['deputy'];
+    if (deputyDir && versionType === 'weekly' && budgetReplacementEntries.length > 0) {
+      const deputyDirVerified = await ensurePermission(deputyDir);
+      if (deputyDirVerified) {
+        const dayIndex = DAYS.indexOf(selectedDay);
+        const titleStr = formatDayFullWithDate(selectedDay, mondayDate ?? undefined, dayIndex);
+        const now = new Date();
+        const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+        const canvas = buildReplacementsImage(budgetReplacementEntries, titleStr);
+        await saveCanvasPngToFolder(canvas, `${ts}_replacements_${selectedDay}.png`, deputyDirVerified);
+      }
+    }
+
+    // 3. Save full JSON export to rshp_json folder
+    const rshpDir = folderHandles['rshp_json'];
+    if (rshpDir) {
+      const rshpDirVerified = await ensurePermission(rshpDir);
+      if (rshpDirVerified) {
+        const json = await exportToJson();
+        const date = new Date().toISOString().slice(0, 10);
+        await saveJsonStringToFolder(json, `timetable-${date}.json`, rshpDirVerified);
+      }
+    }
+
+    // 4. Save occupancy JSON to occupancy_json folder
+    const occupancyDir = folderHandles['occupancy_json'];
+    if (occupancyDir) {
+      const occupancyDirVerified = await ensurePermission(occupancyDir);
+      if (occupancyDirVerified) {
+        const file = generatePartnerAvailability(schedule, {
+          name: versionName,
+          type: versionType,
+          mondayDate: mondayDate ?? undefined,
+        });
+        const json = JSON.stringify(file, null, 2);
+        const safeName = (versionName || 'расписание').replace(/[/\\:*?"<>|]/g, '-');
+        await saveJsonStringToFolder(json, `занятость-${safeName}.json`, occupancyDirVerified);
+      }
+    }
+  }, [
+    selectedDay, baseTemplateSchedule, fsFolderSupported, folderHandle, folderHandles,
+    pickFolder, ensurePermission, saveCanvases, versionType, mondayDate, versionName,
+    budgetReplacementEntries, schedule,
+  ]);
 
   // Download замены image (budget or union)
   const downloadReplacementsImage = useCallback(async (entries: typeof replacementEntries, label: string) => {
@@ -634,7 +659,7 @@ export function ExportPage() {
         )}
         <div className={styles.rightControls}>
           {canFilterByDay && selectedDay && baseTemplateSchedule && (
-            <div className={styles.splitButton} ref={folderMenuRef}>
+            <div className={styles.splitButton}>
               <Button
                 variant="secondary"
                 size="small"
@@ -646,21 +671,11 @@ export function ExportPage() {
               {fsFolderSupported && (
                 <button
                   className={styles.splitChevron}
-                  onClick={() => setFolderMenuOpen(prev => !prev)}
-                  title="Настройка папки загрузки"
+                  onClick={() => setFolderSettingsOpen(true)}
+                  title="Настройка папок автосохранения"
                 >
-                  ▾
+                  ⚙
                 </button>
-              )}
-              {folderMenuOpen && (
-                <div className={styles.splitMenu}>
-                  <button onClick={async () => { setFolderMenuOpen(false); await pickFolder(); }}>
-                    📁 {folderName ? `Папка: ${folderName}` : 'Выбрать папку по умолчанию'}
-                  </button>
-                  <button onClick={handleSaveToOtherFolder}>
-                    Сохранить в другую папку…
-                  </button>
-                </div>
               )}
             </div>
           )}
@@ -805,6 +820,12 @@ export function ExportPage() {
           <div className={styles.gridLegend}>* — замена</div>
         )}
       </div>
+
+      <FolderSettingsDialog
+        isOpen={folderSettingsOpen}
+        onClose={() => setFolderSettingsOpen(false)}
+        folders={folders}
+      />
     </div>
   );
 }

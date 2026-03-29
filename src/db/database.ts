@@ -45,12 +45,16 @@ export interface StoredPartnerFile {
   importedAt: Date;
 }
 
+/** Folder purpose IDs for the 4 autosave destinations */
+export type DownloadFolderId = 'telegram' | 'deputy' | 'rshp_json' | 'occupancy_json';
+
 /**
- * Singleton record storing the user's preferred download folder for Telegram images.
+ * Singleton record storing the user's preferred download folder.
  * The FileSystemDirectoryHandle is structured-cloneable and can be stored in IDB directly.
+ * Four separate records are stored, one per DownloadFolderId.
  */
 export interface StoredDownloadFolder {
-  id: 'telegram';  // singleton key
+  id: DownloadFolderId;
   handle: FileSystemDirectoryHandle;
   folderName: string; // handle.name snapshot for display without async
   savedAt: Date;
