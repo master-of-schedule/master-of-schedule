@@ -290,3 +290,26 @@ export function getTeacherLessonsOnDay(
   results.sort((a, b) => a.lessonNum - b.lessonNum || a.className.localeCompare(b.className, 'ru', { numeric: true }));
   return results;
 }
+
+/**
+ * Get all lesson slots using a specific room on a given day, across all classes.
+ * Returns entries sorted by lesson number then class name.
+ */
+export function getRoomLessonsOnDay(
+  schedule: Schedule,
+  roomName: string,
+  day: Day
+): { className: string; lessonNum: LessonNumber; lessons: ScheduledLesson[] }[] {
+  const results: { className: string; lessonNum: LessonNumber; lessons: ScheduledLesson[] }[] = [];
+
+  forEachSlot(schedule, (className, slotDay, lessonNum, lessons) => {
+    if (slotDay !== day) return;
+    const roomLessons = lessons.filter(l => l.room === roomName);
+    if (roomLessons.length > 0) {
+      results.push({ className, lessonNum, lessons: roomLessons });
+    }
+  });
+
+  results.sort((a, b) => a.lessonNum - b.lessonNum || a.className.localeCompare(b.className, 'ru', { numeric: true }));
+  return results;
+}

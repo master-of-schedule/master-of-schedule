@@ -133,6 +133,14 @@
   background: #c8e6c9;
 }
 
+.unionItem {
+  background: #fce4ec;
+}
+
+.unionItem:hover {
+  background: #f8bbd0;
+}
+
 .subject {
   flex: 1;
   font-weight: var(--font-weight-medium);

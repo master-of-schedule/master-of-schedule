@@ -270,6 +270,20 @@ export function downloadJson(data: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Write a JSON string to a named file inside a FileSystem Access API directory handle.
+ */
+export async function saveJsonStringToFolder(
+  data: string,
+  filename: string,
+  dirHandle: FileSystemDirectoryHandle,
+): Promise<void> {
+  const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(data);
+  await writable.close();
+}
+
 // ============ Excel Import ============
 
 /**

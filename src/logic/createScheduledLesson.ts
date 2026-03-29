@@ -23,6 +23,8 @@ interface ScheduledLessonOptions {
   forceOverride?: boolean;
   /** True when this is a formal teacher substitution */
   isSubstitution?: boolean;
+  /** True when this substitution is paid by the union (профсоюз), not the budget */
+  isUnionSubstitution?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export function createScheduledLesson(
   if (opts?.originalTeacher) lesson.originalTeacher = opts.originalTeacher;
   if (opts?.isSubstitution) lesson.isSubstitution = true;
   if (opts?.forceOverride) lesson.forceOverride = true;
+  if (opts?.isUnionSubstitution) lesson.isUnionSubstitution = true;
 
   return lesson;
 }

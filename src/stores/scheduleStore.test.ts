@@ -451,7 +451,8 @@ describe('acknowledgeConflict / clearConflictAcks — Z32-3', () => {
     expect(keys.some(k => k.includes('|Пн|1|'))).toBe(true);
   });
 
-  it('assignLesson clears acks for that slot', () => {
+  // Z33-2 regression: acks must survive assign/remove of any lesson in the same slot
+  it('assignLesson does NOT clear acks — they persist for the version lifetime', () => {
     useScheduleStore.setState({
       acknowledgedConflictKeys: [
         'force_override_ban|Пн|1|some detail',
@@ -460,18 +461,27 @@ describe('acknowledgeConflict / clearConflictAcks — Z32-3', () => {
     });
     useScheduleStore.getState().assignLesson({ className: '5а', day: DAY, lessonNum: NUM, lesson: makeLesson() });
     const keys = useScheduleStore.getState().acknowledgedConflictKeys;
-    expect(keys.some(k => k.includes(`|${DAY}|${NUM}|`))).toBe(false);
+    expect(keys.some(k => k.includes(`|${DAY}|${NUM}|`))).toBe(true);
     expect(keys.some(k => k.includes('|Вт|3|'))).toBe(true);
   });
 
-  it('removeLesson clears acks for that slot', () => {
+  it('removeLesson does NOT clear acks', () => {
     const lesson = makeLesson();
     useScheduleStore.setState({
       schedule: { '5а': { [DAY]: { [NUM]: { lessons: [lesson] } } } } as never,
       acknowledgedConflictKeys: ['force_override_ban|Пн|1|detail'],
     });
     useScheduleStore.getState().removeLesson({ className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 });
-    expect(useScheduleStore.getState().acknowledgedConflictKeys).toHaveLength(0);
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toEqual(['force_override_ban|Пн|1|detail']);
+  });
+
+  // Z33-2 regression: modifying class B's slot must never clear class A's ack for the same slot
+  it('assigning to class B slot does not clear ack for class A in the same slot', () => {
+    const ackKey = 'force_override_ban|Вт|3|Иванов И.И.';
+    useScheduleStore.setState({ acknowledgedConflictKeys: [ackKey] });
+    // Modify class 10б at the same (Вт, 3) slot — unrelated to the ack
+    useScheduleStore.getState().assignLesson({ className: '10б', day: 'Вт' as Day, lessonNum: 3 as LessonNumber, lesson: makeLesson() });
+    expect(useScheduleStore.getState().acknowledgedConflictKeys).toContain(ackKey);
   });
 
   it('loadSchedule restores acknowledgedConflictKeys from version', () => {

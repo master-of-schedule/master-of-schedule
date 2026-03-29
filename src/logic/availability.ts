@@ -325,6 +325,33 @@ export function getSubstituteTeachers(
 }
 
 /**
+ * Get all teachers who are free at a given slot, regardless of subject.
+ * Excludes teachers already listed in substituteTeacherNames (those who teach the subject).
+ * Used for the "Другие (проф.)" section in the replacement picker.
+ */
+export function getFreeTeachersAtSlot(
+  schedule: Schedule,
+  teachers: Record<string, Teacher>,
+  day: Day,
+  lessonNum: LessonNumber,
+  excludeTeacher?: string,
+  substituteTeacherNames?: string[],
+): Teacher[] {
+  const excludeSet = new Set(substituteTeacherNames ?? []);
+  const result: Teacher[] = [];
+
+  for (const teacher of Object.values(teachers)) {
+    if (excludeTeacher && teacher.name === excludeTeacher) continue;
+    if (excludeSet.has(teacher.name)) continue;
+    if (isTeacherFree(schedule, teachers, teacher.name, day, lessonNum, '')) {
+      result.push(teacher);
+    }
+  }
+
+  return result.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+
+/**
  * Get all classes where a teacher has lessons at a specific time
  * Used for "where is teacher busy" display
  */

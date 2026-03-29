@@ -90,6 +90,7 @@ export {
   exportToJson,
   importFromJson,
   downloadJson,
+  saveJsonStringToFolder,
   parseExcelFile,
   importFromExcel,
   pickJsonFile,

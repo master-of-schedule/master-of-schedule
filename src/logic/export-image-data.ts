@@ -321,6 +321,8 @@ export interface ReplacementEntry {
   subject: string;
   originalTeacher: string;
   replacementTeacher: string;
+  /** True when paid by the union (профсоюз), not the budget */
+  isUnionSubstitution?: boolean;
 }
 
 /**
@@ -345,6 +347,7 @@ export function getReplacementEntries(
             subject: lesson.subject,
             originalTeacher: lesson.originalTeacher,
             replacementTeacher: lesson.teacher,
+            ...(lesson.isUnionSubstitution ? { isUnionSubstitution: true } : {}),
           });
         }
       }
