@@ -8,6 +8,7 @@ import { useUIStore, useScheduleStore, useDataStore } from '@/stores';
 import { formatWeekFull } from '@/utils/dateFormat';
 import { exportToJson, saveJsonFile, pickJsonFile, parseExportData, getExportSummary, importFromJson, type ExportSummary } from '@/db/import-export';
 import { createBackup } from '@/db/backup';
+import { Modal } from './Modal';
 import { ImportConfirmModal } from './ImportConfirmModal';
 import styles from './AppHeader.module.css';
 
@@ -44,6 +45,7 @@ export function AppHeader() {
   const readOnlyYearLabel = useDataStore((state) => state.readOnlyYearLabel);
   const exitReadOnlyYear = useDataStore((state) => state.exitReadOnlyYear);
 
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
 
@@ -113,7 +115,12 @@ export function AppHeader() {
   return (
     <>
     <header className={styles.header}>
-      <h1 className={styles.logo}>РШР</h1>
+      <h1 className={styles.logo}>
+        РШР
+        <button className={styles.versionBtn} onClick={() => setAboutOpen(true)}>
+          v{import.meta.env.VITE_APP_VERSION}
+        </button>
+      </h1>
 
       <div className={styles.fileActions}>
         <button
@@ -214,6 +221,12 @@ export function AppHeader() {
       summary={importSummary}
       isImporting={isImporting}
     />
+    <Modal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} title="О программе" size="small">
+      <div className={styles.aboutContent}>
+        <p className={styles.aboutVersion}>Версия {import.meta.env.VITE_APP_VERSION}</p>
+        <p className={styles.aboutAuthors}>Авторы: Минухин В., Минухин Д., Клаудиа</p>
+      </div>
+    </Modal>
     </>
   );
 }
