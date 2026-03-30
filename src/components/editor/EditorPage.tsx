@@ -13,6 +13,7 @@ import { UnscheduledPanel } from './UnscheduledPanel';
 import { ProtocolPanel } from './ProtocolPanel';
 import { RoomPicker } from './RoomPicker';
 import { ReplacementPanel } from './ReplacementPanel';
+import { AddTemporaryLessonModal } from './AddTemporaryLessonModal';
 import { AbsentPanel } from './AbsentPanel';
 import { RoomPanel } from './RoomPanel';
 import { ValidationPanel } from './ValidationPanel';
@@ -37,6 +38,8 @@ export function EditorPage() {
 
   const { assignLesson, removeLesson, removeLessons, changeRoom } = useScheduleStore();
   const { undo, redo } = useScheduleStore();
+  const historyIndex = useScheduleStore((state) => state.historyIndex);
+  const historyLength = useScheduleStore((state) => state.history.length);
   const selectedCells = useUIStore((state) => state.selectedCells);
   const clearCellSelection = useUIStore((state) => state.clearCellSelection);
   const schedule = useScheduleStore((state) => state.schedule);
@@ -124,6 +127,9 @@ export function EditorPage() {
     lessonNum: LessonNumber;
   }>();
 
+  // Partner modal state (Z35-4: open AddTemporaryLessonModal from ReplacementPanel partner section)
+  const [partnerModal, setPartnerModal] = useState<{ teacher: string; subject: string } | null>(null);
+
   // Paste warning state (replaces window.confirm/alert to avoid React crash)
   const [pasteWarning, setPasteWarning] = useState<{
     type: 'extra' | 'roomBusy';
@@ -155,6 +161,10 @@ export function EditorPage() {
     setCopiedLesson,
     undo,
     redo,
+    canUndo: historyIndex > 0,
+    canRedo: historyIndex < historyLength - 1,
+    onUndoEmpty: () => showToast('Нечего отменять', 'info'),
+    onRedoEmpty: () => showToast('Нечего повторить', 'info'),
     closeContextMenu,
     clearMovingLesson,
     closeMoveTargetPicker: moveTargetPicker.close,
@@ -599,6 +609,12 @@ export function EditorPage() {
     [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
   );
 
+  // Handle partner select (Z35-4): open AddTemporaryLessonModal with pre-filled teacher + subject
+  const handlePartnerSelect = useCallback((teacher: string, subject: string) => {
+    setPartnerModal({ teacher, subject });
+    replacementPicker.close();
+  }, [replacementPicker]);
+
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
     if (!selectedLesson || selectedCells.length === 0) return;
@@ -679,6 +695,7 @@ export function EditorPage() {
             onSelect={handleReplacementSelect}
             onSubstituteSelect={handleSubstituteSelect}
             onUnionSubstituteSelect={handleUnionSubstituteSelect}
+            onPartnerSelect={handlePartnerSelect}
             onClose={replacementPicker.close}
           />
         )}
@@ -761,6 +778,17 @@ export function EditorPage() {
           preferredSubject={movingLesson.requirement.subject}
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
+        />
+      )}
+
+      {/* Partner modal: AddTemporaryLessonModal pre-filled from ReplacementPanel partner (Z35-4) */}
+      {currentClass && (
+        <AddTemporaryLessonModal
+          isOpen={!!partnerModal}
+          onClose={() => setPartnerModal(null)}
+          currentClass={currentClass}
+          initialTeacher={partnerModal?.teacher}
+          initialSubject={partnerModal?.subject}
         />
       )}
 

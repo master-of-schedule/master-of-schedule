@@ -50,9 +50,12 @@ export function createScheduledLesson(
 
   if (req.teacher2) lesson.teacher2 = req.teacher2;
   if (opts?.originalTeacher) lesson.originalTeacher = opts.originalTeacher;
-  if (opts?.isSubstitution) lesson.isSubstitution = true;
+  // Propagate compensation type from requirement (temporary lessons marked as substitutions)
+  const isSubstitution = opts?.isSubstitution || !!req.compensationType;
+  if (isSubstitution) lesson.isSubstitution = true;
   if (opts?.forceOverride) lesson.forceOverride = true;
-  if (opts?.isUnionSubstitution) lesson.isUnionSubstitution = true;
+  const isUnion = opts?.isUnionSubstitution || req.compensationType === 'union';
+  if (isUnion) lesson.isUnionSubstitution = true;
 
   return lesson;
 }

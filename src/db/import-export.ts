@@ -407,7 +407,7 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
     const data = XLSX.utils.sheet_to_json<TeacherRow>(teachersSheet);
     const seenTeacherNames = new Set<string>();
     for (const row of data) {
-      const name = String(row['Фамилия И.О.'] ?? row['ФИО'] ?? row['Имя'] ?? '').trim();
+      const name = String(row['Фамилия И.О.'] ?? row['ФИО'] ?? row['Имя'] ?? '').trim().normalize('NFC');
       if (!name) continue;
       if (seenTeacherNames.has(name)) continue; // skip duplicate names
       seenTeacherNames.add(name);
@@ -498,7 +498,7 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
     for (const row of data) {
       const className = String(row['Класс'] ?? row['Класс/Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
-      const teacher = String(row['Учитель'] ?? '').trim();
+      const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
       const count = Number(row['Занятий в неделю'] ?? row['Часов в неделю'] ?? row['Количество'] ?? 0);
 
       if (!className || !subject || !teacher || count <= 0) continue;
@@ -521,7 +521,7 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
     for (const row of data) {
       const groupName = String(row['Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
-      const teacher = String(row['Учитель'] ?? '').trim();
+      const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
       const count = Number(row['Занятий в неделю'] ?? row['Количество'] ?? 0);
       const parallelGroup = String(row['Параллельная группа'] ?? '').trim();
       const className = String(row['Класс'] ?? '').trim();

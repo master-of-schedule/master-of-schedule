@@ -25,6 +25,8 @@ export interface LessonRequirement {
   className?: string;
   /** Second teacher (for co-teaching, temporary lessons only) */
   teacher2?: string;
+  /** Compensation type for temporary lessons in weekly mode (budget or union substitution) */
+  compensationType?: 'budget' | 'union';
 }
 
 /**

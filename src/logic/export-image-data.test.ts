@@ -335,6 +335,35 @@ describe('getReplacementEntries', () => {
     expect(entries[0].isUnionSubstitution).toBe(true);
     expect(entries[1].isUnionSubstitution).toBeUndefined();
   });
+
+  // Z35-3: isSubstitution=true (no originalTeacher) also appears in entries
+  it('includes lessons with isSubstitution=true even without originalTeacher', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Петрова', room: '-114-', isSubstitution: true }] },
+        },
+      },
+    };
+    const entries = getReplacementEntries(schedule, 'Пн' as never);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].replacementTeacher).toBe('Петрова');
+    expect(entries[0].originalTeacher).toBeUndefined();
+  });
+
+  it('includes isSubstitution lesson with isUnionSubstitution=true as union entry', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Сидоров', room: '-115-', isSubstitution: true, isUnionSubstitution: true }] },
+        },
+      },
+    };
+    const entries = getReplacementEntries(schedule, 'Пн' as never);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].isUnionSubstitution).toBe(true);
+    expect(entries[0].originalTeacher).toBeUndefined();
+  });
 });
 
 // ─── QI-13: getChangedClassesData — class view high-risk ───────
