@@ -133,7 +133,7 @@ export function TeacherEditModal({ teacher, onClose }: TeacherEditModalProps) {
 
     setSaveError(null);
     const data = {
-      name: name.trim(),
+      name: name.trim().normalize('NFC'),
       phone: phone.trim() || undefined,
       messenger: messenger.trim() || undefined,
       defaultRoom: defaultRoom.trim() || undefined,
