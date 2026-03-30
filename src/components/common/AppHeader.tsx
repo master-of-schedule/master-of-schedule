@@ -6,10 +6,7 @@ import { useState, useCallback } from 'react';
 import type { AppTab, VersionType } from '@/types';
 import { useUIStore, useScheduleStore, useDataStore } from '@/stores';
 import { formatWeekFull } from '@/utils/dateFormat';
-import { exportToJson, saveJsonFile, pickJsonFile, parseExportData, getExportSummary, importFromJson, type ExportSummary } from '@/db/import-export';
-import { createBackup } from '@/db/backup';
 import { Modal } from './Modal';
-import { ImportConfirmModal } from './ImportConfirmModal';
 import styles from './AppHeader.module.css';
 
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -37,10 +34,7 @@ export function AppHeader() {
   const mondayDate = useScheduleStore((state) => state.mondayDate);
   const updateVersionName = useScheduleStore((state) => state.updateVersionName);
   const hasSchedule = useScheduleStore((state) => Object.keys(state.schedule).length > 0);
-  const isDirty = useScheduleStore((state) => state.isDirty);
 
-  const hasData = useDataStore((state) => Object.keys(state.teachers).length > 0);
-  const reloadData = useDataStore((state) => state.reloadData);
   const isReadOnlyYear = useDataStore((state) => state.isReadOnlyYear);
   const readOnlyYearLabel = useDataStore((state) => state.readOnlyYearLabel);
   const exitReadOnlyYear = useDataStore((state) => state.exitReadOnlyYear);
@@ -48,12 +42,6 @@ export function AppHeader() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-
-  // File operation state
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importSummary, setImportSummary] = useState<ExportSummary | null>(null);
-  const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
   const handleStartEditName = useCallback(() => {
     setEditedName(versionName);
@@ -72,46 +60,6 @@ export function AppHeader() {
     setEditedName('');
   }, []);
 
-  const handleExportJson = useCallback(async () => {
-    const json = await exportToJson();
-    const date = new Date().toISOString().slice(0, 10);
-    await saveJsonFile(json, `timetable-${date}.json`);
-  }, []);
-
-  const handleImportJsonStart = useCallback(async () => {
-    const file = await pickJsonFile();
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = parseExportData(text);
-      setPendingImportJson(text);
-      setImportSummary(getExportSummary(data));
-      setImportModalOpen(true);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка чтения файла');
-    }
-  }, []);
-
-  const handleImportJsonConfirm = useCallback(async () => {
-    if (!pendingImportJson) return;
-    setIsImporting(true);
-    try {
-      if (hasData) {
-        await createBackup('Импорт JSON');
-      }
-      await importFromJson(pendingImportJson);
-      await reloadData();
-      setImportModalOpen(false);
-      setPendingImportJson(null);
-      setImportSummary(null);
-      setActiveTab('start');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка импорта');
-    } finally {
-      setIsImporting(false);
-    }
-  }, [pendingImportJson, hasData, reloadData, setActiveTab]);
-
   return (
     <>
     <header className={styles.header}>
@@ -121,25 +69,6 @@ export function AppHeader() {
           v{import.meta.env.VITE_APP_VERSION}
         </button>
       </h1>
-
-      <div className={styles.fileActions}>
-        <button
-          className={`${styles.fileButton} ${isDirty ? styles.fileButtonDirty : ''}`}
-          onClick={handleExportJson}
-          disabled={!hasData || isReadOnlyYear}
-          title="Сохранить файл"
-        >
-          Сохранить
-        </button>
-        <button
-          className={styles.fileButton}
-          onClick={handleImportJsonStart}
-          disabled={isReadOnlyYear}
-          title="Открыть файл"
-        >
-          Открыть
-        </button>
-      </div>
 
       {hasSchedule && (
         <div className={styles.versionInfo}>
@@ -210,17 +139,6 @@ export function AppHeader() {
       </div>
     )}
 
-    <ImportConfirmModal
-      isOpen={importModalOpen}
-      onClose={() => {
-        setImportModalOpen(false);
-        setPendingImportJson(null);
-        setImportSummary(null);
-      }}
-      onConfirm={handleImportJsonConfirm}
-      summary={importSummary}
-      isImporting={isImporting}
-    />
     <Modal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} title="О программе" size="small">
       <div className={styles.aboutContent}>
         <p className={styles.aboutVersion}>Версия {import.meta.env.VITE_APP_VERSION}</p>
