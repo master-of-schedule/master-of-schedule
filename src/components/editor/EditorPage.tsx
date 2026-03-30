@@ -13,6 +13,7 @@ import { UnscheduledPanel } from './UnscheduledPanel';
 import { ProtocolPanel } from './ProtocolPanel';
 import { RoomPicker } from './RoomPicker';
 import { ReplacementPanel } from './ReplacementPanel';
+import { AddTemporaryLessonModal } from './AddTemporaryLessonModal';
 import { AbsentPanel } from './AbsentPanel';
 import { RoomPanel } from './RoomPanel';
 import { ValidationPanel } from './ValidationPanel';
@@ -125,6 +126,9 @@ export function EditorPage() {
     day: Day;
     lessonNum: LessonNumber;
   }>();
+
+  // Partner modal state (Z35-4: open AddTemporaryLessonModal from ReplacementPanel partner section)
+  const [partnerModal, setPartnerModal] = useState<{ teacher: string; subject: string } | null>(null);
 
   // Paste warning state (replaces window.confirm/alert to avoid React crash)
   const [pasteWarning, setPasteWarning] = useState<{
@@ -605,6 +609,12 @@ export function EditorPage() {
     [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
   );
 
+  // Handle partner select (Z35-4): open AddTemporaryLessonModal with pre-filled teacher + subject
+  const handlePartnerSelect = useCallback((teacher: string, subject: string) => {
+    setPartnerModal({ teacher, subject });
+    replacementPicker.close();
+  }, [replacementPicker]);
+
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
     if (!selectedLesson || selectedCells.length === 0) return;
@@ -685,6 +695,7 @@ export function EditorPage() {
             onSelect={handleReplacementSelect}
             onSubstituteSelect={handleSubstituteSelect}
             onUnionSubstituteSelect={handleUnionSubstituteSelect}
+            onPartnerSelect={handlePartnerSelect}
             onClose={replacementPicker.close}
           />
         )}
@@ -767,6 +778,17 @@ export function EditorPage() {
           preferredSubject={movingLesson.requirement.subject}
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
+        />
+      )}
+
+      {/* Partner modal: AddTemporaryLessonModal pre-filled from ReplacementPanel partner (Z35-4) */}
+      {currentClass && (
+        <AddTemporaryLessonModal
+          isOpen={!!partnerModal}
+          onClose={() => setPartnerModal(null)}
+          currentClass={currentClass}
+          initialTeacher={partnerModal?.teacher}
+          initialSubject={partnerModal?.subject}
         />
       )}
 

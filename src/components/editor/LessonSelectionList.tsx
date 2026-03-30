@@ -34,6 +34,10 @@ interface LessonSelectionListProps {
   unionTeachers?: Teacher[];
   /** Callback when a union teacher is selected */
   onUnionSubstituteSelect?: (teacher: Teacher) => void;
+  /** Co-teachers already teaching in the same slot (group partners) */
+  partnerTeachers?: { name: string; subject: string; room: string }[];
+  /** Callback when a partner teacher is clicked — opens AddTemporaryLessonModal with pre-filled data */
+  onPartnerSelect?: (teacher: string, subject: string) => void;
 }
 
 export function LessonSelectionList({
@@ -51,6 +55,8 @@ export function LessonSelectionList({
   onSubstituteSelect,
   unionTeachers,
   onUnionSubstituteSelect,
+  partnerTeachers,
+  onPartnerSelect,
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const teachers = useDataStore((state) => state.teachers);
@@ -86,7 +92,8 @@ export function LessonSelectionList({
 
   const hasSubstitutes = (substituteTeachers?.length ?? 0) > 0;
   const hasUnion = (unionTeachers?.length ?? 0) > 0;
-  const hasOptions = availableLessons.unscheduled.length > 0 || availableLessons.movable.length > 0 || hasSubstitutes || hasUnion;
+  const hasPartners = (partnerTeachers?.length ?? 0) > 0 && !!onPartnerSelect;
+  const hasOptions = availableLessons.unscheduled.length > 0 || availableLessons.movable.length > 0 || hasSubstitutes || hasUnion || hasPartners;
 
   if (!hasOptions) {
     return <div className={styles.empty}>Нет доступных уроков для замены</div>;
@@ -180,6 +187,27 @@ export function LessonSelectionList({
                 <span className={styles.teacher}>{teacher.name}</span>
                 {teacher.defaultRoom && (
                   <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasPartners && onPartnerSelect && (
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>Напарники в этом уроке</h4>
+          <div className={styles.list}>
+            {partnerTeachers!.map((partner) => (
+              <button
+                key={partner.name}
+                className={`${styles.item} ${styles.substituteItem}`}
+                onClick={() => onPartnerSelect(partner.name, partner.subject)}
+                title="Создать занятие с этим учителем"
+              >
+                <span className={styles.subject}>{partner.subject} {partner.name}</span>
+                {partner.room && (
+                  <span className={styles.teacher}>каб. {partner.room}</span>
                 )}
               </button>
             ))}

@@ -17,6 +17,10 @@ interface AddTemporaryLessonModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentClass: string;
+  /** Pre-fill teacher field (e.g. when opening from partner flow) */
+  initialTeacher?: string;
+  /** Pre-fill subject field (e.g. when opening from partner flow) */
+  initialSubject?: string;
 }
 
 function generateId(): string {
@@ -32,6 +36,8 @@ export function AddTemporaryLessonModal({
   isOpen,
   onClose,
   currentClass,
+  initialTeacher,
+  initialSubject,
 }: AddTemporaryLessonModalProps) {
   const teachers = useDataStore((state) => state.teachers);
   const classes = useDataStore((state) => state.classes);
@@ -52,10 +58,14 @@ export function AddTemporaryLessonModal({
   const [compensationType, setCompensationType] = useState<CompensationType>('none');
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
 
-  // Sync class field to current grid class when modal opens
+  // Sync class + optional pre-fill when modal opens
   useEffect(() => {
-    if (isOpen) setClassName(currentClass);
-  }, [isOpen, currentClass]);
+    if (isOpen) {
+      setClassName(currentClass);
+      if (initialTeacher !== undefined) setTeacher(initialTeacher);
+      if (initialSubject !== undefined) setSubject(initialSubject);
+    }
+  }, [isOpen, currentClass, initialTeacher, initialSubject]);
 
   // Build sorted teacher names for datalist
   const teacherNames = useMemo(
