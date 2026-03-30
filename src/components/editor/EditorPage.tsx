@@ -37,6 +37,8 @@ export function EditorPage() {
 
   const { assignLesson, removeLesson, removeLessons, changeRoom } = useScheduleStore();
   const { undo, redo } = useScheduleStore();
+  const historyIndex = useScheduleStore((state) => state.historyIndex);
+  const historyLength = useScheduleStore((state) => state.history.length);
   const selectedCells = useUIStore((state) => state.selectedCells);
   const clearCellSelection = useUIStore((state) => state.clearCellSelection);
   const schedule = useScheduleStore((state) => state.schedule);
@@ -155,6 +157,10 @@ export function EditorPage() {
     setCopiedLesson,
     undo,
     redo,
+    canUndo: historyIndex > 0,
+    canRedo: historyIndex < historyLength - 1,
+    onUndoEmpty: () => showToast('Нечего отменять', 'info'),
+    onRedoEmpty: () => showToast('Нечего повторить', 'info'),
     closeContextMenu,
     clearMovingLesson,
     closeMoveTargetPicker: moveTargetPicker.close,
