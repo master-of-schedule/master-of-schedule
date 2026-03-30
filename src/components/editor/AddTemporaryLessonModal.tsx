@@ -5,6 +5,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { LessonRequirement } from '@/types';
 import { useDataStore, useScheduleStore } from '@/stores';
+
+type CompensationType = 'none' | 'budget' | 'union';
 import { Modal } from '@/components/common/Modal';
 import { FormField, formStyles } from '@/components/common/FormField';
 import { FormActions } from '@/components/common/FormActions';
@@ -39,6 +41,7 @@ export function AddTemporaryLessonModal({
   const addCustomSubject = useDataStore((state) => state.addCustomSubject);
   const addTemporaryLesson = useScheduleStore((state) => state.addTemporaryLesson);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
+  const versionType = useScheduleStore((state) => state.versionType);
 
   const [teacher, setTeacher] = useState('');
   const [teacher2, setTeacher2] = useState('');
@@ -46,6 +49,7 @@ export function AddTemporaryLessonModal({
   const [subject, setSubject] = useState('');
   const [count, setCount] = useState(1);
   const [groupSuffix, setGroupSuffix] = useState('');
+  const [compensationType, setCompensationType] = useState<CompensationType>('none');
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
 
   // Sync class field to current grid class when modal opens
@@ -104,6 +108,7 @@ export function AddTemporaryLessonModal({
       ...(isGroup ? { className } : {}),
       ...(parallelGroup ? { parallelGroup } : {}),
       ...(trimmedTeacher2 && teacherNameSet.has(trimmedTeacher2) ? { teacher2: trimmedTeacher2 } : {}),
+      ...(compensationType !== 'none' ? { compensationType: compensationType as 'budget' | 'union' } : {}),
     };
 
     addTemporaryLesson(lesson);
@@ -114,9 +119,10 @@ export function AddTemporaryLessonModal({
     setSubject('');
     setCount(1);
     setGroupSuffix('');
+    setCompensationType('none');
     setConfirmState(null);
     onClose();
-  }, [className, subject, teacher, teacher2, count, groupSuffix, teacherNameSet, addTemporaryLesson, onClose, lessonRequirements, temporaryLessons, addCustomSubject]);
+  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, addTemporaryLesson, onClose, lessonRequirements, temporaryLessons, addCustomSubject]);
 
   const handleSave = useCallback(() => {
     if (!canSave) return;
@@ -220,6 +226,7 @@ export function AddTemporaryLessonModal({
     setSubject('');
     setCount(1);
     setGroupSuffix('');
+    setCompensationType('none');
     setClassName(currentClass);
     setConfirmState(null);
     onClose();
@@ -279,6 +286,21 @@ export function AddTemporaryLessonModal({
             placeholder="Начните вводить фамилию..."
           />
         </FormField>
+
+        {versionType === 'weekly' && (
+          <FormField label="Тип">
+            <select
+              className={formStyles.input}
+              value={compensationType}
+              onChange={(e) => setCompensationType(e.target.value as CompensationType)}
+              style={{ maxWidth: 220 }}
+            >
+              <option value="none">—</option>
+              <option value="budget">Замена (бюджет)</option>
+              <option value="union">Замена (проф.)</option>
+            </select>
+          </FormField>
+        )}
 
         <FormField label="Второй учитель (необязательно)">
           <DatalistInput
