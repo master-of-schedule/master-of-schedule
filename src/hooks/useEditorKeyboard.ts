@@ -15,6 +15,10 @@ export interface UseEditorKeyboardParams {
   setCopiedLesson: (lesson: null) => void;
   undo: () => void;
   redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndoEmpty?: () => void;
+  onRedoEmpty?: () => void;
   // Additional Escape handlers
   closeContextMenu: () => void;
   clearMovingLesson: () => void;
@@ -36,6 +40,10 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
     setCopiedLesson,
     undo,
     redo,
+    canUndo,
+    canRedo,
+    onUndoEmpty,
+    onRedoEmpty,
     closeContextMenu,
     clearMovingLesson,
     closeMoveTargetPicker,
@@ -69,16 +77,18 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
       const isInputFocused =
         activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
 
-      // Undo: Ctrl+Z (works even in inputs)
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+      // Undo: Ctrl+Z — use e.code (physical key) so it works with any keyboard layout
+      if (e.ctrlKey && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
-        undo();
+        if (canUndo) undo();
+        else onUndoEmpty?.();
         return;
       }
-      // Redo: Ctrl+Y or Ctrl+Shift+Z (works even in inputs)
-      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+      // Redo: Ctrl+Y or Ctrl+Shift+Z — use e.code for layout independence
+      if ((e.ctrlKey && e.code === 'KeyY') || (e.ctrlKey && e.shiftKey && e.code === 'KeyZ')) {
         e.preventDefault();
-        redo();
+        if (canRedo) redo();
+        else onRedoEmpty?.();
         return;
       }
 
@@ -107,6 +117,10 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
   }, [
     undo,
     redo,
+    canUndo,
+    canRedo,
+    onUndoEmpty,
+    onRedoEmpty,
     setSelectedLesson,
     closeContextMenu,
     clearSelectedCells,

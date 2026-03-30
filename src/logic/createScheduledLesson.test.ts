@@ -112,4 +112,25 @@ describe('createScheduledLesson', () => {
     expect(lesson.forceOverride).toBe(true);
     expect(lesson.room).toBe('-115-');
   });
+
+  // Z35-3: compensationType propagation
+  it('sets isSubstitution=true when req.compensationType is budget', () => {
+    const req = { ...baseReq, compensationType: 'budget' as const };
+    const lesson = createScheduledLesson(req, '-114-');
+    expect(lesson.isSubstitution).toBe(true);
+    expect(lesson.isUnionSubstitution).toBeUndefined();
+  });
+
+  it('sets isSubstitution=true and isUnionSubstitution=true when req.compensationType is union', () => {
+    const req = { ...baseReq, compensationType: 'union' as const };
+    const lesson = createScheduledLesson(req, '-114-');
+    expect(lesson.isSubstitution).toBe(true);
+    expect(lesson.isUnionSubstitution).toBe(true);
+  });
+
+  it('does not set isSubstitution when compensationType is absent', () => {
+    const lesson = createScheduledLesson(baseReq, '-114-');
+    expect(lesson.isSubstitution).toBeUndefined();
+    expect(lesson.isUnionSubstitution).toBeUndefined();
+  });
 });

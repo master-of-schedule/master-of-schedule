@@ -460,7 +460,7 @@ export function buildReplacementsImage(entries: ReplacementEntry[], title: strin
     e.className,
     String(e.lessonNum),
     e.subject,
-    `${e.originalTeacher} → ${e.replacementTeacher}`,
+    e.originalTeacher ? `${e.originalTeacher} → ${e.replacementTeacher}` : e.replacementTeacher,
   ]);
 
   // Measure column widths

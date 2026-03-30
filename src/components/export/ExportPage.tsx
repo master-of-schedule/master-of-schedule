@@ -469,17 +469,24 @@ export function ExportPage() {
     // 1. Save PNG images to telegram folder
     await saveCanvases(telegramDir);
 
-    // 2. Save замены image to deputy folder (weekly mode only)
+    // 2. Save замены image(s) to deputy folder (weekly mode only)
     const deputyDir = folderHandles['deputy'];
-    if (deputyDir && versionType === 'weekly' && budgetReplacementEntries.length > 0) {
+    const hasDeputyEntries = budgetReplacementEntries.length > 0 || unionReplacementEntries.length > 0;
+    if (deputyDir && versionType === 'weekly' && hasDeputyEntries) {
       const deputyDirVerified = await ensurePermission(deputyDir);
       if (deputyDirVerified) {
         const dayIndex = DAYS.indexOf(selectedDay);
         const titleStr = formatDayFullWithDate(selectedDay, mondayDate ?? undefined, dayIndex);
         const now = new Date();
         const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-        const canvas = buildReplacementsImage(budgetReplacementEntries, titleStr);
-        await saveCanvasPngToFolder(canvas, `${ts}_replacements_${selectedDay}.png`, deputyDirVerified);
+        if (budgetReplacementEntries.length > 0) {
+          const canvas = buildReplacementsImage(budgetReplacementEntries, titleStr);
+          await saveCanvasPngToFolder(canvas, `${ts}_replacements_${selectedDay}.png`, deputyDirVerified);
+        }
+        if (unionReplacementEntries.length > 0) {
+          const canvas = buildReplacementsImage(unionReplacementEntries, titleStr);
+          await saveCanvasPngToFolder(canvas, `${ts}_replacements_union_${selectedDay}.png`, deputyDirVerified);
+        }
       }
     }
 
@@ -512,7 +519,7 @@ export function ExportPage() {
   }, [
     selectedDay, baseTemplateSchedule, fsFolderSupported, folderHandle, folderHandles,
     pickFolder, ensurePermission, saveCanvases, versionType, mondayDate, versionName,
-    budgetReplacementEntries, schedule,
+    budgetReplacementEntries, unionReplacementEntries, schedule,
   ]);
 
   // Download замены image (budget or union)

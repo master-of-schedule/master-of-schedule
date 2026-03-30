@@ -11,6 +11,12 @@ import { getSubstituteTeachers, getFreeTeachersAtSlot } from '@/logic';
 import { LessonSelectionList } from './LessonSelectionList';
 import styles from './ReplacementPanel.module.css';
 
+interface PartnerTeacher {
+  name: string;
+  subject: string;
+  room: string;
+}
+
 interface ReplacementPanelProps {
   className: string;
   day: Day;
@@ -24,6 +30,8 @@ interface ReplacementPanelProps {
   onSelect: (lesson: LessonRequirement) => void;
   onSubstituteSelect: (teacher: Teacher) => void;
   onUnionSubstituteSelect: (teacher: Teacher) => void;
+  /** Called when user clicks a co-teacher (partner) in the same slot */
+  onPartnerSelect?: (teacher: string, subject: string) => void;
   onClose: () => void;
 }
 
@@ -35,6 +43,7 @@ export function ReplacementPanel({
   onSelect,
   onSubstituteSelect,
   onUnionSubstituteSelect,
+  onPartnerSelect,
   onClose,
 }: ReplacementPanelProps) {
   const schedule = useScheduleStore((state) => state.schedule);
@@ -50,6 +59,15 @@ export function ReplacementPanel({
     const substituteNames = substituteTeachers.map((t) => t.name);
     return getFreeTeachersAtSlot(schedule, teachers, day, lessonNum, currentLesson.teacher, substituteNames);
   }, [schedule, teachers, currentLesson, day, lessonNum, substituteTeachers]);
+
+  // Partner teachers: others already teaching in the same slot for the same class
+  const partnerTeachers = useMemo<PartnerTeacher[]>(() => {
+    if (!currentLesson || !onPartnerSelect) return [];
+    const lessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
+    return lessons
+      .filter(l => l.teacher !== currentLesson.teacher)
+      .map(l => ({ name: l.teacher, subject: l.subject, room: l.room }));
+  }, [schedule, className, day, lessonNum, currentLesson, onPartnerSelect]);
 
   return (
     <div className={styles.panel}>
@@ -74,6 +92,8 @@ export function ReplacementPanel({
           onSubstituteSelect={onSubstituteSelect}
           unionTeachers={unionTeachers}
           onUnionSubstituteSelect={onUnionSubstituteSelect}
+          partnerTeachers={partnerTeachers}
+          onPartnerSelect={onPartnerSelect}
         />
       </div>
     </div>

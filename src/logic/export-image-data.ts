@@ -319,14 +319,16 @@ export interface ReplacementEntry {
   day: Day;
   lessonNum: LessonNumber;
   subject: string;
-  originalTeacher: string;
+  /** Original teacher being replaced; undefined for extra (temporary) compensation lessons */
+  originalTeacher?: string;
   replacementTeacher: string;
   /** True when paid by the union (профсоюз), not the budget */
   isUnionSubstitution?: boolean;
 }
 
 /**
- * Get all substitution entries for a given day: lessons where originalTeacher is set.
+ * Get all substitution entries for a given day: lessons where originalTeacher is set
+ * or isSubstitution is true (compensation lessons created via AddTemporaryLessonModal).
  * Sorted by className, then lessonNum.
  */
 export function getReplacementEntries(
@@ -339,13 +341,13 @@ export function getReplacementEntries(
     for (const lessonNum of LESSON_NUMBERS) {
       const lessons = days[day]?.[lessonNum]?.lessons ?? [];
       for (const lesson of lessons) {
-        if (lesson.originalTeacher) {
+        if (lesson.originalTeacher || lesson.isSubstitution) {
           entries.push({
             className,
             day,
             lessonNum,
             subject: lesson.subject,
-            originalTeacher: lesson.originalTeacher,
+            ...(lesson.originalTeacher ? { originalTeacher: lesson.originalTeacher } : {}),
             replacementTeacher: lesson.teacher,
             ...(lesson.isUnionSubstitution ? { isUnionSubstitution: true } : {}),
           });
