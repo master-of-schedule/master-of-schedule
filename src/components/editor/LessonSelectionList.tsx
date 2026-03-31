@@ -174,26 +174,6 @@ export function LessonSelectionList({
         </div>
       )}
 
-      {hasUnion && onUnionSubstituteSelect && (
-        <div className={styles.section}>
-          <h4 className={styles.sectionTitle}>Другие (проф.)</h4>
-          <div className={styles.list}>
-            {unionTeachers!.map((teacher) => (
-              <button
-                key={teacher.id}
-                className={`${styles.item} ${styles.unionItem}`}
-                onClick={() => onUnionSubstituteSelect(teacher)}
-              >
-                <span className={styles.teacher}>{teacher.name}</span>
-                {teacher.defaultRoom && (
-                  <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {hasPartners && onPartnerSelect && (
         <div className={styles.section}>
           <h4 className={styles.sectionTitle}>Напарники в этом уроке</h4>
@@ -208,6 +188,26 @@ export function LessonSelectionList({
                 <span className={styles.subject}>{partner.subject} {partner.name}</span>
                 {partner.room && (
                   <span className={styles.teacher}>каб. {partner.room}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasUnion && onUnionSubstituteSelect && (
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>Другие (проф.)</h4>
+          <div className={styles.list}>
+            {unionTeachers!.map((teacher) => (
+              <button
+                key={teacher.id}
+                className={`${styles.item} ${styles.unionItem}`}
+                onClick={() => onUnionSubstituteSelect(teacher)}
+              >
+                <span className={styles.teacher}>{teacher.name}</span>
+                {teacher.defaultRoom && (
+                  <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
                 )}
               </button>
             ))}
