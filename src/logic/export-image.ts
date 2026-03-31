@@ -440,7 +440,7 @@ export function renderAbsentImage(absentTeachers: string[], title: string): HTML
  * Render a replacements (замены) image: table listing which teachers are replaced.
  * Columns: Класс | Урок | Предмет | Иванов → Петров
  */
-export function buildReplacementsImage(entries: ReplacementEntry[], title: string): HTMLCanvasElement {
+export function buildReplacementsImage(entries: ReplacementEntry[], title: string, headerTitle = 'Замены'): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
 
@@ -499,7 +499,7 @@ export function buildReplacementsImage(entries: ReplacementEntry[], title: strin
   ctx.fillStyle = TITLE_COLOR;
   ctx.font = `bold ${titleFontSize}px ${FONT_FAMILY}`;
   ctx.textBaseline = 'middle';
-  ctx.fillText(`Замены — ${title}`, outerPadding, TITLE_HEIGHT / 2);
+  ctx.fillText(`${headerTitle} — ${title}`, outerPadding, TITLE_HEIGHT / 2);
 
   let y = TITLE_HEIGHT;
 

@@ -484,7 +484,7 @@ export function ExportPage() {
           await saveCanvasPngToFolder(canvas, `${ts}_replacements_${selectedDay}.png`, deputyDirVerified);
         }
         if (unionReplacementEntries.length > 0) {
-          const canvas = buildReplacementsImage(unionReplacementEntries, titleStr);
+          const canvas = buildReplacementsImage(unionReplacementEntries, titleStr, 'Профсоюз');
           await saveCanvasPngToFolder(canvas, `${ts}_replacements_union_${selectedDay}.png`, deputyDirVerified);
         }
       }
@@ -523,13 +523,13 @@ export function ExportPage() {
   ]);
 
   // Download замены image (budget or union)
-  const downloadReplacementsImage = useCallback(async (entries: typeof replacementEntries, label: string) => {
+  const downloadReplacementsImage = useCallback(async (entries: typeof replacementEntries, label: string, headerTitle = 'Замены') => {
     if (!selectedDay || entries.length === 0) return;
     const dayIndex = DAYS.indexOf(selectedDay);
     const titleStr = formatDayFullWithDate(selectedDay, mondayDate ?? undefined, dayIndex);
     const now = new Date();
     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-    const canvas = buildReplacementsImage(entries, titleStr);
+    const canvas = buildReplacementsImage(entries, titleStr, headerTitle);
     const filename = `${ts}_${label}_${selectedDay}.png`;
 
     if (fsFolderSupported && folderHandle) {
@@ -550,7 +550,7 @@ export function ExportPage() {
   );
 
   const handleDownloadUnionReplacements = useCallback(
-    () => downloadReplacementsImage(unionReplacementEntries, 'replacements_union'),
+    () => downloadReplacementsImage(unionReplacementEntries, 'replacements_union', 'Профсоюз'),
     [downloadReplacementsImage, unionReplacementEntries]
   );
 
