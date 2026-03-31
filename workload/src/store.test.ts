@@ -443,6 +443,18 @@ describe('deleteClass (З7-1а)', () => {
 });
 
 describe('applyDeptSnapshot (MU-2)', () => {
+  // Helper: build a minimal snapshot payload for the 'filo' group
+  function makeFiloSnapshot(overrides: { teachers?: RNTeacher[]; teacherIds?: string[] } = {}) {
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const deptGroup = {
+      ...filoGroup,
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1' ? { ...t, teacherIds: overrides.teacherIds ?? t.teacherIds } : t,
+      ),
+    };
+    return { groupId: 'filo', assignments: [], teachers: overrides.teachers ?? [], deptGroup };
+  }
+
   it('replaces assignments for group subjects and adds snapshot assignments', () => {
     // Set up filo group to have Математика in its subject filter
     useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'] });
@@ -450,7 +462,7 @@ describe('applyDeptSnapshot (MU-2)', () => {
     useStore.getState().setAssignment({ teacherId: 't2', className: '5а', subject: 'Химия', hoursPerWeek: 2 });
 
     const newAssignments = [{ teacherId: 't3', className: '5а', subject: 'Математика', hoursPerWeek: 5 }];
-    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: newAssignments });
+    useStore.getState().applyDeptSnapshot({ ...makeFiloSnapshot(), assignments: newAssignments });
 
     const result = useStore.getState().assignments;
     // Математика replaced, Химия kept
@@ -463,15 +475,54 @@ describe('applyDeptSnapshot (MU-2)', () => {
     useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'] });
     useStore.getState().setAssignment({ teacherId: 't1', className: '5а', subject: 'Физкультура', hoursPerWeek: 3 });
 
-    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [] });
+    useStore.getState().applyDeptSnapshot(makeFiloSnapshot());
 
     expect(useStore.getState().assignments.find((a) => a.subject === 'Физкультура')).toBeDefined();
   });
 
   it('does nothing when groupId is unknown', () => {
     useStore.getState().setAssignment({ teacherId: 't1', className: '5а', subject: 'Математика', hoursPerWeek: 4 });
-    useStore.getState().applyDeptSnapshot({ groupId: 'nonexistent', assignments: [] });
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    useStore.getState().applyDeptSnapshot({ groupId: 'nonexistent', assignments: [], teachers: [], deptGroup: filoGroup });
     expect(useStore.getState().assignments).toHaveLength(1);
+  });
+
+  it('З16-4: new teacher from snapshot is added to master teacher list', () => {
+    const newTeacher: RNTeacher = { id: 'dept-new', name: 'Петрова', initials: 'П.П.', subjects: ['Математика'] };
+    useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'], teacherIds: ['dept-new'] });
+
+    useStore.getState().applyDeptSnapshot(makeFiloSnapshot({ teachers: [newTeacher], teacherIds: ['dept-new'] }));
+
+    const teachers = useStore.getState().teachers;
+    expect(teachers.find((t) => t.id === 'dept-new')).toBeDefined();
+    expect(teachers.find((t) => t.id === 'dept-new')?.name).toBe('Петрова');
+  });
+
+  it('З16-4: existing teacher in snapshot is not duplicated', () => {
+    const existing: RNTeacher = { id: 'existing-1', name: 'Иванов', initials: 'И.И.', subjects: ['Математика'] };
+    useStore.getState().addTeacher(existing);
+
+    useStore.getState().applyDeptSnapshot(makeFiloSnapshot({ teachers: [existing] }));
+
+    const teachers = useStore.getState().teachers.filter((t) => t.id === 'existing-1');
+    expect(teachers).toHaveLength(1);
+  });
+
+  it('З16-4: deptGroup is replaced with snapshot version (updated teacherIds)', () => {
+    const newTeacher: RNTeacher = { id: 'dept-added', name: 'Сидорова', initials: 'С.С.', subjects: ['Математика'] };
+    useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'] });
+
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const updatedGroup = {
+      ...filoGroup,
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1' ? { ...t, teacherIds: [...t.teacherIds, 'dept-added'] } : t,
+      ),
+    };
+    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [], teachers: [newTeacher], deptGroup: updatedGroup });
+
+    const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    expect(filo.tables.find((t) => t.id === 'filo-t1')?.teacherIds).toContain('dept-added');
   });
 });
 
