@@ -72,10 +72,11 @@ interface RNState {
   deleteClass: (className: string) => void;
 
   /**
-   * MU-2: Merge a dept snapshot into the master assignments.
+   * MU-2: Merge a dept snapshot into the master assignments, teachers, and deptGroup.
    * Removes all assignments for subjects in the group's scope, then adds snapshot assignments.
+   * New teachers from the snapshot are appended to the master list; the deptGroup is replaced.
    */
-  applyDeptSnapshot: (snapshot: { groupId: string; assignments: Assignment[] }) => void;
+  applyDeptSnapshot: (snapshot: { groupId: string; assignments: Assignment[]; teachers: RNTeacher[]; deptGroup: DeptGroup }) => void;
 
   /**
    * З9-BUG-1a: Bootstrap full state from a dept-snapshot on a blank machine.
@@ -397,13 +398,26 @@ export const useStore = create<RNState>()(
           };
         }),
 
-      applyDeptSnapshot: ({ groupId, assignments: snapAssignments }) =>
+      applyDeptSnapshot: ({ groupId, assignments: snapAssignments, teachers: snapTeachers, deptGroup: snapDeptGroup }) =>
         set((s) => {
           const group = s.deptGroups.find((g) => g.id === groupId);
           if (!group) return {};
           const groupSubjects = new Set(group.tables.flatMap((t) => t.subjectFilter));
           const toKeep = s.assignments.filter((a) => !groupSubjects.has(a.subject));
-          return { assignments: [...toKeep, ...snapAssignments] };
+
+          // Merge teachers: add any new teachers from the snapshot not yet in master list
+          const existingIds = new Set(s.teachers.map((t) => t.id));
+          const newTeachers = snapTeachers.filter((t) => !existingIds.has(t.id));
+          const mergedTeachers = newTeachers.length > 0 ? [...s.teachers, ...newTeachers] : s.teachers;
+
+          // Replace deptGroup with the snapshot version (preserves updated teacherIds)
+          const mergedDeptGroups = s.deptGroups.map((g) => (g.id === groupId ? snapDeptGroup : g));
+
+          return {
+            assignments: [...toKeep, ...snapAssignments],
+            teachers: mergedTeachers,
+            deptGroups: mergedDeptGroups,
+          };
         }),
 
       bulkSetAssignments: (newAssignments) => set({ assignments: newAssignments }),
