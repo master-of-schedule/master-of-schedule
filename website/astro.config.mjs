@@ -1,7 +1,7 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  site: 'https://vanderhoof.github.io',
-  base: '/timetable/',
+  site: 'https://master-of-schedule.github.io',
+  base: '/',
   output: 'static',
 });

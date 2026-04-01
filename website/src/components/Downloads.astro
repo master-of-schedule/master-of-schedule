@@ -8,7 +8,7 @@ const apps = [
     abbr: 'РШР',
     full: 'Редактор Школьного Расписания',
     color: 'blue',
-    releasesUrl: 'https://github.com/Vanderhoof/timetable/releases',
+    releasesUrl: 'https://github.com/master-of-schedule/master-of-schedule/releases',
     exampleFile: `${base}example-data.xlsx`,
   },
   {
@@ -17,7 +17,7 @@ const apps = [
     abbr: 'РН',
     full: 'Редактор Нагрузки',
     color: 'green',
-    releasesUrl: 'https://github.com/Vanderhoof/timetable/releases?q=workload',
+    releasesUrl: 'https://github.com/master-of-schedule/master-of-schedule/releases?q=workload',
     exampleFile: null,
   },
 ];
@@ -124,7 +124,7 @@ const apps = [
 (function () {
   const CACHE_KEY = 'rshr_gh_releases_v1';
   const CACHE_TTL = 15 * 60 * 1000;
-  const REPO = 'Vanderhoof/timetable';
+  const REPO = 'master-of-schedule/master-of-schedule';
 
   async function getReleasesData(): Promise<{ rshr: any; rn: any } | null> {
     try {
