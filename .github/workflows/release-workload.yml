@@ -29,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            --title "master-of-workload $GITHUB_REF_NAME" \
+            --title "РН $GITHUB_REF_NAME" \
             --notes-file /tmp/release-notes.md
 
   # ── Web build: single-file HTML app ───────────────────────────────────────
