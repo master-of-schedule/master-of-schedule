@@ -1,0 +1,137 @@
+---
+const base = import.meta.env.BASE_URL;
+
+const nav = [
+  { label: 'Возможности', href: '#features' },
+  { label: 'Скачать', href: '#download' },
+  { label: 'Контакты', href: '#contact' },
+];
+---
+
+<header class="header">
+  <div class="container header-inner">
+    <a href={base} class="logo" aria-label="На главную">
+      <span class="logo-rshr">РШР</span>
+      <span class="logo-plus">+</span>
+      <span class="logo-rn">РН</span>
+    </a>
+
+    <nav class="nav" aria-label="Основная навигация">
+      {nav.map((item) => (
+        <a href={item.href} class="nav-link">{item.label}</a>
+      ))}
+    </nav>
+
+    <a
+      href="https://github.com/Vanderhoof/timetable"
+      class="github-btn"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="GitHub репозиторий"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+      </svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--nav-h);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  :global(.header-scrolled) {
+    border-bottom-color: var(--border);
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  .header-inner {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo {
+    font-family: 'Geologica', sans-serif;
+    font-weight: 800;
+    font-size: 1.1875rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+
+  .logo-rshr {
+    color: var(--blue);
+  }
+
+  .logo-plus {
+    color: var(--text-muted);
+    font-weight: 300;
+    font-size: 1rem;
+  }
+
+  .logo-rn {
+    color: var(--green);
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+  }
+
+  .nav-link {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.14s, background 0.14s;
+  }
+
+  .nav-link:hover {
+    color: var(--text);
+    background: var(--bg-subtle);
+  }
+
+  .github-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border-strong);
+    transition: color 0.14s, background 0.14s, border-color 0.14s;
+    margin-left: 8px;
+  }
+
+  .github-btn:hover {
+    color: var(--text);
+    background: var(--bg-subtle);
+    border-color: var(--text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .nav {
+      display: none;
+    }
+  }
+</style>
