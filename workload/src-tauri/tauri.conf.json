@@ -1,7 +1,7 @@
 {
-  "productName": "Редактор нагрузки",
+  "productName": "master-of-workload",
   "identifier": "com.school.workload-editor",
-  "version": "1.13.0",
+  "version": "1.15.1",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5174",

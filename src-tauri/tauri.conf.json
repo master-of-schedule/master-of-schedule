@@ -1,7 +1,7 @@
 {
-  "productName": "РШР",
+  "productName": "master-of-schedule",
   "identifier": "com.school.timetable-editor",
-  "version": "3.27.0",
+  "version": "3.29.1",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
