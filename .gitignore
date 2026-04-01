@@ -36,10 +36,6 @@ dist-ssr
 !public/favicon.png
 !.github/assets/*.png
 
-# Exception: website public assets (logos, screenshots, example data)
-!website/public/**/*.png
-!website/public/**/*.xlsx
-
 # Old version snapshots
 v3.*/
 
