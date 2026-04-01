@@ -1,0 +1,250 @@
+---
+const base = import.meta.env.BASE_URL;
+
+const products = [
+  {
+    id: 'rshr',
+    logo: `${base}logos/rshr.png`,
+    abbr: 'РШР',
+    full: 'Редактор Школьного Расписания',
+    color: 'blue',
+    tagline: 'Составляйте расписание визуально',
+    description:
+      'Редактор с сеткой 5×8 для всех классов. Автоматически проверяет занятость учителей и кабинетов, выявляет конфликты, поддерживает несколько версий расписания и экспортирует в таблицы.',
+    features: [
+      'Визуальная сетка по классам, дням и урокам',
+      'Цветовая подсветка конфликтов и занятости',
+      'Шаблоны, недельные и технические версии',
+      'Экспорт в Google Sheets и Excel',
+    ],
+  },
+  {
+    id: 'rn',
+    logo: `${base}logos/rn.png`,
+    abbr: 'РН',
+    full: 'Редактор Нагрузки',
+    color: 'green',
+    tagline: 'Планируйте нагрузку до расписания',
+    description:
+      'Приложение для планирования учебной нагрузки до начала учебного года. Распределяйте часы по учителям и кафедрам, затем одним действием передавайте данные в РШР.',
+    features: [
+      'Таблица нагрузки по классам и предметам',
+      'Распределение часов по учителям',
+      'Структура кафедр и сводные отчёты',
+      'Прямой экспорт в формат РШР',
+    ],
+  },
+];
+---
+
+<section class="products" id="products">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-eyebrow">Два приложения</p>
+      <h2 class="section-title">Полный цикл работы с расписанием</h2>
+      <p class="section-sub">
+        РН планирует нагрузку, РШР строит расписание. Оба работают вместе и по отдельности.
+      </p>
+    </div>
+
+    <div class="products-grid">
+      {products.map((p, i) => (
+        <div class={`product-card product-${p.color} reveal reveal-delay-${i + 1}`}>
+          <div class="card-accent-bar"></div>
+          <div class="card-body">
+            <div class="card-header-row">
+              <img src={p.logo} alt={`${p.abbr} логотип`} class="card-logo" />
+              <div class="card-titles">
+                <span class={`card-abbr card-abbr-${p.color}`}>{p.abbr}</span>
+                <span class="card-full">{p.full}</span>
+              </div>
+            </div>
+            <p class="card-tagline">{p.tagline}</p>
+            <p class="card-desc">{p.description}</p>
+            <ul class="card-features">
+              {p.features.map((f) => (
+                <li class="card-feature">
+                  <span class={`feature-check feature-check-${p.color}`} aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .products {
+    background: var(--bg-subtle);
+    padding: 96px 0;
+  }
+
+  .section-header {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto 64px;
+  }
+
+  .section-eyebrow {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: clamp(1.875rem, 3.5vw, 2.625rem);
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .section-sub {
+    font-size: 1.0625rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .products-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .product-card {
+    background: white;
+    border-radius: var(--radius-xl);
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .product-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
+  }
+
+  .card-accent-bar {
+    height: 4px;
+  }
+
+  .product-blue .card-accent-bar { background: var(--blue); }
+  .product-green .card-accent-bar { background: var(--green); }
+
+  .card-body {
+    padding: 36px;
+  }
+
+  .card-header-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .card-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    object-fit: contain;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .card-abbr {
+    font-family: 'Geologica', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .card-abbr-blue { color: var(--blue); }
+  .card-abbr-green { color: var(--green); }
+
+  .card-full {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .card-tagline {
+    font-family: 'Geologica', sans-serif;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .card-desc {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+
+  .card-features {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .card-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .feature-check {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+
+  .feature-check-blue {
+    background: var(--blue-50);
+    color: var(--blue);
+  }
+
+  .feature-check-green {
+    background: var(--green-50);
+    color: var(--green);
+  }
+
+  @media (max-width: 800px) {
+    .products-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card-body {
+      padding: 28px 24px;
+    }
+  }
+</style>
