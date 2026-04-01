@@ -29,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            --title "РШР $GITHUB_REF_NAME" \
+            --title "master-of-schedule $GITHUB_REF_NAME" \
             --notes-file /tmp/release-notes.md
 
   # ── Web build: single-file HTML app ───────────────────────────────────────
@@ -49,7 +49,7 @@ jobs:
 
       - name: Package web app
         run: |
-          FOLDER="РШР-web-${GITHUB_REF_NAME}"
+          FOLDER="master-of-schedule-web-${GITHUB_REF_NAME}"
           mkdir -p "$FOLDER"
           cp dist/index.html "$FOLDER/index.html"
           zip -r "${FOLDER}.zip" "$FOLDER/"
@@ -57,7 +57,7 @@ jobs:
       - name: Upload to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" "РШР-web-${GITHUB_REF_NAME}.zip" --clobber
+        run: gh release upload "$GITHUB_REF_NAME" "master-of-schedule-web-${GITHUB_REF_NAME}.zip" --clobber
 
   # ── macOS build: Tauri .dmg ────────────────────────────────────────────────
   build-macos:
