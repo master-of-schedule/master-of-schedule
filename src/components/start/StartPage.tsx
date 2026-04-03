@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { VersionListItem, VersionType } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
-import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile } from '@/db/import-export';
+import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile, downloadExcelTemplate } from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { getVersionsByType, getVersion, deleteVersion, setActiveTemplate, getActiveTemplate, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { Button } from '@/components/common/Button';
@@ -458,6 +458,14 @@ export function StartPage() {
             title="Импорт учителей, кабинетов, классов и занятий из Excel"
           >
             {isImporting ? 'Загрузка...' : 'Загрузить Excel'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={downloadExcelTemplate}
+            title="Скачать пустой шаблон Excel с нужными листами и заголовками"
+          >
+            Шаблон Excel
           </Button>
           {hasData && !isReadOnlyYear && (
             <Button
