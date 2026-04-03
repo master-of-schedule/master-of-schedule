@@ -8,6 +8,8 @@
   ![Лицензия](https://img.shields.io/badge/лицензия-MIT-blue)
   ![Платформа](https://img.shields.io/badge/платформа-web%20%7C%20macOS%20%7C%20Windows-lightgrey)
   ![Сборка](https://img.shields.io/github/actions/workflow/status/Vanderhoof/timetable/release.yml?label=сборка)
+
+  **[master-of-schedule.github.io](https://master-of-schedule.github.io)**
 </div>
 
 ---
