@@ -32,6 +32,7 @@ export function ProtocolPanel() {
   const redo = useScheduleStore((state) => state.redo);
   const undoAll = useScheduleStore((state) => state.undoAll);
   const clearHistory = useScheduleStore((state) => state.clearHistory);
+  const goToHistoryEntry = useScheduleStore((state) => state.goToHistoryEntry);
   const classes = useDataStore((state) => state.classes);
 
   const classNames = useMemo(() => classes.map(c => c.name), [classes]);
@@ -83,7 +84,9 @@ export function ProtocolPanel() {
             return (
               <div
                 key={entry.id}
-                className={`${styles.entry} ${isCurrent ? styles.current : ''} ${isUndone ? styles.undone : ''}`}
+                className={`${styles.entry} ${isCurrent ? styles.current : ''} ${isUndone ? styles.undone : ''} ${!isCurrent ? styles.clickable : ''}`}
+                onClick={!isCurrent ? () => goToHistoryEntry(index) : undefined}
+                title={!isCurrent ? 'Восстановить это состояние' : undefined}
               >
                 <span className={styles.time}>
                   {new Date(entry.timestamp).toLocaleTimeString('ru-RU', {

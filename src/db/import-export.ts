@@ -284,6 +284,54 @@ export async function saveJsonStringToFolder(
   await writable.close();
 }
 
+// ============ Excel Template ============
+
+/**
+ * Generate and download an empty Excel template with the required sheets and column headers.
+ */
+export function downloadExcelTemplate(): void {
+  const wb = XLSX.utils.book_new();
+
+  const sheets: Array<{ name: string; headers: string[] }> = [
+    {
+      name: 'Учителя',
+      headers: ['Фамилия И.О.', 'Предметы', 'Запреты', 'Кабинет', 'Телефон', 'Мессенджер'],
+    },
+    {
+      name: 'Кабинеты',
+      headers: ['Имя для составителя', 'Для расписания', 'Вместимость (детей)', 'Несколько классов (Число)'],
+    },
+    {
+      name: 'Классы',
+      headers: ['Класс', 'Число детей'],
+    },
+    {
+      name: 'Классные занятия',
+      headers: ['Класс', 'Предмет', 'Учитель', 'Занятий в неделю'],
+    },
+    {
+      name: 'Групповые занятия',
+      headers: ['Группа', 'Класс', 'Предмет', 'Учитель', 'Занятий в неделю', 'Параллельная группа'],
+    },
+  ];
+
+  for (const { name, headers } of sheets) {
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }
+
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'шаблон_данных.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ============ Excel Import ============
 
 /**
