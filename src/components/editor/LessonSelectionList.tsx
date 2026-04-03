@@ -3,7 +3,7 @@
  * Computes available lessons, renders unscheduled and movable sections.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useDataStore, useScheduleStore, useUIStore } from '@/stores';
 import { getAvailableLessonsForSlot } from '@/logic';
 import { extractGroupIndex } from '@/utils/formatLesson';
@@ -89,6 +89,8 @@ export function LessonSelectionList({
     setHighlightedMovableTeacher(teacherName);
     onClose();
   };
+
+  const [unionExpanded, setUnionExpanded] = useState(false);
 
   const hasSubstitutes = (substituteTeachers?.length ?? 0) > 0;
   const hasUnion = (unionTeachers?.length ?? 0) > 0;
@@ -197,21 +199,31 @@ export function LessonSelectionList({
 
       {hasUnion && onUnionSubstituteSelect && (
         <div className={styles.section}>
-          <h4 className={styles.sectionTitle}>Другие (проф.)</h4>
-          <div className={styles.list}>
-            {unionTeachers!.map((teacher) => (
-              <button
-                key={teacher.id}
-                className={`${styles.item} ${styles.unionItem}`}
-                onClick={() => onUnionSubstituteSelect(teacher)}
-              >
-                <span className={styles.teacher}>{teacher.name}</span>
-                {teacher.defaultRoom && (
-                  <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
-                )}
-              </button>
-            ))}
-          </div>
+          <button
+            className={styles.collapsibleHeader}
+            onClick={() => setUnionExpanded((v) => !v)}
+            aria-expanded={unionExpanded}
+          >
+            <span>Другие (проф.)</span>
+            <span className={styles.collapsibleCount}>{unionTeachers!.length}</span>
+            <span className={styles.collapsibleChevron}>{unionExpanded ? '▲' : '▼'}</span>
+          </button>
+          {unionExpanded && (
+            <div className={styles.list}>
+              {unionTeachers!.map((teacher) => (
+                <button
+                  key={teacher.id}
+                  className={`${styles.item} ${styles.unionItem}`}
+                  onClick={() => onUnionSubstituteSelect(teacher)}
+                >
+                  <span className={styles.teacher}>{teacher.name}</span>
+                  {teacher.defaultRoom && (
+                    <span className={styles.teacher}>каб. {teacher.defaultRoom}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </>

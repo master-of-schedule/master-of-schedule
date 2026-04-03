@@ -73,6 +73,10 @@
   text-decoration: line-through;
 }
 
+.entry.clickable {
+  cursor: pointer;
+}
+
 .time {
   flex-shrink: 0;
   color: var(--color-text-secondary);
