@@ -33,11 +33,11 @@ function makeAssignment(overrides: Partial<Assignment> = {}): Assignment {
 }
 
 describe('hoursPerClass', () => {
-  it('sums hours per class correctly', () => {
+  it('sums hours per class across different subjects', () => {
     const assignments: Assignment[] = [
-      makeAssignment({ className: '5а', hoursPerWeek: 5 }),
-      makeAssignment({ className: '5а', hoursPerWeek: 3 }),
-      makeAssignment({ className: '6б', hoursPerWeek: 4 }),
+      makeAssignment({ className: '5а', subject: 'Математика', hoursPerWeek: 5 }),
+      makeAssignment({ className: '5а', subject: 'Физкультура', hoursPerWeek: 3 }),
+      makeAssignment({ className: '6б', subject: 'Математика', hoursPerWeek: 4 }),
     ];
     const result = hoursPerClass(assignments);
     expect(result['5а']).toBe(8);
@@ -46,6 +46,18 @@ describe('hoursPerClass', () => {
 
   it('returns empty object for no assignments', () => {
     expect(hoursPerClass([])).toEqual({});
+  });
+
+  it('З17-1: does not double-count groupSplit subjects (two teachers, same class+subject)', () => {
+    // groupSplit subject: two teachers each assigned to the same class+subject
+    const assignments: Assignment[] = [
+      makeAssignment({ className: '5а', subject: 'Английский', teacherId: 't1', hoursPerWeek: 2 }),
+      makeAssignment({ className: '5а', subject: 'Английский', teacherId: 't2', hoursPerWeek: 2 }),
+      makeAssignment({ className: '5а', subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+    ];
+    const result = hoursPerClass(assignments);
+    // Should count Английский only once: 2 + 5 = 7, not 2+2+5=9
+    expect(result['5а']).toBe(7);
   });
 });
 
