@@ -2,16 +2,9 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { deriveInitials, shortTeacherName } from '../logic/groupNames';
 import { useToast } from '../hooks/useToast';
+import { generateId } from '../utils/generateId';
 import type { DeptGroup, DeptTable } from '../types';
 import styles from './DepartmentsPage.module.css';
-
-function makeId() {
-  return `dept-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function makeTeacherId() {
-  return `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
 
 export function DepartmentsPage() {
   const {
@@ -61,7 +54,7 @@ export function DepartmentsPage() {
     const name = newGroupName.trim();
     if (!name) { setAddGroupError('Введите название'); return; }
     if (deptGroups.find((g) => g.name === name)) { setAddGroupError('Кафедра с таким именем уже есть'); return; }
-    const groupId = makeId();
+    const groupId = generateId("dept");
     addDeptGroup({ id: groupId, name, tables: [{ id: `${groupId}-t1`, name, teacherIds: [], subjectFilter: [] }] });
     setNewGroupName('');
     setAddGroupError('');
@@ -96,7 +89,7 @@ export function DepartmentsPage() {
   function handleAddTable(groupId: string) {
     const name = newTableName.trim();
     if (!name) { setAddTableError('Введите название'); return; }
-    addDeptTable(groupId, { id: makeId(), name, teacherIds: [], subjectFilter: [] });
+    addDeptTable(groupId, { id: generateId("dept"), name, teacherIds: [], subjectFilter: [] });
     setNewTableName('');
     setAddTableError('');
     setAddingTableForGroup(null);
@@ -136,7 +129,7 @@ export function DepartmentsPage() {
         updateDeptTable(groupId, table.id, { teacherIds: [...table.teacherIds, existing.id] });
       }
     } else {
-      const id = makeTeacherId();
+      const id = generateId("t");
       addTeacher({ id, name, initials: deriveInitials(name), subjects: [] });
       updateDeptTable(groupId, table.id, { teacherIds: [...table.teacherIds, id] });
     }

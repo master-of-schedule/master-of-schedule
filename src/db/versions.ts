@@ -5,13 +5,7 @@
 
 import { db, updateSettings } from './database';
 import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement } from '@/types';
-
-/**
- * Generate unique ID
- */
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '@/utils/generateId';
 
 /**
  * Create a new version

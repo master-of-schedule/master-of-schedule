@@ -11,10 +11,7 @@
  */
 
 import type { LessonRequirement, ScheduledLesson } from '@/types';
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '@/utils/generateId';
 
 interface ScheduledLessonOptions {
   /** Original teacher name (set when this is a substitution) */

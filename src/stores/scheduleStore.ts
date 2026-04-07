@@ -17,6 +17,7 @@ import type {
   HistoryActionType,
 } from '@/types';
 import { describeAction } from '@/types';
+import { generateId } from '@/utils/generateId';
 import {
   addLessonToSlot,
   removeLessonFromSlot,
@@ -145,9 +146,6 @@ interface ScheduleState {
   getHistoryDescription: (index: number) => string;
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
 
 /** Returns history up to and including the current index, discarding any redo entries. */
 function truncateHistory(history: HistoryEntry[], historyIndex: number): HistoryEntry[] {

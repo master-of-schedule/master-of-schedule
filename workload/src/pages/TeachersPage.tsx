@@ -5,12 +5,9 @@ import { importTeachersFromDataXlsx } from '../logic/importTeachers';
 import { computeTeacherTotalHours } from '../logic/teacherHours';
 import { TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { useToast } from '../hooks/useToast';
+import { generateId } from '../utils/generateId';
 import type { RNTeacher } from '../types';
 import styles from './TeachersPage.module.css';
-
-function makeId() {
-  return `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
 
 const EMPTY_FORM = { name: '', initials: '', defaultRoom: '', homeroomClass: '' };
 
@@ -72,7 +69,7 @@ export function TeachersPage() {
 
     if (editing === 'new') {
       addTeacher({
-        id: makeId(),
+        id: generateId('t'),
         name,
         initials: form.initials.trim() || deriveInitials(name),
         subjects: [],
