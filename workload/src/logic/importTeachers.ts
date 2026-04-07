@@ -10,10 +10,7 @@
 
 import * as XLSX from 'xlsx';
 import type { RNTeacher } from '../types';
-
-function makeId() {
-  return `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
+import { generateId } from '../utils/generateId';
 
 /** Extract initials from "Авдеева Н.В." → "НВ" (two uppercase letters, no dots, З3-7) */
 export function parseInitials(name: string): string {
@@ -50,7 +47,7 @@ export async function importTeachersFromDataXlsx(file: File): Promise<RNTeacher[
 
     const room = parseRoom(String(row[1] ?? ''));
     teachers.push({
-      id: makeId(),
+      id: generateId('t'),
       name,
       initials: parseInitials(name),
       subjects: [],
