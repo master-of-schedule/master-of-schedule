@@ -504,20 +504,22 @@ function DeptTableSection({
               {visibleClassNames.map((cn) => {
                 const total = classTotal(cn);
                 const max = sanpinMaxForClass(cn);
-                const over = max !== null && total > max;
+                const planned = deptPlanned(cn);
+                const assigned = deptAssigned(cn);
+                const deptOver = planned > 0 && assigned > planned;
                 const gc = groupCount(cn);
-                const deptComplete = deptPlanned(cn) > 0 && deptAssigned(cn) >= deptPlanned(cn);
+                const deptComplete = planned > 0 && assigned >= planned;
                 return (
                   <th
                     key={cn}
                     className={
-                      over ? styles.classHeaderOver :
+                      deptOver ? styles.classHeaderOver :
                       deptComplete ? styles.classHeaderComplete :
                       styles.classHeader
                     }
                   >
                     {cn}
-                    <div className={`${styles.classTotal} ${over ? styles.classTotalOver : ''}`}>
+                    <div className={`${styles.classTotal} ${deptOver ? styles.classTotalOver : ''}`}>
                       {total}/{max ?? '?'}
                     </div>
                     {hasGroupSplitSubjects && (
