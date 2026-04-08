@@ -87,8 +87,8 @@ export function EditorPage() {
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
     if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
-      ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки. Двойной клик — авто-кабинет'
-      : 'Нажмите на свободную ячейку сетки для назначения. Двойной клик — авто-кабинет';
+      ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки.'
+      : 'Нажмите на свободную ячейку сетки для назначения.';
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
   }, [movingLesson, absentTeacher, copiedLesson, selectedCells.length, selectedLesson, versionType]);
 
