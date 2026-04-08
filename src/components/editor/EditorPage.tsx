@@ -683,8 +683,8 @@ export function EditorPage() {
 
       <div className={styles.rightPanel}>
         {currentClass && <UnscheduledPanel className={currentClass} />}
-        {(versionType === 'weekly' || versionType === 'technical') && <AbsentPanel />}
-        {(versionType === 'weekly' || versionType === 'technical') && <RoomPanel />}
+        {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <AbsentPanel />}
+        {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <RoomPanel />}
         {replacementPicker.isOpen && currentClass && replacementPicker.data && (
           <ReplacementPanel
             className={currentClass}

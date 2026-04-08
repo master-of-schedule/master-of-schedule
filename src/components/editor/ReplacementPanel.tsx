@@ -47,6 +47,7 @@ export function ReplacementPanel({
   onClose,
 }: ReplacementPanelProps) {
   const schedule = useScheduleStore((state) => state.schedule);
+  const versionType = useScheduleStore((state) => state.versionType);
   const teachers = useDataStore((state) => state.teachers);
 
   const substituteTeachers = useMemo(() => {
@@ -55,10 +56,10 @@ export function ReplacementPanel({
   }, [schedule, teachers, currentLesson, day, lessonNum, className]);
 
   const unionTeachers = useMemo(() => {
-    if (!currentLesson) return [];
+    if (!currentLesson || versionType === 'template') return undefined;
     const substituteNames = substituteTeachers.map((t) => t.name);
     return getFreeTeachersAtSlot(schedule, teachers, day, lessonNum, currentLesson.teacher, substituteNames);
-  }, [schedule, teachers, currentLesson, day, lessonNum, substituteTeachers]);
+  }, [schedule, teachers, currentLesson, day, lessonNum, substituteTeachers, versionType]);
 
   // Partner teachers: others already teaching in the same slot for the same class
   const partnerTeachers = useMemo<PartnerTeacher[]>(() => {
