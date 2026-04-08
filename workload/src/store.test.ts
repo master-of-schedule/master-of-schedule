@@ -524,6 +524,49 @@ describe('applyDeptSnapshot (MU-2)', () => {
     const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
     expect(filo.tables.find((t) => t.id === 'filo-t1')?.teacherIds).toContain('dept-added');
   });
+
+  it('З17-3: new teacher from кафедра snapshot appears in assignments and teachers after import', () => {
+    // Simulate: завуч has existing data (no chem assignments).
+    // Кафедра sends snapshot with a NEW teacher + her assignments.
+    const chemGroup = useStore.getState().deptGroups.find((g) => g.id === 'chembio')!;
+    // Give chem group a subject filter
+    useStore.getState().updateDeptTable('chembio', chemGroup.tables[0].id, { subjectFilter: ['Биология'] });
+
+    // Pre-existing assignment for a DIFFERENT subject (not chem)
+    useStore.getState().setAssignment({ teacherId: 't1', className: '5а', subject: 'Математика', hoursPerWeek: 5 });
+
+    // Build snap from кафедра: new teacher + assignments
+    const newTeacher: RNTeacher = { id: 'new-bio', name: 'Новикова А.В.', initials: 'А.В.', subjects: ['Биология'] };
+    const snapAssignments = [
+      { teacherId: 'new-bio', className: '5а', subject: 'Биология', hoursPerWeek: 2 },
+      { teacherId: 'new-bio', className: '6а', subject: 'Биология', hoursPerWeek: 2 },
+    ];
+    const updatedChemGroup = useStore.getState().deptGroups.find((g) => g.id === 'chembio')!;
+    const snapDeptGroup = {
+      ...updatedChemGroup,
+      tables: updatedChemGroup.tables.map((t, i) =>
+        i === 0 ? { ...t, teacherIds: ['new-bio'] } : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({
+      groupId: 'chembio',
+      assignments: snapAssignments,
+      teachers: [newTeacher],
+      deptGroup: snapDeptGroup,
+    });
+
+    const s = useStore.getState();
+    // New teacher must be in teachers
+    expect(s.teachers.find((t) => t.id === 'new-bio')).toBeDefined();
+    // Her assignments must be present
+    const newTeacherAssignments = s.assignments.filter((a) => a.teacherId === 'new-bio');
+    expect(newTeacherAssignments).toHaveLength(2);
+    // Pre-existing non-chem assignment must survive
+    expect(s.assignments.find((a) => a.subject === 'Математика')).toBeDefined();
+    // Total: 1 (Мат) + 2 (Био) = 3
+    expect(s.assignments).toHaveLength(3);
+  });
 });
 
 describe('bootstrapFromDeptSnapshot', () => {
