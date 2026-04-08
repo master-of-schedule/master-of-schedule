@@ -7,6 +7,7 @@ import { validateWorkload } from '../logic/validation';
 import { generateWorkloadReport } from '../logic/workloadReport';
 import { printWorkloadReport } from '../logic/printReport';
 import { buildDeptReportData, printDeptReport } from '../logic/deptReport';
+import { compareClassNames } from '../logic/classSort';
 import { buildOfficialReport } from '../logic/officialReport';
 import { printOfficialReport } from '../logic/exportPdfReport';
 import { downloadWordReport } from '../logic/exportWordReport';
@@ -52,8 +53,14 @@ export function ExportPage() {
   const deptInputRef = useRef<HTMLInputElement>(null);
 
   const requirements = generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides);
-  const classReqs = requirements.filter((r) => r.type === 'class');
-  const groupReqs = requirements.filter((r) => r.type === 'group');
+  const classReqs = requirements.filter((r) => r.type === 'class').sort((a, b) => {
+    const c = compareClassNames(a.classOrGroup, b.classOrGroup);
+    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+  });
+  const groupReqs = requirements.filter((r) => r.type === 'group').sort((a, b) => {
+    const c = compareClassNames(a.className ?? '', b.className ?? '');
+    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+  });
 
   const issues = curriculumPlan
     ? validateWorkload(curriculumPlan, teachers, assignments, homeroomAssignments)
