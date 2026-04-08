@@ -7,6 +7,7 @@ import { validateWorkload } from '../logic/validation';
 import { generateWorkloadReport } from '../logic/workloadReport';
 import { printWorkloadReport } from '../logic/printReport';
 import { buildDeptReportData, printDeptReport } from '../logic/deptReport';
+import { compareClassNames } from '../logic/classSort';
 import { buildOfficialReport } from '../logic/officialReport';
 import { printOfficialReport } from '../logic/exportPdfReport';
 import { downloadWordReport } from '../logic/exportWordReport';
@@ -52,8 +53,14 @@ export function ExportPage() {
   const deptInputRef = useRef<HTMLInputElement>(null);
 
   const requirements = generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides);
-  const classReqs = requirements.filter((r) => r.type === 'class');
-  const groupReqs = requirements.filter((r) => r.type === 'group');
+  const classReqs = requirements.filter((r) => r.type === 'class').sort((a, b) => {
+    const c = compareClassNames(a.classOrGroup, b.classOrGroup);
+    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+  });
+  const groupReqs = requirements.filter((r) => r.type === 'group').sort((a, b) => {
+    const c = compareClassNames(a.className ?? '', b.className ?? '');
+    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+  });
 
   const issues = curriculumPlan
     ? validateWorkload(curriculumPlan, teachers, assignments, homeroomAssignments)
@@ -175,6 +182,19 @@ export function ExportPage() {
       const masterSubjects = getGroupSubjects(masterGroup);
       const replacedCount = assignments.filter((a) => masterSubjects.includes(a.subject)).length;
       applyDeptSnapshot(snap);
+
+      // З17-4: warn about duplicate teachers (same name, different IDs)
+      const postTeachers = useStore.getState().teachers;
+      const nameCount = new Map<string, number>();
+      for (const t of postTeachers) nameCount.set(t.name, (nameCount.get(t.name) ?? 0) + 1);
+      const duplicates = [...nameCount.entries()].filter(([, c]) => c > 1).map(([name]) => name);
+      if (duplicates.length > 0) {
+        notify(
+          `Возможные дубликаты учителей: ${duplicates.join(', ')}. Проверьте вкладку «Учителя».`,
+          'warning',
+          0,
+        );
+      }
 
       if (hasMismatch) {
         const conflicts = detectSnapshotConflicts(snap, curriculumPlan!);

@@ -136,6 +136,42 @@ describe('validateWorkload', () => {
     expect(issues.some((i) => i.severity === 'error' && i.target === TEACHER.name)).toBe(true);
   });
 
+  it('З18-3: warns when subject has more teachers assigned than planned', () => {
+    // Математика is non-split (1 slot planned), assign 2 teachers
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Математика', teacherId: 't2', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    // Математика: 2 assigned, 1 planned → warning. Физкультура: 2 assigned, 2 planned (groupSplit) → ok
+    expect(overAssigned).toHaveLength(1);
+    expect(overAssigned[0].message).toContain('Математика');
+  });
+
+  it('З18-3: no warning when groupSplit has correct number of teachers', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    expect(overAssigned).toHaveLength(0);
+  });
+
+  it('З18-3: bothGroups=true counts as 2 slots', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 3, bothGroups: true }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    expect(overAssigned).toHaveLength(0);
+  });
+
   it('З17-1: groupSplit does not cause false СанПиН error', () => {
     // 5а has СанПиН max 29. Assign 28h of various subjects + 3h Физкультура split between 2 teachers.
     // Without dedup: 28 + 3 + 3 = 34 > 29 → false error
