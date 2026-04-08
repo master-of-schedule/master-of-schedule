@@ -126,5 +126,27 @@ export function validateWorkload(
     }
   }
 
+  // ── Per-subject over-assignment (З18-3) ────────────────────────────────────
+  for (const { className, subject, hours } of allRequiredSubjects(plan)) {
+    const subjectAssignments = assignments.filter(
+      (a) => a.className === className && a.subject === subject,
+    );
+    const assignedSlots = subjectAssignments.reduce(
+      (sum, a) => sum + (a.bothGroups ? 2 : 1), 0,
+    );
+    const subjectRow = plan.grades
+      .flatMap((g) => g.subjects)
+      .find((s) => s.name === subject && (s.hoursPerClass[className] ?? 0) > 0);
+    if (!subjectRow) continue;
+    const gc = subjectRow.groupSplit ? (plan.groupCounts?.[className] ?? 2) : 1;
+    if (assignedSlots > gc) {
+      issues.push({
+        severity: 'warning',
+        message: `${className}: «${subject}» — назначено учителей: ${assignedSlots}, по плану: ${gc}`,
+        target: className,
+      });
+    }
+  }
+
   return issues;
 }
