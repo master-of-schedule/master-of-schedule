@@ -52,6 +52,8 @@ export interface SchoolClass {
   name: string;
   /** Number of students (for room capacity matching) */
   studentCount?: number;
+  /** Class belongs to a partner school — placed at end of grid, conflicts shown in grey */
+  isPartner?: boolean;
 }
 
 /**

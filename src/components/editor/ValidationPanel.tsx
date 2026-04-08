@@ -40,6 +40,7 @@ export function ValidationPanel() {
   const teachers = useDataStore((state) => state.teachers);
   const groups = useDataStore((state) => state.groups);
   const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
+  const classes = useDataStore((state) => state.classes);
   const setCurrentClass = useUIStore((state) => state.setCurrentClass);
   const setFocusedCell = useUIStore((state) => state.setFocusedCell);
   const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
@@ -47,10 +48,15 @@ export function ValidationPanel() {
   const [showGaps, setShowGaps] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
 
-  // Validate schedule
+  const partnerClassNames = useMemo(
+    () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
+  );
+
+  // Validate schedule (excluding partner class slots)
   const allConflicts = useMemo(
-    () => validateSchedule(schedule, teachers),
-    [schedule, teachers]
+    () => validateSchedule(schedule, teachers, partnerClassNames),
+    [schedule, teachers, partnerClassNames]
   );
 
   // Filter out acknowledged conflicts

@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { Day, LessonNumber, Room, ScheduledLesson, CellRef, LessonRequirement, Teacher } from '@/types';
-import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
+import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/stores';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson } from '@/logic';
 import { ClassSelector, groupClassesByGrade } from './ClassSelector';
@@ -62,6 +62,9 @@ export function EditorPage() {
   const setMovingLesson = useUIStore((state) => state.setMovingLesson);
   const clearMovingLesson = useUIStore((state) => state.clearMovingLesson);
   const absentTeacher = useUIStore((state) => state.absentTeacher);
+
+  const partnerData = usePartnerStore((state) => state.partnerData);
+  const clearPartnerFile = usePartnerStore((state) => state.clearPartnerFile);
 
   const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();
@@ -141,11 +144,11 @@ export function EditorPage() {
     lessonWithoutRoom?: ScheduledLesson;
   } | null>(null);
 
-  // Set initial class if none selected — pick the first non-excluded class (top-left in selector)
+  // Set initial class if none selected — pick the first non-partner, non-excluded class
   useEffect(() => {
     if (!currentClass && classes.length > 0) {
-      const classNames = classes.map(c => c.name);
-      const sorted = groupClassesByGrade(classNames, gapExcludedClasses);
+      const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
+      const sorted = groupClassesByGrade(ownClassNames.length > 0 ? ownClassNames : classes.map(c => c.name), gapExcludedClasses);
       const firstClass = sorted[0]?.[1][0] ?? classes[0].name;
       setCurrentClass(firstClass);
     }
@@ -652,6 +655,16 @@ export function EditorPage() {
                     title={`Назначить "${selectedLesson?.subject}" на ${selectedCells.length} ячеек`}
                   >
                     Назначить ({selectedCells.length})
+                  </Button>
+                )}
+                {partnerData && (
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={clearPartnerFile}
+                    title="Убрать загруженный JSON партнёра"
+                  >
+                    Отменить JSON партнёра
                   </Button>
                 )}
                 <Button

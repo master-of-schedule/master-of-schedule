@@ -22,6 +22,7 @@ export function ClassEditModal({ schoolClass, onClose }: ClassEditModalProps) {
 
   const [name, setName] = useState(schoolClass?.name ?? '');
   const [studentCount, setStudentCount] = useState<number | ''>(schoolClass?.studentCount ?? '');
+  const [isPartner, setIsPartner] = useState(schoolClass?.isPartner ?? false);
   const [nameError, setNameError] = useState<string | null>(null);
 
   const { isNew, isSaving, save } = useFormSave(schoolClass, onClose);
@@ -35,6 +36,7 @@ export function ClassEditModal({ schoolClass, onClose }: ClassEditModalProps) {
     const data = {
       name: name.trim(),
       studentCount: studentCount === '' ? undefined : studentCount,
+      isPartner: isPartner || undefined,
     };
     await save(
       async () => {
@@ -89,6 +91,14 @@ export function ClassEditModal({ schoolClass, onClose }: ClassEditModalProps) {
             max={100}
             style={{ maxWidth: 120 }}
             placeholder="30"
+          />
+        </FormField>
+
+        <FormField label="Партнёрская школа">
+          <input
+            type="checkbox"
+            checked={isPartner}
+            onChange={(e) => setIsPartner(e.target.checked)}
           />
         </FormField>
 

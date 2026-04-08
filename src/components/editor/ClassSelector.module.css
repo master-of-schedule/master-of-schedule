@@ -95,3 +95,8 @@
   background: var(--color-primary);
   border-color: var(--color-primary);
 }
+
+.classButton.partner {
+  opacity: 0.7;
+  font-style: italic;
+}

@@ -96,6 +96,28 @@ describe('generatePartnerAvailability', () => {
     const result = generatePartnerAvailability({}, { name: 'Шаблон', type: 'template' });
     expect(result.mondayDate).toBeUndefined();
   });
+
+  it('excludes partner class lessons when excludeClasses option is set', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Петрова А.П.', room: '101' }] },
+        },
+      },
+      '9п': { // partner class
+        'Пн': {
+          1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Химия', teacher: 'Козлова М.И.', room: '102' }] },
+        },
+      },
+    };
+    const result = generatePartnerAvailability(
+      schedule,
+      { name: 'Тест', type: 'template' },
+      { excludeClasses: new Set(['9п']) }
+    );
+    expect(result.slots['Петрова А.П.']).toBeDefined();
+    expect(result.slots['Козлова М.И.']).toBeUndefined();
+  });
 });
 
 describe('parsePartnerFile', () => {
