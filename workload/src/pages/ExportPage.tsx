@@ -183,6 +183,19 @@ export function ExportPage() {
       const replacedCount = assignments.filter((a) => masterSubjects.includes(a.subject)).length;
       applyDeptSnapshot(snap);
 
+      // З17-4: warn about duplicate teachers (same name, different IDs)
+      const postTeachers = useStore.getState().teachers;
+      const nameCount = new Map<string, number>();
+      for (const t of postTeachers) nameCount.set(t.name, (nameCount.get(t.name) ?? 0) + 1);
+      const duplicates = [...nameCount.entries()].filter(([, c]) => c > 1).map(([name]) => name);
+      if (duplicates.length > 0) {
+        notify(
+          `Возможные дубликаты учителей: ${duplicates.join(', ')}. Проверьте вкладку «Учителя».`,
+          'warning',
+          0,
+        );
+      }
+
       if (hasMismatch) {
         const conflicts = detectSnapshotConflicts(snap, curriculumPlan!);
         if (conflicts.orphanedCount > 0) {
