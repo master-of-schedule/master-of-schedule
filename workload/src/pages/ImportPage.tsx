@@ -4,6 +4,7 @@ import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
 import { applyGroupSplitToggle } from '../logic/planUtils';
 import { downloadUPTemplate } from '../logic/upTemplate';
+import { downloadPlanXlsx } from '../logic/planExport';
 import { compareClassNames } from '../logic/classSort';
 import { useToast } from '../hooks/useToast';
 import type { CurriculumPlan, SubjectRow } from '../types';
@@ -415,6 +416,9 @@ export function ImportPage() {
             </button>
             <button className={styles.exportUpBtn} onClick={handleExportUP}>
               Скачать УП (JSON)
+            </button>
+            <button className={styles.exportUpBtn} onClick={() => downloadPlanXlsx(curriculumPlan)}>
+              Скачать УП (.xlsx)
             </button>
           </div>
           <input
