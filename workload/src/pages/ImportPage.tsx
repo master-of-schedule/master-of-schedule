@@ -4,6 +4,7 @@ import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
 import { applyGroupSplitToggle } from '../logic/planUtils';
 import { downloadUPTemplate } from '../logic/upTemplate';
+import { compareClassNames } from '../logic/classSort';
 import { useToast } from '../hooks/useToast';
 import type { CurriculumPlan, SubjectRow } from '../types';
 import styles from './ImportPage.module.css';
@@ -243,7 +244,7 @@ export function ImportPage() {
     pushUndo(false, `копирование ${sourceClass} → ${newClass}`);
     const updated: CurriculumPlan = {
       ...target,
-      classNames: [...target.classNames, newClass].sort((a, b) => a.localeCompare(b, 'ru')),
+      classNames: [...target.classNames, newClass].sort(compareClassNames),
       groupCounts: {
         ...(target.groupCounts ?? {}),
         [newClass]: target.groupCounts?.[sourceClass] ?? 2,
@@ -270,7 +271,7 @@ export function ImportPage() {
     pushUndo(false, `добавление класса ${className}`);
     const updated: CurriculumPlan = {
       ...target,
-      classNames: [...target.classNames, className].sort((a, b) => a.localeCompare(b, 'ru')),
+      classNames: [...target.classNames, className].sort(compareClassNames),
       grades: target.grades.map((g) => {
         if (g.grade !== _grade) return g;
         return {
