@@ -140,6 +140,24 @@
   opacity: 0.5;
 }
 
+.lesson.conducted {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: line-through;
+}
+
+.lesson.conducted:hover {
+  background: none;
+}
+
+.conductedBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-success, #1e7e34);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .removeButton {
   display: flex;
   align-items: center;

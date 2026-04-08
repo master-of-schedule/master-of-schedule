@@ -513,3 +513,25 @@ describe('acknowledgeConflict / clearConflictAcks — Z32-3', () => {
     expect(useScheduleStore.getState().acknowledgedConflictKeys).toEqual([]);
   });
 });
+
+describe('lessonStatuses — conducted count', () => {
+  beforeEach(() => {
+    useScheduleStore.getState().newSchedule('weekly');
+  });
+
+  it('setLessonStatus stores completed2 status for two-period conducted', () => {
+    useScheduleStore.getState().setLessonStatus('req1', 'completed2');
+    expect(useScheduleStore.getState().lessonStatuses['req1']).toBe('completed2');
+  });
+
+  it('clearLessonStatus removes conducted status', () => {
+    useScheduleStore.getState().setLessonStatus('req1', 'completed2');
+    useScheduleStore.getState().clearLessonStatus('req1');
+    expect(useScheduleStore.getState().lessonStatuses['req1']).toBeUndefined();
+  });
+
+  it('single-period conducted uses completed status', () => {
+    useScheduleStore.getState().setLessonStatus('req1', 'completed');
+    expect(useScheduleStore.getState().lessonStatuses['req1']).toBe('completed');
+  });
+});

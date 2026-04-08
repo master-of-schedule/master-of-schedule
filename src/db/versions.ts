@@ -16,7 +16,7 @@ export async function createVersion(params: {
   schedule: Schedule;
   substitutions?: Substitution[];
   temporaryLessons?: LessonRequirement[];
-  lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
   acknowledgedConflictKeys?: string[];
   comment?: string;
   mondayDate?: Date;
@@ -99,7 +99,7 @@ export async function updateVersionSchedule(
   schedule: Schedule,
   substitutions?: Substitution[],
   temporaryLessons?: LessonRequirement[],
-  lessonStatuses?: Record<string, 'sick' | 'completed'>,
+  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>,
   acknowledgedConflictKeys?: string[]
 ): Promise<void> {
   const updates: Partial<Version> = { schedule };

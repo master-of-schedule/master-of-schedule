@@ -37,7 +37,7 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
   versionDaysPerWeek?: number;
   substitutions: import('@/types').Substitution[];
   temporaryLessons?: import('@/types').LessonRequirement[];
-  lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
   acknowledgedConflictKeys?: string[];
   baseTemplateId?: string;
   baseTemplateSchedule?: Schedule;

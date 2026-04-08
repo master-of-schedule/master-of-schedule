@@ -59,14 +59,21 @@ export function LessonSelectionList({
   onPartnerSelect,
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
+  const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
   const teachers = useDataStore((state) => state.teachers);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
   const setHighlightedMovableTeacher = useUIStore((state) => state.setHighlightedMovableTeacher);
 
+  // Exclude requirements marked as conducted from replacement search
+  const activeRequirements = useMemo(
+    () => lessonRequirements.filter(r => lessonStatuses[r.id] !== 'completed' && lessonStatuses[r.id] !== 'completed2'),
+    [lessonRequirements, lessonStatuses]
+  );
+
   const availableLessons = useMemo(() => {
     if (!isOpen) return { unscheduled: [], movable: [] };
     return getAvailableLessonsForSlot(
-      lessonRequirements,
+      activeRequirements,
       schedule,
       teachers,
       className,
@@ -74,7 +81,7 @@ export function LessonSelectionList({
       lessonNum,
       currentLesson
     );
-  }, [isOpen, lessonRequirements, schedule, teachers, className, day, lessonNum, currentLesson]);
+  }, [isOpen, activeRequirements, schedule, teachers, className, day, lessonNum, currentLesson]);
 
   // Extract unique teacher names from movable lessons
   const movableTeachers = useMemo(() => {
