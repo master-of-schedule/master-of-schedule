@@ -410,8 +410,21 @@ export const useStore = create<RNState>()(
           const newTeachers = snapTeachers.filter((t) => !existingIds.has(t.id));
           const mergedTeachers = newTeachers.length > 0 ? [...s.teachers, ...newTeachers] : s.teachers;
 
-          // Replace deptGroup with the snapshot version (preserves updated teacherIds)
-          const mergedDeptGroups = s.deptGroups.map((g) => (g.id === groupId ? snapDeptGroup : g));
+          // З18-6: Keep master's deptGroup structure, only merge new teacherIds from snapshot
+          const snapTeacherIdsByTable = new Map(snapDeptGroup.tables.map((t) => [t.id, new Set(t.teacherIds)]));
+          const mergedDeptGroups = s.deptGroups.map((g) => {
+            if (g.id !== groupId) return g;
+            return {
+              ...g,
+              tables: g.tables.map((t) => {
+                const snapIds = snapTeacherIdsByTable.get(t.id);
+                if (!snapIds) return t;
+                const existing = new Set(t.teacherIds);
+                const added = [...snapIds].filter((id) => !existing.has(id));
+                return added.length > 0 ? { ...t, teacherIds: [...t.teacherIds, ...added] } : t;
+              }),
+            };
+          });
 
           return {
             assignments: [...toKeep, ...snapAssignments],

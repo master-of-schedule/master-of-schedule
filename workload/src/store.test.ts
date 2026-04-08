@@ -508,7 +508,7 @@ describe('applyDeptSnapshot (MU-2)', () => {
     expect(teachers).toHaveLength(1);
   });
 
-  it('З16-4: deptGroup is replaced with snapshot version (updated teacherIds)', () => {
+  it('З16-4: new teacherIds from snapshot are merged into master table', () => {
     const newTeacher: RNTeacher = { id: 'dept-added', name: 'Сидорова', initials: 'С.С.', subjects: ['Математика'] };
     useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'] });
 
@@ -523,6 +523,60 @@ describe('applyDeptSnapshot (MU-2)', () => {
 
     const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
     expect(filo.tables.find((t) => t.id === 'filo-t1')?.teacherIds).toContain('dept-added');
+  });
+
+  it('З18-6: master deptGroup structure is preserved (snapshot cannot change names or subjectFilter)', () => {
+    // Master has specific table name and subjectFilter
+    useStore.getState().updateDeptTable('filo', 'filo-t1', {
+      subjectFilter: ['Русский язык', 'Литература'],
+    });
+
+    // Snapshot has different table name and subjectFilter (кафедра modified their copy)
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const snapDeptGroup = {
+      ...filoGroup,
+      name: 'Кафедра Филологов (переименовано)',
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1'
+          ? { ...t, name: 'Переименованная таблица', subjectFilter: ['Только русский'], teacherIds: ['snap-t1'] }
+          : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [], teachers: [], deptGroup: snapDeptGroup });
+
+    const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    // Master name preserved
+    expect(filo.name).toBe('Филологи');
+    const table = filo.tables.find((t) => t.id === 'filo-t1')!;
+    // Master table name preserved
+    expect(table.name).toBe('Филологи');
+    // Master subjectFilter preserved
+    expect(table.subjectFilter).toEqual(['Русский язык', 'Литература']);
+    // But new teacherId IS merged
+    expect(table.teacherIds).toContain('snap-t1');
+  });
+
+  it('З18-6: existing teacherIds in master are not duplicated by snapshot', () => {
+    useStore.getState().updateDeptTable('filo', 'filo-t1', {
+      subjectFilter: ['Математика'],
+      teacherIds: ['t-existing'],
+    });
+
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const snapDeptGroup = {
+      ...filoGroup,
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1' ? { ...t, teacherIds: ['t-existing', 't-new'] } : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [], teachers: [], deptGroup: snapDeptGroup });
+
+    const table = useStore.getState().deptGroups.find((g) => g.id === 'filo')!.tables.find((t) => t.id === 'filo-t1')!;
+    // t-existing not duplicated, t-new added
+    expect(table.teacherIds.filter((id) => id === 't-existing')).toHaveLength(1);
+    expect(table.teacherIds).toContain('t-new');
   });
 
   it('З17-3: new teacher from кафедра snapshot appears in assignments and teachers after import', () => {
