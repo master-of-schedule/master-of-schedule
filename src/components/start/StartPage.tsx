@@ -126,10 +126,12 @@ export function StartPage() {
   const newSchedule = useScheduleStore((state) => state.newSchedule);
   const loadSchedule = useScheduleStore((state) => state.loadSchedule);
   const isDirty = useScheduleStore((state) => state.isDirty);
+  const jsonIsDirty = useScheduleStore((state) => state.jsonIsDirty);
   const versionId = useScheduleStore((state) => state.versionId);
   const versionName = useScheduleStore((state) => state.versionName);
   const schedule = useScheduleStore((state) => state.schedule);
   const markSaved = useScheduleStore((state) => state.markSaved);
+  const markJsonSaved = useScheduleStore((state) => state.markJsonSaved);
 
   const hasData = Object.keys(teachers).length > 0 || classes.length > 0 || requirements.length > 0;
 
@@ -297,13 +299,14 @@ export function StartPage() {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
       await saveJsonFile(json, `timetable-${date}.json`);
+      markJsonSaved();
       showToast('Файл скачан', 'success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка экспорта';
       setImportError(msg);
       showToast(msg, 'error');
     }
-  }, [showToast]);
+  }, [showToast, markJsonSaved]);
 
   // Create new schedule and open editor
   const handleCreate = useCallback((type: VersionType) => {
@@ -433,7 +436,7 @@ export function StartPage() {
             <span className={styles.dataSummary}>Не загружены</span>
           )}
           <Button
-            variant="secondary"
+            variant={jsonIsDirty ? 'danger' : 'secondary'}
             size="small"
             onClick={handleExportJson}
             disabled={isImporting || !hasData}

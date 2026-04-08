@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { Day, LessonNumber, Room, ScheduledLesson, CellRef, LessonRequirement, Teacher } from '@/types';
 import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/stores';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
+import { exportToJson, saveJsonFile } from '@/db/import-export';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson } from '@/logic';
 import { ClassSelector, groupClassesByGrade } from './ClassSelector';
 import { ScheduleGrid } from './ScheduleGrid';
@@ -47,7 +48,9 @@ export function EditorPage() {
   const versionType = useScheduleStore((state) => state.versionType);
   const versionName = useScheduleStore((state) => state.versionName);
   const isDirty = useScheduleStore((state) => state.isDirty);
+  const jsonIsDirty = useScheduleStore((state) => state.jsonIsDirty);
   const markSaved = useScheduleStore((state) => state.markSaved);
+  const markJsonSaved = useScheduleStore((state) => state.markJsonSaved);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
   const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
@@ -250,6 +253,19 @@ export function EditorPage() {
       setIsSaving(false);
     }
   }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek, markSaved, showToast]);
+
+  const handleSaveJson = useCallback(async () => {
+    try {
+      const json = await exportToJson();
+      const date = new Date().toISOString().slice(0, 10);
+      await saveJsonFile(json, `timetable-${date}.json`);
+      markJsonSaved();
+      showToast('Файл скачан', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка экспорта';
+      showToast(msg, 'error');
+    }
+  }, [markJsonSaved, showToast]);
 
   // Handle cell click to assign lesson (or paste copied lesson)
   const handleAssignLesson = useCallback(
@@ -672,9 +688,17 @@ export function EditorPage() {
                   size="small"
                   onClick={handleSave}
                   disabled={isSaving}
-                  title="Сохранить расписание"
+                  title="Сохранить расписание в браузере"
                 >
-                  {isSaving ? 'Сохранение...' : isDirty ? 'Сохранить*' : 'Сохранить'}
+                  {isSaving ? 'Сохранение...' : isDirty ? 'Сохранить действие*' : 'Сохранить действие'}
+                </Button>
+                <Button
+                  variant={jsonIsDirty ? 'danger' : 'secondary'}
+                  size="small"
+                  onClick={handleSaveJson}
+                  title="Экспортировать расписание в JSON-файл"
+                >
+                  Сохранить файл
                 </Button>
               </div>
             </div>
