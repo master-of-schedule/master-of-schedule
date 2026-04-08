@@ -127,7 +127,7 @@ export function validateWorkload(
   }
 
   // ── Per-subject over-assignment (З18-3) ────────────────────────────────────
-  for (const { className, subject, hours } of allRequiredSubjects(plan)) {
+  for (const { className, subject } of allRequiredSubjects(plan)) {
     const subjectAssignments = assignments.filter(
       (a) => a.className === className && a.subject === subject,
     );
