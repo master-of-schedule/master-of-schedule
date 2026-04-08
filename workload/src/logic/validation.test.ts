@@ -59,6 +59,16 @@ describe('hoursPerClass', () => {
     // Should count Английский only once: 2 + 5 = 7, not 2+2+5=9
     expect(result['5а']).toBe(7);
   });
+
+  it('З17-1: bothGroups does not inflate class total (one teacher, both groups)', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ className: '5а', subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3, bothGroups: true }),
+      makeAssignment({ className: '5а', subject: 'Математика', teacherId: 't2', hoursPerWeek: 5 }),
+    ];
+    const result = hoursPerClass(assignments);
+    // Class has 3h PE + 5h math = 8h, NOT 6+5=11 (bothGroups is teacher-level, not class-level)
+    expect(result['5а']).toBe(8);
+  });
 });
 
 describe('hoursPerTeacher', () => {
@@ -124,5 +134,24 @@ describe('validateWorkload', () => {
     );
     const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
     expect(issues.some((i) => i.severity === 'error' && i.target === TEACHER.name)).toBe(true);
+  });
+
+  it('З17-1: groupSplit does not cause false СанПиН error', () => {
+    // 5а has СанПиН max 29. Assign 28h of various subjects + 3h Физкультура split between 2 teachers.
+    // Without dedup: 28 + 3 + 3 = 34 > 29 → false error
+    // With dedup: 28 + 3 = 31 > 29 → still over, but correctly
+    // Better test: 25h + 3h split = 28 (under 29), should NOT trigger error
+    const assignments: Assignment[] = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        makeAssignment({ subject: `Предмет${i}`, hoursPerWeek: 5 }),
+      ),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    // Total without dedup: 25 + 3 + 3 = 31 > 29 → false error
+    // Total with dedup: 25 + 3 = 28 < 29 → no error
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const sanpinErrors = issues.filter((i) => i.severity === 'error' && i.message.includes('СанПиН'));
+    expect(sanpinErrors).toHaveLength(0);
   });
 });
