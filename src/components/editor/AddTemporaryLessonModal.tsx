@@ -5,6 +5,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { LessonRequirement } from '@/types';
 import { useDataStore, useScheduleStore } from '@/stores';
+import { generateId } from '@/utils/generateId';
 
 type CompensationType = 'none' | 'budget' | 'union';
 import { Modal } from '@/components/common/Modal';
@@ -23,9 +24,6 @@ interface AddTemporaryLessonModalProps {
   initialSubject?: string;
 }
 
-function generateId(): string {
-  return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
 
 type ConfirmState =
   | { type: 'duplicate'; message: string }
@@ -109,7 +107,7 @@ export function AddTemporaryLessonModal({
     }
 
     const lesson: LessonRequirement = {
-      id: generateId(),
+      id: generateId('temp'),
       type: isGroup ? 'group' : 'class',
       classOrGroup,
       subject: trimmedSubject,

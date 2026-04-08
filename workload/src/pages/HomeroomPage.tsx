@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useStore } from '../store';
 import { shortTeacherName } from '../logic/groupNames';
 import { useToast } from '../hooks/useToast';
@@ -25,13 +26,26 @@ export function HomeroomPage({ plan }: Props) {
     return homeroomAssignments.find((h) => h.className === className)?.teacherId ?? '';
   }
 
-  function handleChange(className: string, teacherId: string) {
+  // З18-7: build lookup map for name → teacherId
+  const sortedTeachers = useMemo(
+    () => [...teachers].sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+    [teachers],
+  );
+  const nameToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of teachers) map.set(shortTeacherName(t.name), t.id);
+    return map;
+  }, [teachers]);
+
+  function handleNameInput(className: string, name: string) {
+    if (!name.trim()) {
+      removeHomeroom(className);
+      return;
+    }
+    const teacherId = nameToId.get(name.trim());
     if (teacherId) {
       setHomeroom(className, teacherId);
-      const t = teachers.find((t) => t.id === teacherId);
-      if (t) notify(`Классный руководитель назначен: ${shortTeacherName(t.name)} — ${className}`, 'success');
-    } else {
-      removeHomeroom(className);
+      notify(`Классный руководитель назначен: ${name.trim()} — ${className}`, 'success');
     }
   }
 
@@ -72,16 +86,14 @@ export function HomeroomPage({ plan }: Props) {
               <tr key={cn}>
                 <td className={styles.className}>{cn}</td>
                 <td>
-                  <select
+                  <input
+                    list="homeroom-teachers"
                     className={`${styles.select} ${!tid ? styles.selectEmpty : ''}`}
-                    value={tid}
-                    onChange={(e) => handleChange(cn, e.target.value)}
-                  >
-                    <option value="">— не назначен —</option>
-                    {[...teachers].sort((a, b) => a.name.localeCompare(b.name, 'ru')).map((t) => (
-                      <option key={t.id} value={t.id}>{shortTeacherName(t.name)}</option>
-                    ))}
-                  </select>
+                    defaultValue={teacher ? shortTeacherName(teacher.name) : ''}
+                    placeholder="начните вводить фамилию…"
+                    onBlur={(e) => handleNameInput(cn, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  />
                 </td>
                 <td className={styles.razgovory}>
                   {teacher ? (
@@ -95,6 +107,11 @@ export function HomeroomPage({ plan }: Props) {
           })}
         </tbody>
       </table>
+      <datalist id="homeroom-teachers">
+        {sortedTeachers.map((t) => (
+          <option key={t.id} value={shortTeacherName(t.name)} />
+        ))}
+      </datalist>
 
       {unassigned.length > 0 && (
         <p className={styles.warning}>

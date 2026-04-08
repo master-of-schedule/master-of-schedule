@@ -33,11 +33,11 @@ function makeAssignment(overrides: Partial<Assignment> = {}): Assignment {
 }
 
 describe('hoursPerClass', () => {
-  it('sums hours per class correctly', () => {
+  it('sums hours per class across different subjects', () => {
     const assignments: Assignment[] = [
-      makeAssignment({ className: '5а', hoursPerWeek: 5 }),
-      makeAssignment({ className: '5а', hoursPerWeek: 3 }),
-      makeAssignment({ className: '6б', hoursPerWeek: 4 }),
+      makeAssignment({ className: '5а', subject: 'Математика', hoursPerWeek: 5 }),
+      makeAssignment({ className: '5а', subject: 'Физкультура', hoursPerWeek: 3 }),
+      makeAssignment({ className: '6б', subject: 'Математика', hoursPerWeek: 4 }),
     ];
     const result = hoursPerClass(assignments);
     expect(result['5а']).toBe(8);
@@ -46,6 +46,28 @@ describe('hoursPerClass', () => {
 
   it('returns empty object for no assignments', () => {
     expect(hoursPerClass([])).toEqual({});
+  });
+
+  it('З17-1: does not double-count groupSplit subjects (two teachers, same class+subject)', () => {
+    // groupSplit subject: two teachers each assigned to the same class+subject
+    const assignments: Assignment[] = [
+      makeAssignment({ className: '5а', subject: 'Английский', teacherId: 't1', hoursPerWeek: 2 }),
+      makeAssignment({ className: '5а', subject: 'Английский', teacherId: 't2', hoursPerWeek: 2 }),
+      makeAssignment({ className: '5а', subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+    ];
+    const result = hoursPerClass(assignments);
+    // Should count Английский only once: 2 + 5 = 7, not 2+2+5=9
+    expect(result['5а']).toBe(7);
+  });
+
+  it('З17-1: bothGroups does not inflate class total (one teacher, both groups)', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ className: '5а', subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3, bothGroups: true }),
+      makeAssignment({ className: '5а', subject: 'Математика', teacherId: 't2', hoursPerWeek: 5 }),
+    ];
+    const result = hoursPerClass(assignments);
+    // Class has 3h PE + 5h math = 8h, NOT 6+5=11 (bothGroups is teacher-level, not class-level)
+    expect(result['5а']).toBe(8);
   });
 });
 
@@ -112,5 +134,60 @@ describe('validateWorkload', () => {
     );
     const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
     expect(issues.some((i) => i.severity === 'error' && i.target === TEACHER.name)).toBe(true);
+  });
+
+  it('З18-3: warns when subject has more teachers assigned than planned', () => {
+    // Математика is non-split (1 slot planned), assign 2 teachers
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Математика', teacherId: 't2', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    // Математика: 2 assigned, 1 planned → warning. Физкультура: 2 assigned, 2 planned (groupSplit) → ok
+    expect(overAssigned).toHaveLength(1);
+    expect(overAssigned[0].message).toContain('Математика');
+  });
+
+  it('З18-3: no warning when groupSplit has correct number of teachers', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    expect(overAssigned).toHaveLength(0);
+  });
+
+  it('З18-3: bothGroups=true counts as 2 slots', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 3, bothGroups: true }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const overAssigned = issues.filter((i) => i.message.includes('назначено учителей'));
+    expect(overAssigned).toHaveLength(0);
+  });
+
+  it('З17-1: groupSplit does not cause false СанПиН error', () => {
+    // 5а has СанПиН max 29. Assign 28h of various subjects + 3h Физкультура split between 2 teachers.
+    // Without dedup: 28 + 3 + 3 = 34 > 29 → false error
+    // With dedup: 28 + 3 = 31 > 29 → still over, but correctly
+    // Better test: 25h + 3h split = 28 (under 29), should NOT trigger error
+    const assignments: Assignment[] = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        makeAssignment({ subject: `Предмет${i}`, hoursPerWeek: 5 }),
+      ),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    // Total without dedup: 25 + 3 + 3 = 31 > 29 → false error
+    // Total with dedup: 25 + 3 = 28 < 29 → no error
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const sanpinErrors = issues.filter((i) => i.severity === 'error' && i.message.includes('СанПиН'));
+    expect(sanpinErrors).toHaveLength(0);
   });
 });

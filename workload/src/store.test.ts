@@ -508,7 +508,7 @@ describe('applyDeptSnapshot (MU-2)', () => {
     expect(teachers).toHaveLength(1);
   });
 
-  it('З16-4: deptGroup is replaced with snapshot version (updated teacherIds)', () => {
+  it('З16-4: new teacherIds from snapshot are merged into master table', () => {
     const newTeacher: RNTeacher = { id: 'dept-added', name: 'Сидорова', initials: 'С.С.', subjects: ['Математика'] };
     useStore.getState().updateDeptTable('filo', 'filo-t1', { subjectFilter: ['Математика'] });
 
@@ -523,6 +523,103 @@ describe('applyDeptSnapshot (MU-2)', () => {
 
     const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
     expect(filo.tables.find((t) => t.id === 'filo-t1')?.teacherIds).toContain('dept-added');
+  });
+
+  it('З18-6: master deptGroup structure is preserved (snapshot cannot change names or subjectFilter)', () => {
+    // Master has specific table name and subjectFilter
+    useStore.getState().updateDeptTable('filo', 'filo-t1', {
+      subjectFilter: ['Русский язык', 'Литература'],
+    });
+
+    // Snapshot has different table name and subjectFilter (кафедра modified their copy)
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const snapDeptGroup = {
+      ...filoGroup,
+      name: 'Кафедра Филологов (переименовано)',
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1'
+          ? { ...t, name: 'Переименованная таблица', subjectFilter: ['Только русский'], teacherIds: ['snap-t1'] }
+          : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [], teachers: [], deptGroup: snapDeptGroup });
+
+    const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    // Master name preserved
+    expect(filo.name).toBe('Филологи');
+    const table = filo.tables.find((t) => t.id === 'filo-t1')!;
+    // Master table name preserved
+    expect(table.name).toBe('Филологи');
+    // Master subjectFilter preserved
+    expect(table.subjectFilter).toEqual(['Русский язык', 'Литература']);
+    // But new teacherId IS merged
+    expect(table.teacherIds).toContain('snap-t1');
+  });
+
+  it('З18-6: existing teacherIds in master are not duplicated by snapshot', () => {
+    useStore.getState().updateDeptTable('filo', 'filo-t1', {
+      subjectFilter: ['Математика'],
+      teacherIds: ['t-existing'],
+    });
+
+    const filoGroup = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    const snapDeptGroup = {
+      ...filoGroup,
+      tables: filoGroup.tables.map((t) =>
+        t.id === 'filo-t1' ? { ...t, teacherIds: ['t-existing', 't-new'] } : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({ groupId: 'filo', assignments: [], teachers: [], deptGroup: snapDeptGroup });
+
+    const table = useStore.getState().deptGroups.find((g) => g.id === 'filo')!.tables.find((t) => t.id === 'filo-t1')!;
+    // t-existing not duplicated, t-new added
+    expect(table.teacherIds.filter((id) => id === 't-existing')).toHaveLength(1);
+    expect(table.teacherIds).toContain('t-new');
+  });
+
+  it('З17-3: new teacher from кафедра snapshot appears in assignments and teachers after import', () => {
+    // Simulate: завуч has existing data (no chem assignments).
+    // Кафедра sends snapshot with a NEW teacher + her assignments.
+    const chemGroup = useStore.getState().deptGroups.find((g) => g.id === 'chembio')!;
+    // Give chem group a subject filter
+    useStore.getState().updateDeptTable('chembio', chemGroup.tables[0].id, { subjectFilter: ['Биология'] });
+
+    // Pre-existing assignment for a DIFFERENT subject (not chem)
+    useStore.getState().setAssignment({ teacherId: 't1', className: '5а', subject: 'Математика', hoursPerWeek: 5 });
+
+    // Build snap from кафедра: new teacher + assignments
+    const newTeacher: RNTeacher = { id: 'new-bio', name: 'Новикова А.В.', initials: 'А.В.', subjects: ['Биология'] };
+    const snapAssignments = [
+      { teacherId: 'new-bio', className: '5а', subject: 'Биология', hoursPerWeek: 2 },
+      { teacherId: 'new-bio', className: '6а', subject: 'Биология', hoursPerWeek: 2 },
+    ];
+    const updatedChemGroup = useStore.getState().deptGroups.find((g) => g.id === 'chembio')!;
+    const snapDeptGroup = {
+      ...updatedChemGroup,
+      tables: updatedChemGroup.tables.map((t, i) =>
+        i === 0 ? { ...t, teacherIds: ['new-bio'] } : t,
+      ),
+    };
+
+    useStore.getState().applyDeptSnapshot({
+      groupId: 'chembio',
+      assignments: snapAssignments,
+      teachers: [newTeacher],
+      deptGroup: snapDeptGroup,
+    });
+
+    const s = useStore.getState();
+    // New teacher must be in teachers
+    expect(s.teachers.find((t) => t.id === 'new-bio')).toBeDefined();
+    // Her assignments must be present
+    const newTeacherAssignments = s.assignments.filter((a) => a.teacherId === 'new-bio');
+    expect(newTeacherAssignments).toHaveLength(2);
+    // Pre-existing non-chem assignment must survive
+    expect(s.assignments.find((a) => a.subject === 'Математика')).toBeDefined();
+    // Total: 1 (Мат) + 2 (Био) = 3
+    expect(s.assignments).toHaveLength(3);
   });
 });
 

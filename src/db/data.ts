@@ -3,6 +3,7 @@
  */
 
 import { db } from './database';
+import { generateId } from '@/utils/generateId';
 import type {
   Teacher,
   Room,
@@ -26,7 +27,7 @@ export async function getTeacherByName(name: string): Promise<Teacher | undefine
 }
 
 export async function addTeacher(teacher: Omit<Teacher, 'id'> | Teacher): Promise<string> {
-  const id = 'id' in teacher && teacher.id ? teacher.id : `teacher-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = 'id' in teacher && teacher.id ? teacher.id : generateId('teacher');
   await db.teachers.add({ ...teacher, id } as Teacher);
   return id;
 }
@@ -63,7 +64,7 @@ export async function getRoomByShortName(shortName: string): Promise<Room | unde
 }
 
 export async function addRoom(room: Omit<Room, 'id'> | Room): Promise<string> {
-  const id = 'id' in room && room.id ? room.id : `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = 'id' in room && room.id ? room.id : generateId('room');
   await db.rooms.add({ ...room, id } as Room);
   return id;
 }
@@ -179,7 +180,7 @@ export async function getLessonRequirement(id: string): Promise<LessonRequiremen
 }
 
 export async function addLessonRequirement(requirement: Omit<LessonRequirement, 'id'> | LessonRequirement): Promise<string> {
-  const id = 'id' in requirement && requirement.id ? requirement.id : `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const id = 'id' in requirement && requirement.id ? requirement.id : generateId('req');
   await db.lessonRequirements.add({ ...requirement, id } as LessonRequirement);
   return id;
 }

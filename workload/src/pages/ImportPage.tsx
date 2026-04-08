@@ -3,6 +3,9 @@ import { useStore } from '../store';
 import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
 import { applyGroupSplitToggle } from '../logic/planUtils';
+import { downloadUPTemplate } from '../logic/upTemplate';
+import { downloadPlanXlsx } from '../logic/planExport';
+import { compareClassNames } from '../logic/classSort';
 import { useToast } from '../hooks/useToast';
 import type { CurriculumPlan, SubjectRow } from '../types';
 import styles from './ImportPage.module.css';
@@ -242,7 +245,7 @@ export function ImportPage() {
     pushUndo(false, `копирование ${sourceClass} → ${newClass}`);
     const updated: CurriculumPlan = {
       ...target,
-      classNames: [...target.classNames, newClass].sort((a, b) => a.localeCompare(b, 'ru')),
+      classNames: [...target.classNames, newClass].sort(compareClassNames),
       groupCounts: {
         ...(target.groupCounts ?? {}),
         [newClass]: target.groupCounts?.[sourceClass] ?? 2,
@@ -269,7 +272,7 @@ export function ImportPage() {
     pushUndo(false, `добавление класса ${className}`);
     const updated: CurriculumPlan = {
       ...target,
-      classNames: [...target.classNames, className].sort((a, b) => a.localeCompare(b, 'ru')),
+      classNames: [...target.classNames, className].sort(compareClassNames),
       grades: target.grades.map((g) => {
         if (g.grade !== _grade) return g;
         return {
@@ -367,31 +370,36 @@ export function ImportPage() {
       )}
 
       {!draft && (
-        <div
-          className={styles.dropzone}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx"
-            className={styles.fileInput}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-            }}
-          />
-          {loading ? (
-            <p>Читаю файл...</p>
-          ) : (
-            <>
-              <p className={styles.dropText}>Перетащите файл учебного плана (.xlsx) сюда</p>
-              <p className={styles.dropHint}>или нажмите чтобы выбрать</p>
-            </>
-          )}
-        </div>
+        <>
+          <div
+            className={styles.dropzone}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx"
+              className={styles.fileInput}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }}
+            />
+            {loading ? (
+              <p>Читаю файл...</p>
+            ) : (
+              <>
+                <p className={styles.dropText}>Перетащите файл учебного плана (.xlsx) сюда</p>
+                <p className={styles.dropHint}>или нажмите чтобы выбрать</p>
+              </>
+            )}
+          </div>
+          <button className={styles.templateBtn} onClick={downloadUPTemplate}>
+            Скачать шаблон .xlsx
+          </button>
+        </>
       )}
 
       {error && <p className={styles.error}>{error}</p>}
@@ -408,6 +416,9 @@ export function ImportPage() {
             </button>
             <button className={styles.exportUpBtn} onClick={handleExportUP}>
               Скачать УП (JSON)
+            </button>
+            <button className={styles.exportUpBtn} onClick={() => downloadPlanXlsx(curriculumPlan)}>
+              Скачать УП (.xlsx)
             </button>
           </div>
           <input

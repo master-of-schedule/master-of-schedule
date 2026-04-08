@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
-import { validateWorkload } from '../logic/validation';
+import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { shortTeacherName } from '../logic/groupNames';
 import { isTeacherBlocked, computeDeptPlanned, visibleClassesForTable } from '../logic/assignHelpers';
@@ -168,12 +168,17 @@ export function AssignPage({ plan }: Props) {
     );
   }
 
+  // З17-1: use hoursPerClass() which deduplicates groupSplit subjects
+  const classTotalsMap = useMemo(() => {
+    const totals = hoursPerClass(assignments);
+    for (const h of homeroomAssignments) {
+      totals[h.className] = (totals[h.className] ?? 0) + 1;
+    }
+    return totals;
+  }, [assignments, homeroomAssignments]);
+
   function classTotal(className: string): number {
-    const fromAssign = assignments
-      .filter((a) => a.className === className)
-      .reduce((sum, a) => sum + a.hoursPerWeek * (a.bothGroups ? 2 : 1), 0);
-    const fromHomeroom = homeroomAssignments.filter((h) => h.className === className).length;
-    return fromAssign + fromHomeroom;
+    return classTotalsMap[className] ?? 0;
   }
 
   function teacherTotal(teacherId: string): number {
@@ -499,20 +504,22 @@ function DeptTableSection({
               {visibleClassNames.map((cn) => {
                 const total = classTotal(cn);
                 const max = sanpinMaxForClass(cn);
-                const over = max !== null && total > max;
+                const planned = deptPlanned(cn);
+                const assigned = deptAssigned(cn);
+                const deptOver = planned > 0 && assigned > planned;
                 const gc = groupCount(cn);
-                const deptComplete = deptPlanned(cn) > 0 && deptAssigned(cn) >= deptPlanned(cn);
+                const deptComplete = planned > 0 && assigned >= planned;
                 return (
                   <th
                     key={cn}
                     className={
-                      over ? styles.classHeaderOver :
+                      deptOver ? styles.classHeaderOver :
                       deptComplete ? styles.classHeaderComplete :
                       styles.classHeader
                     }
                   >
                     {cn}
-                    <div className={`${styles.classTotal} ${over ? styles.classTotalOver : ''}`}>
+                    <div className={`${styles.classTotal} ${deptOver ? styles.classTotalOver : ''}`}>
                       {total}/{max ?? '?'}
                     </div>
                     {hasGroupSplitSubjects && (
