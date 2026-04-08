@@ -86,6 +86,12 @@ export function ExportPage() {
 
   const hasSchedule = Object.keys(schedule).length > 0;
 
+  // Partner school class names — excluded from partner availability export
+  const partnerClassNames = useMemo(
+    () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
+  );
+
   // Build teacher/room schedule maps for grid views
   const teacherSchedule = useMemo(() => buildTeacherScheduleMap(schedule), [schedule]);
   const roomSchedule = useMemo(() => buildRoomScheduleMap(schedule), [schedule]);
@@ -510,7 +516,7 @@ export function ExportPage() {
           name: versionName,
           type: versionType,
           mondayDate: mondayDate ?? undefined,
-        });
+        }, { excludeClasses: partnerClassNames });
         const json = JSON.stringify(file, null, 2);
         const safeName = (versionName || 'расписание').replace(/[/\\:*?"<>|]/g, '-');
         await saveJsonStringToFolder(json, `занятость-${safeName}.json`, occupancyDirVerified);
@@ -567,11 +573,11 @@ export function ExportPage() {
       name: versionName,
       type: versionType,
       mondayDate: mondayDate ?? undefined,
-    });
+    }, { excludeClasses: partnerClassNames });
     const json = JSON.stringify(file, null, 2);
     const safeName = (versionName || 'расписание').replace(/[/\\:*?"<>|]/g, '-');
     downloadJson(json, `занятость-${safeName}.json`);
-  }, [schedule, versionName, versionType, mondayDate]);
+  }, [schedule, versionName, versionType, mondayDate, partnerClassNames]);
 
   // Render cell content
   const renderCellContent = useCallback((entries: ScheduleEntry[]) => {

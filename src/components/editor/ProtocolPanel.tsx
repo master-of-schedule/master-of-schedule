@@ -2,7 +2,8 @@
  * ProtocolPanel - History/undo visualization panel
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import type { HistoryEntry } from '@/types';
 import { useScheduleStore, useDataStore } from '@/stores';
 import { Button } from '@/components/common/Button';
 import styles from './ProtocolPanel.module.css';
@@ -36,6 +37,23 @@ export function ProtocolPanel() {
   const classes = useDataStore((state) => state.classes);
 
   const classNames = useMemo(() => classes.map(c => c.name), [classes]);
+
+  // Single-slot backup of history before "Очистить"
+  const [clearedBackup, setClearedBackup] = useState<{ history: HistoryEntry[]; index: number } | null>(null);
+
+  const handleClearHistory = useCallback(() => {
+    setClearedBackup({ history: [...history], index: historyIndex });
+    clearHistory();
+  }, [history, historyIndex, clearHistory]);
+
+  const handleRestoreHistory = useCallback(() => {
+    if (!clearedBackup) return;
+    useScheduleStore.setState({
+      history: clearedBackup.history,
+      historyIndex: clearedBackup.index,
+    });
+    setClearedBackup(null);
+  }, [clearedBackup]);
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
@@ -112,8 +130,20 @@ export function ProtocolPanel() {
           >
             Отменить всё
           </Button>
-          <Button variant="ghost" size="small" onClick={clearHistory} title="Очистить историю">
+          <Button variant="ghost" size="small" onClick={handleClearHistory} title="Очистить историю">
             Очистить
+          </Button>
+        </div>
+      )}
+      {clearedBackup && (
+        <div className={styles.footer}>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={handleRestoreHistory}
+            title="Восстановить последнюю очищенную историю"
+          >
+            Восстановить
           </Button>
         </div>
       )}

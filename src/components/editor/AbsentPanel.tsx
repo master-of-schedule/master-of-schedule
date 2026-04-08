@@ -12,18 +12,25 @@ import { DAYS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
 import { absentCellKey } from '@/stores/uiStore';
-import { getTeacherLessonsOnDay } from '@/logic';
+import { getTeacherLessonsOnDay, getSlotLessons } from '@/logic';
 import { DatalistInput } from '@/components/common/DatalistInput';
 import styles from './AbsentPanel.module.css';
 
 export function AbsentPanel() {
   const schedule = useScheduleStore((state) => state.schedule);
+  const versionType = useScheduleStore((state) => state.versionType);
+  const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
+  const setLessonStatus = useScheduleStore((state) => state.setLessonStatus);
+  const clearLessonStatus = useScheduleStore((state) => state.clearLessonStatus);
   const teachers = useDataStore((state) => state.teachers);
   const absentTeacher = useUIStore((state) => state.absentTeacher);
   const absentDay = useUIStore((state) => state.absentDay);
   const absentMarkedCells = useUIStore((state) => state.absentMarkedCells);
   const absentLessons = useUIStore((state) => state.absentLessons);
   const { setAbsentTeacher, setAbsentLessons, toggleAbsentCell, clearAbsentMarked } = useUIStore();
+
+  const [sickMode, setSickMode] = useState(false);
+  const isWeekly = versionType === 'weekly';
 
   // Sorted teacher names + set for O(1) lookup
   const teacherNameSet = useRef(new Set<string>());
@@ -72,8 +79,20 @@ export function AbsentPanel() {
   }, [absentTeacher, setAbsentTeacher]);
 
   const handleToggle = useCallback((className: string, day: Day, lessonNum: LessonNumber) => {
-    toggleAbsentCell(className, day, lessonNum);
-  }, [toggleAbsentCell]);
+    if (sickMode && isWeekly) {
+      // In sick mode: mark/unmark lessons as sick via setLessonStatus
+      const lessons = getSlotLessons(schedule, className, day, lessonNum);
+      for (const lesson of lessons) {
+        if (lessonStatuses[lesson.requirementId] === 'sick') {
+          clearLessonStatus(lesson.requirementId);
+        } else {
+          setLessonStatus(lesson.requirementId, 'sick');
+        }
+      }
+    } else {
+      toggleAbsentCell(className, day, lessonNum);
+    }
+  }, [sickMode, isWeekly, schedule, lessonStatuses, setLessonStatus, clearLessonStatus, toggleAbsentCell]);
 
   const markedCount = absentMarkedCells.size;
 
@@ -81,6 +100,16 @@ export function AbsentPanel() {
     <div className={styles.panel}>
       <div className={styles.header}>
         <h3 className={styles.title}>Учитель</h3>
+        {isWeekly && (
+          <label className={styles.sickToggle} title="Отмечать уроки как больничный вместо замен">
+            <input
+              type="checkbox"
+              checked={sickMode}
+              onChange={(e) => setSickMode(e.target.checked)}
+            />
+            Больничный
+          </label>
+        )}
         {markedCount > 0 && (
           <button className={styles.clearButton} onClick={clearAbsentMarked} title="Очистить все отметки">
             Сброс ({markedCount})
@@ -119,10 +148,14 @@ export function AbsentPanel() {
             ) : (
               absentLessons.map(({ className, lessonNum, subjects }) => {
                 const key = absentCellKey(className, absentDay, lessonNum);
-                const isChecked = absentMarkedCells.has(key);
+                const isAbsentChecked = absentMarkedCells.has(key);
+                // In sick mode: check if any lesson in this slot is marked sick
+                const slotLessons = sickMode ? getSlotLessons(schedule, className, absentDay, lessonNum) : [];
+                const isSickChecked = sickMode && slotLessons.some(l => lessonStatuses[l.requirementId] === 'sick');
+                const isChecked = sickMode ? isSickChecked : isAbsentChecked;
 
                 return (
-                  <label key={key} className={`${styles.item} ${isChecked ? styles.checked : ''}`}>
+                  <label key={key} className={`${styles.item} ${isChecked ? styles.checked : ''} ${isSickChecked ? styles.sick : ''}`}>
                     <input
                       type="checkbox"
                       checked={isChecked}

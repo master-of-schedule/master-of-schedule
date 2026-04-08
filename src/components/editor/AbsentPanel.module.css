@@ -42,6 +42,24 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+.sickToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-text-secondary);
+}
+
+.item.sick {
+  background: #e3f2fd;
+}
+
+.item.sick:hover {
+  background: #bbdefb;
+}
+
 .content {
   flex: 1;
   min-height: 0;

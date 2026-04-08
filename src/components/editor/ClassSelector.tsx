@@ -48,11 +48,21 @@ export function ClassSelector() {
   const schedule = useScheduleStore((state) => state.schedule);
   const versionType = useScheduleStore((state) => state.versionType);
 
-  // Group classes by grade, with fully gap-excluded grades at the bottom
-  const groupedClasses = useMemo(
-    () => groupClassesByGrade(classes.map(c => c.name), gapExcludedClasses),
-    [classes, gapExcludedClasses]
+  const partnerClassNameSet = useMemo(
+    () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
   );
+
+  // Group own classes by grade (partner classes excluded), partner classes appended at end
+  const groupedClasses = useMemo(() => {
+    const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
+    const partnerClassNames = classes.filter(c => c.isPartner).map(c => c.name);
+    const grouped = groupClassesByGrade(ownClassNames, gapExcludedClasses);
+    if (partnerClassNames.length > 0) {
+      grouped.push(['Партнёр', partnerClassNames]);
+    }
+    return grouped;
+  }, [classes, gapExcludedClasses]);
 
   // For template type, track which classes have remaining unscheduled lessons
   const classesWithRemaining = useMemo(() => {
@@ -80,7 +90,7 @@ export function ClassSelector() {
               {classNames.map((className) => (
                 <button
                   key={className}
-                  className={`${styles.classButton} ${currentClass === className ? styles.active : ''} ${classesWithRemaining.has(className) ? styles.hasRemaining : ''}`}
+                  className={`${styles.classButton} ${currentClass === className ? styles.active : ''} ${classesWithRemaining.has(className) ? styles.hasRemaining : ''} ${partnerClassNameSet.has(className) ? styles.partner : ''}`}
                   onClick={() => setCurrentClass(className)}
                 >
                   {className}

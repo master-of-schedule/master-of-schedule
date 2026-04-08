@@ -36,6 +36,8 @@ interface ScheduleState {
   mondayDate: Date | null; // For weekly schedules
   versionDaysPerWeek: number | null; // Per-version day count override (weekly schedules)
   isDirty: boolean;
+  /** JSON file has not been exported since the last schedule change */
+  jsonIsDirty: boolean;
 
   // Base template for diff highlighting (weekly schedules only)
   baseTemplateId: string | null;
@@ -52,7 +54,7 @@ interface ScheduleState {
   temporaryLessons: LessonRequirement[];
 
   // Per-lesson statuses (sick / completed) — weekly schedules only
-  lessonStatuses: Record<string, 'sick' | 'completed'>;
+  lessonStatuses: Record<string, 'sick' | 'completed' | 'completed2'>;
 
   /**
    * Acknowledged conflict keys for the current version.
@@ -109,7 +111,7 @@ interface ScheduleState {
   removeTemporaryLesson: (id: string) => void;
 
   // Actions - Lesson statuses
-  setLessonStatus: (id: string, status: 'sick' | 'completed') => void;
+  setLessonStatus: (id: string, status: 'sick' | 'completed' | 'completed2') => void;
   clearLessonStatus: (id: string) => void;
 
   // Actions - History
@@ -134,12 +136,13 @@ interface ScheduleState {
     versionDaysPerWeek?: number;
     substitutions?: Substitution[];
     temporaryLessons?: LessonRequirement[];
-    lessonStatuses?: Record<string, 'sick' | 'completed'>;
+    lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
     acknowledgedConflictKeys?: string[];
     baseTemplateId?: string;
     baseTemplateSchedule?: Schedule;
   }) => void;
   markSaved: (versionId: string, versionName: string) => void;
+  markJsonSaved: () => void;
   updateVersionName: (name: string) => void;
 
   // Helpers
@@ -180,6 +183,7 @@ export const useScheduleStore = create<ScheduleState>()(
     mondayDate: null,
     versionDaysPerWeek: null,
     isDirty: false,
+    jsonIsDirty: false,
     history: [],
     historyIndex: -1,
     substitutions: [],
@@ -213,6 +217,7 @@ export const useScheduleStore = create<ScheduleState>()(
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -243,6 +248,7 @@ export const useScheduleStore = create<ScheduleState>()(
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -276,6 +282,7 @@ export const useScheduleStore = create<ScheduleState>()(
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -305,6 +312,7 @@ export const useScheduleStore = create<ScheduleState>()(
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -333,6 +341,7 @@ export const useScheduleStore = create<ScheduleState>()(
         history: newHistory,
         historyIndex: newHistory.length - 1,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -361,6 +370,7 @@ export const useScheduleStore = create<ScheduleState>()(
       set((state) => {
         state.temporaryLessons.push(lesson);
         state.isDirty = true;
+        state.jsonIsDirty = true;
       });
     },
 
@@ -382,6 +392,7 @@ export const useScheduleStore = create<ScheduleState>()(
       set((state) => {
         state.lessonStatuses[id] = status;
         state.isDirty = true;
+        state.jsonIsDirty = true;
       });
     },
 
@@ -391,6 +402,7 @@ export const useScheduleStore = create<ScheduleState>()(
       set((state) => {
         delete state.lessonStatuses[id];
         state.isDirty = true;
+        state.jsonIsDirty = true;
       });
     },
 
@@ -408,6 +420,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: entry.substitutions.map(s => ({ ...s })),
         historyIndex: newIndex,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -425,6 +438,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: entry.substitutions.map(s => ({ ...s })),
         historyIndex: newIndex,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -441,6 +455,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: entry.substitutions.map(s => ({ ...s })),
         historyIndex: 0,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -457,6 +472,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: entry.substitutions.map(s => ({ ...s })),
         historyIndex: index,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -484,6 +500,7 @@ export const useScheduleStore = create<ScheduleState>()(
         ? state.acknowledgedConflictKeys
         : [...state.acknowledgedConflictKeys, key],
       isDirty: true,
+      jsonIsDirty: true,
     })),
     clearConflictAcks: (day, lessonNum) => set((state) => ({
       acknowledgedConflictKeys: state.acknowledgedConflictKeys.filter(
@@ -503,6 +520,7 @@ export const useScheduleStore = create<ScheduleState>()(
         mondayDate: mondayDate ?? null,
         versionDaysPerWeek: daysPerWeek ?? null,
         isDirty: false,
+        jsonIsDirty: false,
         history: [initialEntry],
         historyIndex: 0,
         substitutions: [],
@@ -531,6 +549,7 @@ export const useScheduleStore = create<ScheduleState>()(
         mondayDate: mondayDate ?? null,
         versionDaysPerWeek: versionDaysPerWeek ?? null,
         isDirty: false,
+        jsonIsDirty: false,
         history: [initialEntry],
         historyIndex: 0,
         substitutions: substitutions ?? [],
@@ -551,12 +570,18 @@ export const useScheduleStore = create<ScheduleState>()(
       });
     },
 
+    // Mark JSON file as saved (exported)
+    markJsonSaved: () => {
+      set({ jsonIsDirty: false });
+    },
+
     // Update version name
     updateVersionName: (name) => {
       if (useDataStore.getState().isReadOnlyYear) return;
       set({
         versionName: name,
         isDirty: true,
+        jsonIsDirty: true,
       });
     },
 

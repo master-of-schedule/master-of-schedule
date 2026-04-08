@@ -94,10 +94,21 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     return { unscheduled: list, mergedTempsByEntryId: mergedTemps };
   }, [mergedRequirements, schedule, className, temporaryLessons]);
 
-  // Filter out completed lessons
+  const isCompleted = useCallback(
+    (id: string) => lessonStatuses[id] === 'completed' || lessonStatuses[id] === 'completed2',
+    [lessonStatuses]
+  );
+
+  // Filter out completed lessons from the main list
   const visibleLessons = useMemo(
-    () => unscheduled.filter(item => lessonStatuses[item.requirement.id] !== 'completed'),
-    [unscheduled, lessonStatuses]
+    () => unscheduled.filter(item => !isCompleted(item.requirement.id)),
+    [unscheduled, isCompleted]
+  );
+
+  // Completed lessons shown at bottom with badge
+  const completedLessons = useMemo(
+    () => unscheduled.filter(item => isCompleted(item.requirement.id)),
+    [unscheduled, isCompleted]
   );
 
   // Handle lesson click
@@ -140,26 +151,19 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     setCtxMenu({ isOpen: false, x: 0, y: 0, targetId: null });
   }, []);
 
-  const handleMarkSick = useCallback(() => {
+  const handleMarkCompleted = useCallback((count: 1 | 2) => {
     if (ctxMenu.targetId) {
-      setLessonStatus(ctxMenu.targetId, 'sick');
+      setLessonStatus(ctxMenu.targetId, count === 2 ? 'completed2' : 'completed');
     }
     closeContextMenu();
   }, [ctxMenu.targetId, setLessonStatus, closeContextMenu]);
 
-  const handleClearSick = useCallback(() => {
+  const handleClearCompleted = useCallback(() => {
     if (ctxMenu.targetId) {
       clearLessonStatus(ctxMenu.targetId);
     }
     closeContextMenu();
   }, [ctxMenu.targetId, clearLessonStatus, closeContextMenu]);
-
-  const handleMarkCompleted = useCallback(() => {
-    if (ctxMenu.targetId) {
-      setLessonStatus(ctxMenu.targetId, 'completed');
-    }
-    closeContextMenu();
-  }, [ctxMenu.targetId, setLessonStatus, closeContextMenu]);
 
   // Group by subject for better organization
   const groupedLessons = useMemo(() => {
@@ -195,7 +199,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       </div>
 
       <div className={styles.list}>
-        {visibleLessons.length === 0 ? (
+        {visibleLessons.length === 0 && completedLessons.length === 0 ? (
           <div className={styles.empty}>
             Все занятия расставлены
             {showAddButton && (
@@ -205,57 +209,82 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
             )}
           </div>
         ) : (
-          groupedLessons.map(([subject, items]) => (
-            <div key={subject} className={styles.group}>
-              {items.map((item) => {
-                const isSelected = selectedLesson?.id === item.requirement.id;
-                const isSubstitution = item.requirement.type === 'group';
-                const isTemporary = temporaryIds.has(item.requirement.id);
-                const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
-                const isSick = lessonStatuses[item.requirement.id] === 'sick';
+          <>
+            {groupedLessons.map(([subject, items]) => (
+              <div key={subject} className={styles.group}>
+                {items.map((item) => {
+                  const isSelected = selectedLesson?.id === item.requirement.id;
+                  const isSubstitution = item.requirement.type === 'group';
+                  const isTemporary = temporaryIds.has(item.requirement.id);
+                  const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
+                  const isSick = lessonStatuses[item.requirement.id] === 'sick';
 
-                return (
-                  <button
-                    key={item.requirement.id}
-                    className={`${styles.lesson} ${isSelected ? styles.selected : ''} ${isTemporary || mergedTemp ? styles.temporary : ''} ${isSick ? styles.sick : ''}`}
-                    onClick={() => handleLessonClick(item.requirement)}
-                    onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
-                  >
-                    <span className={styles.subject}>
-                      {item.requirement.subject}
-                      {isSubstitution && (
-                        <span className={styles.groupIndex}>
-                          ({extractGroupIndex(item.requirement.classOrGroup)})
-                        </span>
+                  return (
+                    <button
+                      key={item.requirement.id}
+                      className={`${styles.lesson} ${isSelected ? styles.selected : ''} ${isTemporary || mergedTemp ? styles.temporary : ''} ${isSick ? styles.sick : ''}`}
+                      onClick={() => handleLessonClick(item.requirement)}
+                      onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
+                    >
+                      <span className={styles.subject}>
+                        {item.requirement.subject}
+                        {isSubstitution && (
+                          <span className={styles.groupIndex}>
+                            ({extractGroupIndex(item.requirement.classOrGroup)})
+                          </span>
+                        )}
+                      </span>
+                      <span className={styles.teacher}>{item.requirement.teacher}</span>
+                      <span className={styles.lessonCount}>{item.remaining}</span>
+                      {(isTemporary || mergedTemp) && (
+                        <button
+                          className={styles.removeButton}
+                          onClick={(e) => handleRemoveTemporary(e, mergedTemp?.id ?? item.requirement.id)}
+                          title="Удалить временное занятие"
+                        >
+                          ×
+                        </button>
                       )}
-                    </span>
-                    <span className={styles.teacher}>{item.requirement.teacher}</span>
-                    <span className={styles.lessonCount}>{item.remaining}</span>
-                    {(isTemporary || mergedTemp) && (
-                      <button
-                        className={styles.removeButton}
-                        onClick={(e) => handleRemoveTemporary(e, mergedTemp?.id ?? item.requirement.id)}
-                        title="Удалить временное занятие"
-                      >
-                        ×
-                      </button>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            {completedLessons.map((item) => {
+              const conductedCount = lessonStatuses[item.requirement.id] === 'completed2' ? 2 : 1;
+              const isSubstitution = item.requirement.type === 'group';
+              return (
+                <button
+                  key={item.requirement.id}
+                  className={`${styles.lesson} ${styles.conducted}`}
+                  onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
+                  onClick={() => {}}
+                >
+                  <span className={styles.subject}>
+                    {item.requirement.subject}
+                    {isSubstitution && (
+                      <span className={styles.groupIndex}>
+                        ({extractGroupIndex(item.requirement.classOrGroup)})
+                      </span>
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          ))
+                  </span>
+                  <span className={styles.teacher}>{item.requirement.teacher}</span>
+                  <span className={styles.conductedBadge}>✓{conductedCount}</span>
+                </button>
+              );
+            })}
+          </>
         )}
       </div>
 
       {isWeekly && (
         <ContextMenu isOpen={ctxMenu.isOpen} x={ctxMenu.x} y={ctxMenu.y} onClose={closeContextMenu}>
-          {targetStatus === 'sick' ? (
-            <ContextMenuItem onClick={handleClearSick}>Снять больничный</ContextMenuItem>
+          {targetStatus === 'completed' || targetStatus === 'completed2' ? (
+            <ContextMenuItem onClick={handleClearCompleted}>Снять отметку</ContextMenuItem>
           ) : (
             <>
-              <ContextMenuItem onClick={handleMarkSick}>Больничный</ContextMenuItem>
-              <ContextMenuItem onClick={handleMarkCompleted}>Проведено</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleMarkCompleted(1)}>Проведено (1 занятие)</ContextMenuItem>
+              <ContextMenuItem onClick={() => handleMarkCompleted(2)}>Проведено (2 занятия)</ContextMenuItem>
             </>
           )}
           <ContextMenuItem onClick={closeContextMenu}>Отмена</ContextMenuItem>

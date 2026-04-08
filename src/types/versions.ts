@@ -34,7 +34,7 @@ export interface Version {
   /** Temporary extra lessons for this version only (not in master requirements) */
   temporaryLessons?: LessonRequirement[];
   /** Per-lesson statuses: 'sick' (gray, teacher on sick leave) or 'completed' (held elsewhere, hidden) */
-  lessonStatuses?: Record<string, 'sick' | 'completed'>;
+  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
   /**
    * Acknowledged conflict keys for this version.
    * Conflicts acknowledged here are suppressed in the Check panel and persist across sessions.

@@ -1171,6 +1171,92 @@ describe('getCellStatus — partner_busy', () => {
   });
 });
 
+// ─── Z37-4 partner school class tests ─────────────────────────────────────
+
+describe('getCellStatus — Z37-4 partner class names', () => {
+  const teachers = createTestTeachers();
+
+  const req = (override: Partial<LessonRequirement> = {}): LessonRequirement => ({
+    id: 'req-1',
+    type: 'class',
+    classOrGroup: '10а',
+    subject: 'Физика',
+    teacher: 'Петрова А.П.',
+    countPerWeek: 3,
+    ...override,
+  });
+
+  const buildScheduleWithTeacherInPartnerClass = () => {
+    const schedule: Schedule = {
+      '9п': { // partner class
+        'Пн': {
+          1: {
+            lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Петрова А.П.', room: '-114-' }],
+          },
+        },
+      },
+    };
+    return schedule;
+  };
+
+  it('returns partner_busy (not teacher_busy) when teacher conflict is in a partner class', () => {
+    const schedule = buildScheduleWithTeacherInPartnerClass();
+    const partnerClassNames = new Set(['9п']);
+    const status = getCellStatus(schedule, teachers, req(), '10а', 'Пн', 1, undefined, undefined, partnerClassNames);
+    expect(status.status).toBe('partner_busy');
+  });
+
+  it('returns teacher_busy when conflict class is NOT a partner class', () => {
+    const schedule = buildScheduleWithTeacherInPartnerClass();
+    // No partnerClassNames provided — 9п is treated as regular class
+    const status = getCellStatus(schedule, teachers, req(), '10а', 'Пн', 1, undefined, undefined, undefined);
+    expect(status.status).toBe('teacher_busy');
+  });
+
+  it('returns partner_busy for teacher2 conflict in partner class', () => {
+    const schedule: Schedule = {
+      '9п': {
+        'Пн': {
+          1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Алгебра', teacher: 'Иванова Т.С.', room: '-114-' }] },
+        },
+      },
+    };
+    const partnerClassNames = new Set(['9п']);
+    const status = getCellStatus(schedule, teachers, req({ teacher2: 'Иванова Т.С.' }), '10а', 'Пн', 1, undefined, undefined, partnerClassNames);
+    expect(status.status).toBe('partner_busy');
+  });
+});
+
+describe('validateSchedule — Z37-4 partner class exclusion', () => {
+  it('does not report teacher_double_booked when second class is a partner class', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Петрова А.П.', room: '-114-' }] } },
+      },
+      '9п': { // partner class
+        'Пн': { 1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петрова А.П.', room: '-115-' }] } },
+      },
+    };
+    const partnerClassNames = new Set(['9п']);
+    const conflicts = validateSchedule(schedule, createTestTeachers(), partnerClassNames);
+    expect(conflicts.filter(c => c.type === 'teacher_double_booked')).toHaveLength(0);
+  });
+
+  it('still reports teacher_double_booked when both classes are non-partner', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физика', teacher: 'Петрова А.П.', room: '-114-' }] } },
+      },
+      '10б': {
+        'Пн': { 1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петрова А.П.', room: '-115-' }] } },
+      },
+    };
+    const partnerClassNames = new Set<string>(); // empty
+    const conflicts = validateSchedule(schedule, createTestTeachers(), partnerClassNames);
+    expect(conflicts.filter(c => c.type === 'teacher_double_booked').length).toBeGreaterThan(0);
+  });
+});
+
 // ─── Z27 regression tests ─────────────────────────────────────
 
 describe('validateSchedule — Z27-4 force_override_ban', () => {
