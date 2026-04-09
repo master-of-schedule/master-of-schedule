@@ -1,0 +1,121 @@
+{
+  "state": {
+    "activeTab": "export",
+    "subjectShortNames": {},
+    "curriculumPlan": {
+      "classNames": ["5а", "5б", "7а", "7б", "9а", "10а", "11а"],
+      "groupCounts": {},
+      "groupNameOverrides": {},
+      "grades": [
+        {
+          "grade": 5,
+          "subjects": [
+            { "name": "Русский язык",     "shortName": "Рус.яз",   "groupSplit": false, "part": "mandatory", "hoursPerClass": { "5а": 3, "5б": 3 } },
+            { "name": "Литература",       "shortName": "Лит",      "groupSplit": false, "part": "mandatory", "hoursPerClass": { "5а": 2, "5б": 2 } },
+            { "name": "Математика",       "shortName": "Мат",      "groupSplit": false, "part": "mandatory", "hoursPerClass": { "5а": 4, "5б": 4 } },
+            { "name": "Физическая культура", "shortName": "Физ-ра", "groupSplit": true,  "part": "mandatory", "hoursPerClass": { "5а": 2, "5б": 2 } }
+          ]
+        },
+        {
+          "grade": 7,
+          "subjects": [
+            { "name": "Русский язык",              "shortName": "Рус.яз",  "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 3, "7б": 3 } },
+            { "name": "Литература",                "shortName": "Лит",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 2, "7б": 2 } },
+            { "name": "Алгебра",                   "shortName": "Алг",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 3, "7б": 3 } },
+            { "name": "Геометрия",                 "shortName": "Геом",    "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 2, "7б": 2 } },
+            { "name": "Вероятность и статистика",  "shortName": "Вер",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 1, "7б": 1 } },
+            { "name": "Физика",                    "shortName": "Физ",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "7а": 2, "7б": 2 } },
+            { "name": "Физическая культура",       "shortName": "Физ-ра",  "groupSplit": true,  "part": "mandatory", "hoursPerClass": { "7а": 2, "7б": 2 } }
+          ]
+        },
+        {
+          "grade": 9,
+          "subjects": [
+            { "name": "Русский язык",              "shortName": "Рус.яз",  "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 3 } },
+            { "name": "Литература",                "shortName": "Лит",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 3 } },
+            { "name": "Алгебра",                   "shortName": "Алг",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 3 } },
+            { "name": "Геометрия",                 "shortName": "Геом",    "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 2 } },
+            { "name": "Вероятность и статистика",  "shortName": "Вер",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 1 } },
+            { "name": "Физика",                    "shortName": "Физ",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 3 } },
+            { "name": "Химия",                     "shortName": "Хим",     "groupSplit": false, "part": "mandatory", "hoursPerClass": { "9а": 2 } },
+            { "name": "Физическая культура",       "shortName": "Физ-ра",  "groupSplit": true,  "part": "mandatory", "hoursPerClass": { "9а": 2 } }
+          ]
+        },
+        {
+          "grade": 10,
+          "subjects": [
+            { "name": "Физика",                            "shortName": "Физ",    "groupSplit": false, "part": "mandatory", "hoursPerClass": { "10а": 4 } },
+            { "name": "Физическая культура",               "shortName": "Физ-ра", "groupSplit": true,  "part": "mandatory", "hoursPerClass": { "10а": 2 } },
+            { "name": "Практикум ЕГЭ по русскому языку",  "shortName": "ЕГЭ Рус","groupSplit": false, "part": "optional",  "hoursPerClass": { "10а": 1 } }
+          ]
+        },
+        {
+          "grade": 11,
+          "subjects": [
+            { "name": "Физическая культура",               "shortName": "Физ-ра", "groupSplit": true,  "part": "mandatory", "hoursPerClass": { "11а": 2 } },
+            { "name": "Практикум ЕГЭ по русскому языку",  "shortName": "ЕГЭ Рус","groupSplit": false, "part": "optional",  "hoursPerClass": { "11а": 1 } }
+          ]
+        }
+      ]
+    },
+    "teachers": [
+      { "id": "t1", "name": "Иванова Анна Васильевна",        "initials": "ИА", "subjects": ["Русский язык", "Литература"],                                      "homeroomClass": "7а" },
+      { "id": "t2", "name": "Петров Сергей Николаевич",       "initials": "ПС", "subjects": ["Алгебра", "Геометрия", "Вероятность и статистика"],                 "homeroomClass": "9а" },
+      { "id": "t3", "name": "Сидорова Марина Константиновна", "initials": "СМ", "subjects": ["Физика", "Химия"],                                                  "homeroomClass": "5а" },
+      { "id": "t4", "name": "Крохин Владимир Петрович",       "initials": "КВ", "subjects": ["Физическая культура"],                                              "homeroomClass": null },
+      { "id": "t5", "name": "Соколова Алина Николаевна",      "initials": "СА", "subjects": ["Математика", "Практикум ЕГЭ по русскому языку"],                    "homeroomClass": null }
+    ],
+    "deptGroups": [
+      {
+        "id": "g1",
+        "name": "Все предметы",
+        "tables": [
+          { "id": "dt1", "name": "Учителя",       "teacherIds": ["t1", "t2", "t3", "t4", "t5"], "subjectFilter": [] }
+        ]
+      }
+    ],
+    "assignments": [
+      { "teacherId": "t1", "className": "5а",  "subject": "Русский язык",             "hoursPerWeek": 3 },
+      { "teacherId": "t1", "className": "5б",  "subject": "Русский язык",             "hoursPerWeek": 3 },
+      { "teacherId": "t1", "className": "7а",  "subject": "Русский язык",             "hoursPerWeek": 3 },
+      { "teacherId": "t1", "className": "7б",  "subject": "Русский язык",             "hoursPerWeek": 3 },
+      { "teacherId": "t1", "className": "9а",  "subject": "Русский язык",             "hoursPerWeek": 3 },
+      { "teacherId": "t1", "className": "5а",  "subject": "Литература",               "hoursPerWeek": 2 },
+      { "teacherId": "t1", "className": "5б",  "subject": "Литература",               "hoursPerWeek": 2 },
+      { "teacherId": "t1", "className": "7а",  "subject": "Литература",               "hoursPerWeek": 2 },
+      { "teacherId": "t1", "className": "7б",  "subject": "Литература",               "hoursPerWeek": 2 },
+      { "teacherId": "t1", "className": "9а",  "subject": "Литература",               "hoursPerWeek": 3 },
+      { "teacherId": "t2", "className": "7а",  "subject": "Алгебра",                  "hoursPerWeek": 3 },
+      { "teacherId": "t2", "className": "7б",  "subject": "Алгебра",                  "hoursPerWeek": 3 },
+      { "teacherId": "t2", "className": "9а",  "subject": "Алгебра",                  "hoursPerWeek": 3 },
+      { "teacherId": "t2", "className": "7а",  "subject": "Геометрия",                "hoursPerWeek": 2 },
+      { "teacherId": "t2", "className": "7б",  "subject": "Геометрия",                "hoursPerWeek": 2 },
+      { "teacherId": "t2", "className": "9а",  "subject": "Геометрия",                "hoursPerWeek": 2 },
+      { "teacherId": "t2", "className": "7а",  "subject": "Вероятность и статистика", "hoursPerWeek": 1 },
+      { "teacherId": "t2", "className": "7б",  "subject": "Вероятность и статистика", "hoursPerWeek": 1 },
+      { "teacherId": "t2", "className": "9а",  "subject": "Вероятность и статистика", "hoursPerWeek": 1 },
+      { "teacherId": "t3", "className": "7а",  "subject": "Физика",                   "hoursPerWeek": 2 },
+      { "teacherId": "t3", "className": "7б",  "subject": "Физика",                   "hoursPerWeek": 2 },
+      { "teacherId": "t3", "className": "9а",  "subject": "Физика",                   "hoursPerWeek": 3 },
+      { "teacherId": "t3", "className": "10а", "subject": "Физика",                   "hoursPerWeek": 4 },
+      { "teacherId": "t3", "className": "9а",  "subject": "Химия",                    "hoursPerWeek": 2 },
+      { "teacherId": "t4", "className": "5а",  "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "5б",  "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "7а",  "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "7б",  "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "9а",  "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "10а", "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t4", "className": "11а", "subject": "Физическая культура",      "hoursPerWeek": 2, "bothGroups": true },
+      { "teacherId": "t5", "className": "5а",  "subject": "Математика",               "hoursPerWeek": 4 },
+      { "teacherId": "t5", "className": "5б",  "subject": "Математика",               "hoursPerWeek": 4 },
+      { "teacherId": "t5", "className": "10а", "subject": "Практикум ЕГЭ по русскому языку", "hoursPerWeek": 1 },
+      { "teacherId": "t5", "className": "11а", "subject": "Практикум ЕГЭ по русскому языку", "hoursPerWeek": 1 }
+    ],
+    "homeroomAssignments": [
+      { "className": "5а", "teacherId": "t3" },
+      { "className": "7а", "teacherId": "t1" },
+      { "className": "9а", "teacherId": "t2" }
+    ]
+  },
+  "version": 4
+}

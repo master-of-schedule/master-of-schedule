@@ -29,12 +29,14 @@ dist-ssr
 *.docx
 *.xlsx
 
-# Exception: Tauri app icons and favicon must be committed
+# Exception: Tauri app icons, favicons, and root app logos must be committed
 !src-tauri/icons/**/*.png
 !workload/src-tauri/icons/**/*.png
 !workload/public/favicon.png
 !public/favicon.png
 !.github/assets/*.png
+!rshr.png
+!rn.png
 
 # Old version snapshots
 v3.*/

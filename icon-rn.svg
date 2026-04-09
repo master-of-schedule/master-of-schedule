@@ -1,0 +1,66 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+  <defs>
+    <clipPath id="shape">
+      <rect width="512" height="512" rx="112"/>
+    </clipPath>
+
+    <!--
+      Same pipeline as РШР, different seed → different swirl pattern.
+      Greens dominate; blue sits bottom-left (opposite corner from РШР's blue mass).
+    -->
+
+    <filter id="fluid" x="-60%" y="-60%" width="220%" height="220%"
+            color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="soft"/>
+<!--      <feTurbulence type="fractalNoise" baseFrequency="0.016 0.012"-->
+<!--                    numOctaves="12" seed="21" result="warp"/>-->
+      <feDisplacementMap in="soft" in2="SourceGraphic"
+                         scale="25" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+
+  <!-- ── Base ─────────────────────────────────────────── -->
+  <rect width="512" height="512" rx="112" fill="#06080e"/>
+
+  <!-- ── Fluid colour layer ────────────────────────────── -->
+  <g clip-path="url(#shape)">
+    <g filter="url(#fluid)">
+      <!-- Full-bleed base — ensures displacement never reads outside into transparent/black -->
+      <rect x="-300" y="-300" width="1112" height="1112" fill="#091a0e"/>
+      <!-- greens — dominant, right/upper/centre -->
+      <circle cx="340" cy="160" r="270" fill="#16a34a" fill-opacity="0.95"/>
+      <circle cx="290" cy="390" r="250" fill="#15803d" fill-opacity="0.90"/>
+      <circle cx="460" cy="300" r="210" fill="#1fbb55" fill-opacity="0.80"/>
+      <!-- teal-green bridge -->
+      <circle cx="200" cy="120" r="180" fill="#0d9488" fill-opacity="0.60"/>
+      <!-- blue accent — bottom-left corner (contrast to РШР's blue top-left) -->
+      <circle cx="10"  cy="580" r="250" fill="#1d4ed8" fill-opacity="0.40"/>
+      <circle cx="10"  cy="580" r="200" fill="#1d4ed8" fill-opacity="0.60"/>
+<!--      <circle cx="90"  cy="260" r="140" fill="#0ea5e9" fill-opacity="0.40"/>-->
+    </g>
+    <!-- Same dark desaturating overlay as РШР -->
+    <rect width="512" height="512" fill="#5b5c5e" fill-opacity="0.38"/>
+  </g>
+
+  <!--
+    РН — mirrored Р + normal Н.
+    Font-size 190, two chars centred at 256.
+    Estimated widths: Р ≈ 104 px, Н ≈ 124 px, spacing −5 → total ≈ 223 px.
+    Р cx ≈ 145 + 52 = 197    Н cx ≈ 145 + 99 + 62 = 306
+  -->
+  <!-- Mirrored Р (bowl faces left) -->
+  <text x="237" y="334"
+    transform="translate(394,0) scale(-1,1)"
+    font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800" font-size="220" fill="white"
+    text-anchor="middle" clip-path="url(#shape)"
+  >Р</text>
+  <!-- Н -->
+  <text x="346" y="334"
+    font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800" font-size="220" fill="white"
+    text-anchor="middle" clip-path="url(#shape)"
+  >Н</text>
+
+</svg>
