@@ -1,0 +1,53 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="shape">
+      <rect width="512" height="512" rx="112"/>
+    </clipPath>
+
+    <!--
+      Pipeline:
+        1. feGaussianBlur — dissolves hard circle edges into soft color clouds
+        2. feTurbulence   — generates organic noise
+        3. feDisplacementMap — warps the soft clouds into flowing shapes
+    -->
+    <filter id="fluid" x="-60%" y="-60%" width="220%" height="220%"
+            color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="soft"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.016 0.012"
+                    numOctaves="4" seed="9" result="warp"/>
+      <feDisplacementMap in="soft" in2="warp"
+                         scale="135" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- ── Base ─────────────────────────────────────────── -->
+  <rect width="512" height="512" rx="112" fill="#050e26"/>
+
+  <!-- ── Fluid color layer ─────────────────────────────── -->
+  <g clip-path="url(#shape)">
+    <g filter="url(#fluid)">
+      <!-- blues — large, overlapping, dominant -->
+      <circle cx="140" cy="180" r="280" fill="#1651dd" fill-opacity="0.95"/>
+      <circle cx="260" cy="380" r="260" fill="#1040c0" fill-opacity="0.90"/>
+      <circle cx="50"  cy="320" r="220" fill="#2468f0" fill-opacity="0.80"/>
+      <circle cx="320" cy="200" r="200" fill="#1145c8" fill-opacity="0.75"/>
+      <!-- teal — bridge colour -->
+      <circle cx="360" cy="100" r="200" fill="#0ab0cc" fill-opacity="0.55"/>
+      <circle cx="460" cy="280" r="160" fill="#08c4d8" fill-opacity="0.40"/>
+      <!-- green — single subtle accent, right edge only -->
+      <circle cx="460" cy="180" r="150" fill="#0e9a50" fill-opacity="0.60"/>
+    </g>
+  </g>
+
+  <!-- ── РШР — white, crisp, above fluid layer ─────────── -->
+  <text
+    x="256" y="314"
+    font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800"
+    font-size="190"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-5"
+    clip-path="url(#shape)"
+  >РШР</text>
+</svg>

@@ -1,0 +1,50 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="shape">
+      <rect width="512" height="512" rx="112"/>
+    </clipPath>
+
+    <!--
+      Fluid warp: fractal noise displaces the color blobs,
+      creating the organic swirl effect.
+    -->
+    <filter id="fluid" x="-40%" y="-40%" width="180%" height="180%"
+            color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.013"
+                    numOctaves="4" seed="9" result="warp"/>
+      <feDisplacementMap in="SourceGraphic" in2="warp"
+                         scale="110" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- ── Base: deep navy ──────────────────────────────── -->
+  <rect width="512" height="512" rx="112" fill="#060f28"/>
+
+  <!-- ── Fluid color blobs (filtered → clipped) ──────── -->
+  <g clip-path="url(#shape)">
+    <g filter="url(#fluid)">
+      <!-- dominant blues -->
+      <circle cx="170" cy="190" r="230" fill="#1651dd" fill-opacity="0.85"/>
+      <circle cx="210" cy="400" r="210" fill="#1040c0" fill-opacity="0.75"/>
+      <circle cx="60"  cy="300" r="170" fill="#2060f0" fill-opacity="0.65"/>
+      <!-- teal transitions -->
+      <circle cx="320" cy="130" r="190" fill="#0aabcc" fill-opacity="0.60"/>
+      <circle cx="260" cy="80"  r="130" fill="#07c8d8" fill-opacity="0.45"/>
+      <!-- green accents (right side, less dominant) -->
+      <circle cx="430" cy="220" r="170" fill="#0e9e58" fill-opacity="0.55"/>
+      <circle cx="390" cy="410" r="150" fill="#0b8848" fill-opacity="0.40"/>
+    </g>
+  </g>
+
+  <!-- ── РШР — white, crisp, no filter ────────────────── -->
+  <text
+    x="256" y="314"
+    font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="800"
+    font-size="190"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-5"
+    clip-path="url(#shape)"
+  >РШР</text>
+</svg>
