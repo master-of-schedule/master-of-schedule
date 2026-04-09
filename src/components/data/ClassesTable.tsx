@@ -27,6 +27,15 @@ export function ClassesTable() {
     return classes.filter(c => c.name.toLowerCase().includes(query));
   }, [classes, search]);
 
+  const updateClass = useDataStore((state) => state.updateClass);
+
+  const handleTogglePartner = useCallback(
+    async (cls: SchoolClass) => {
+      await updateClass(cls.id, { isPartner: !cls.isPartner });
+    },
+    [updateClass]
+  );
+
   const handleCopyTable = useCallback(() => {
     const header = ['Класс', 'Число детей'].join('\t');
     const rows = filteredClasses.map(c =>
@@ -70,13 +79,14 @@ export function ClassesTable() {
             <tr>
               <th>Класс</th>
               <th>Число детей</th>
+              <th>Партнёр</th>
               <th className={styles.actionsColumn}></th>
             </tr>
           </thead>
           <tbody>
             {filteredClasses.length === 0 ? (
               <tr>
-                <td colSpan={3} className={styles.empty}>
+                <td colSpan={4} className={styles.empty}>
                   {search ? 'Ничего не найдено' : (
                     <>
                       Нет классов
@@ -93,6 +103,14 @@ export function ClassesTable() {
                 <tr key={cls.id}>
                   <td className={styles.nameCell}>{cls.name}</td>
                   <td className={styles.capacityCell}>{cls.studentCount ?? '—'}</td>
+                  <td className={styles.capacityCell}>
+                    <input
+                      type="checkbox"
+                      checked={cls.isPartner ?? false}
+                      onChange={() => handleTogglePartner(cls)}
+                      title="Класс партнёрской школы"
+                    />
+                  </td>
                   <TableActions
                     onEdit={() => openEdit(cls)}
                     onDelete={() => handleDelete(cls)}

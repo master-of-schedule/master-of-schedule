@@ -13,11 +13,13 @@ import type { PartnerAvailabilityFile } from '@/types/partner';
  */
 export function generatePartnerAvailability(
   schedule: Schedule,
-  versionMeta: { name: string; type: VersionType; mondayDate?: Date }
+  versionMeta: { name: string; type: VersionType; mondayDate?: Date },
+  options?: { excludeClasses?: Set<string> }
 ): PartnerAvailabilityFile {
   const slots: Record<string, Array<{ day: Day; lesson: LessonNumber }>> = {};
 
-  for (const [, classSchedule] of Object.entries(schedule)) {
+  for (const [className, classSchedule] of Object.entries(schedule)) {
+    if (options?.excludeClasses?.has(className)) continue;
     for (const day of DAYS) {
       const daySchedule = classSchedule[day];
       if (!daySchedule) continue;

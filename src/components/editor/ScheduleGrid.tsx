@@ -2,7 +2,7 @@
  * ScheduleGrid - The 5x8 schedule grid for a single class
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { GridCell } from './GridCell';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber, CellStatusInfo } from '@/types';
@@ -37,6 +37,11 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
 
   const partnerBusySet = usePartnerStore((state) => state.partnerBusySet);
   const isPartnerBusy = usePartnerStore((state) => state.isPartnerBusy);
+  const classes = useDataStore((state) => state.classes);
+  const partnerClassNames = useMemo(
+    () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
+  );
 
   const highlightedMovableCell = useUIStore((state) => state.highlightedMovableCell);
   const highlightedMovableTeacher = useUIStore((state) => state.highlightedMovableTeacher);
@@ -147,9 +152,9 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
       if (!activeLesson) {
         return { status: 'available' };
       }
-      return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups);
+      return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups, partnerClassNames);
     },
-    [schedule, teachers, selectedLesson, copiedLesson, className, partnerBusySet, groups]
+    [schedule, teachers, selectedLesson, copiedLesson, className, partnerBusySet, groups, partnerClassNames]
   );
 
   // Handle cell click

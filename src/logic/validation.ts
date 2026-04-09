@@ -221,7 +221,8 @@ export function getCellStatus(
   day: Day,
   lessonNum: LessonNumber,
   partnerBusySet?: Set<string>,
-  groups?: Group[]
+  groups?: Group[],
+  partnerClassNames?: Set<string>
 ): CellStatusInfo {
   const existingLessons = getSlotLessons(schedule, className, day, lessonNum);
 
@@ -246,7 +247,7 @@ export function getCellStatus(
     return { status: 'teacher_banned' };
   }
 
-  // Check teacher busy in another class (Orange)
+  // Check teacher busy in another class (Orange, or partner_busy if in partner class)
   const conflict = getTeacherConflict(
     schedule,
     selectedLesson.teacher,
@@ -255,6 +256,9 @@ export function getCellStatus(
     className
   );
   if (conflict) {
+    if (partnerClassNames?.has(conflict.className)) {
+      return { status: 'partner_busy', teacherName: selectedLesson.teacher };
+    }
     return {
       status: 'teacher_busy',
       conflictClass: conflict.className,
@@ -262,7 +266,7 @@ export function getCellStatus(
     };
   }
 
-  // Check teacher2 busy in another class (Orange)
+  // Check teacher2 busy in another class (Orange, or partner_busy if in partner class)
   if (selectedLesson.teacher2) {
     const conflict2 = getTeacherConflict(
       schedule,
@@ -272,6 +276,9 @@ export function getCellStatus(
       className
     );
     if (conflict2) {
+      if (partnerClassNames?.has(conflict2.className)) {
+        return { status: 'partner_busy', teacherName: selectedLesson.teacher2 };
+      }
       return {
         status: 'teacher_busy',
         conflictClass: conflict2.className,
@@ -329,7 +336,8 @@ export interface ScheduleConflict {
 
 export function validateSchedule(
   schedule: Schedule,
-  teachers: Record<string, Teacher>
+  teachers: Record<string, Teacher>,
+  partnerClassNames?: Set<string>
 ): ScheduleConflict[] {
   const conflicts: ScheduleConflict[] = [];
   const days = DAYS;
@@ -352,6 +360,8 @@ export function validateSchedule(
       const teacherAssignments = new Map<string, string[]>();
 
       forEachSlotAt(schedule, day, lessonNum, (className, lessons) => {
+        // Skip partner school class slots — their teacher assignments don't count as conflicts
+        if (partnerClassNames?.has(className)) return;
         for (const lesson of lessons) {
           const existing = teacherAssignments.get(lesson.teacher) ?? [];
           existing.push(className);

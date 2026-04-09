@@ -4,8 +4,9 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { Day, LessonNumber, Room, ScheduledLesson, CellRef, LessonRequirement, Teacher } from '@/types';
-import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
+import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/stores';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
+import { exportToJson, saveJsonFile } from '@/db/import-export';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson } from '@/logic';
 import { ClassSelector, groupClassesByGrade } from './ClassSelector';
 import { ScheduleGrid } from './ScheduleGrid';
@@ -47,7 +48,9 @@ export function EditorPage() {
   const versionType = useScheduleStore((state) => state.versionType);
   const versionName = useScheduleStore((state) => state.versionName);
   const isDirty = useScheduleStore((state) => state.isDirty);
+  const jsonIsDirty = useScheduleStore((state) => state.jsonIsDirty);
   const markSaved = useScheduleStore((state) => state.markSaved);
+  const markJsonSaved = useScheduleStore((state) => state.markJsonSaved);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
   const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
@@ -62,6 +65,9 @@ export function EditorPage() {
   const setMovingLesson = useUIStore((state) => state.setMovingLesson);
   const clearMovingLesson = useUIStore((state) => state.clearMovingLesson);
   const absentTeacher = useUIStore((state) => state.absentTeacher);
+
+  const partnerData = usePartnerStore((state) => state.partnerData);
+  const clearPartnerFile = usePartnerStore((state) => state.clearPartnerFile);
 
   const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();
@@ -87,8 +93,8 @@ export function EditorPage() {
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
     if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
-      ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки. Двойной клик — авто-кабинет'
-      : 'Нажмите на свободную ячейку сетки для назначения. Двойной клик — авто-кабинет';
+      ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки.'
+      : 'Нажмите на свободную ячейку сетки для назначения.';
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
   }, [movingLesson, absentTeacher, copiedLesson, selectedCells.length, selectedLesson, versionType]);
 
@@ -141,11 +147,11 @@ export function EditorPage() {
     lessonWithoutRoom?: ScheduledLesson;
   } | null>(null);
 
-  // Set initial class if none selected — pick the first non-excluded class (top-left in selector)
+  // Set initial class if none selected — pick the first non-partner, non-excluded class
   useEffect(() => {
     if (!currentClass && classes.length > 0) {
-      const classNames = classes.map(c => c.name);
-      const sorted = groupClassesByGrade(classNames, gapExcludedClasses);
+      const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
+      const sorted = groupClassesByGrade(ownClassNames.length > 0 ? ownClassNames : classes.map(c => c.name), gapExcludedClasses);
       const firstClass = sorted[0]?.[1][0] ?? classes[0].name;
       setCurrentClass(firstClass);
     }
@@ -247,6 +253,19 @@ export function EditorPage() {
       setIsSaving(false);
     }
   }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek, markSaved, showToast]);
+
+  const handleSaveJson = useCallback(async () => {
+    try {
+      const json = await exportToJson();
+      const date = new Date().toISOString().slice(0, 10);
+      await saveJsonFile(json, `timetable-${date}.json`);
+      markJsonSaved();
+      showToast('Файл скачан', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка экспорта';
+      showToast(msg, 'error');
+    }
+  }, [markJsonSaved, showToast]);
 
   // Handle cell click to assign lesson (or paste copied lesson)
   const handleAssignLesson = useCallback(
@@ -654,14 +673,32 @@ export function EditorPage() {
                     Назначить ({selectedCells.length})
                   </Button>
                 )}
+                {partnerData && (
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={clearPartnerFile}
+                    title="Убрать загруженный JSON партнёра"
+                  >
+                    Отменить JSON партнёра
+                  </Button>
+                )}
                 <Button
                   variant={isDirty ? 'danger' : 'secondary'}
                   size="small"
                   onClick={handleSave}
                   disabled={isSaving}
-                  title="Сохранить расписание"
+                  title="Сохранить расписание в браузере"
                 >
-                  {isSaving ? 'Сохранение...' : isDirty ? 'Сохранить*' : 'Сохранить'}
+                  {isSaving ? 'Сохранение...' : isDirty ? 'Сохранить действие*' : 'Сохранить действие'}
+                </Button>
+                <Button
+                  variant={jsonIsDirty ? 'danger' : 'secondary'}
+                  size="small"
+                  onClick={handleSaveJson}
+                  title="Экспортировать расписание в JSON-файл"
+                >
+                  Сохранить файл
                 </Button>
               </div>
             </div>
@@ -683,8 +720,8 @@ export function EditorPage() {
 
       <div className={styles.rightPanel}>
         {currentClass && <UnscheduledPanel className={currentClass} />}
-        {(versionType === 'weekly' || versionType === 'technical') && <AbsentPanel />}
-        {(versionType === 'weekly' || versionType === 'technical') && <RoomPanel />}
+        {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <AbsentPanel />}
+        {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <RoomPanel />}
         {replacementPicker.isOpen && currentClass && replacementPicker.data && (
           <ReplacementPanel
             className={currentClass}

@@ -218,11 +218,22 @@ describe('parseUP', () => {
       ['', 'Русский язык', 4, 4, 4, 4, 4],
     ];
     const plan = await parseUP(makeXlsx(rows));
-    expect(plan.classNames).toEqual(['6-а', '6-в', '6-г', '6-б', '6-д']);
+    expect(plan.classNames).toEqual(['6-а', '6-б', '6-в', '6-г', '6-д']); // sorted
     const subj = plan.grades[0].subjects[0];
     expect(subj.hoursPerClass['6-а']).toBe(4);
     expect(subj.hoursPerClass['6-б']).toBe(4);
     expect(subj.hoursPerClass['6-д']).toBe(4);
+  });
+
+  it('classNames are sorted numerically by grade even when file has them in non-sequential order', async () => {
+    const rows: (string | number | null)[][] = [
+      ['', '10 класс', '10а', '10б'],
+      ['', 'Алгебра', 3, 3],
+      ['', '5 класс', '5б', '5а'],
+      ['', 'Математика', 5, 5],
+    ];
+    const plan = await parseUP(makeXlsx(rows));
+    expect(plan.classNames).toEqual(['5-а', '5-б', '10-а', '10-б']);
   });
 
   it('З3-5: captures expectedTotals from итого row', async () => {
