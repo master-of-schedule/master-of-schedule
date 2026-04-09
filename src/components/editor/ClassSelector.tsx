@@ -48,18 +48,17 @@ export function ClassSelector() {
   const schedule = useScheduleStore((state) => state.schedule);
   const versionType = useScheduleStore((state) => state.versionType);
 
-  const partnerClassNameSet = useMemo(
-    () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
-    [classes]
-  );
-
-  // Group own classes by grade (partner classes excluded), partner classes appended at end
+  // Group own classes by grade, then partner classes by grade (appended at end).
+  // Partner grade groups use 'partner:<grade>' keys so the render can identify them.
   const groupedClasses = useMemo(() => {
     const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
     const partnerClassNames = classes.filter(c => c.isPartner).map(c => c.name);
     const grouped = groupClassesByGrade(ownClassNames, gapExcludedClasses);
     if (partnerClassNames.length > 0) {
-      grouped.push(['Партнёр', partnerClassNames]);
+      const partnerGraded = groupClassesByGrade(partnerClassNames, []);
+      for (const [grade, names] of partnerGraded) {
+        grouped.push([`partner:${grade}`, names]);
+      }
     }
     return grouped;
   }, [classes, gapExcludedClasses]);
@@ -84,22 +83,26 @@ export function ClassSelector() {
       </div>
 
       <div className={styles.list}>
-        {groupedClasses.map(([grade, classNames]) => (
-          <div key={grade} className={`${styles.group} ${grade === 'Партнёр' ? styles.partnerGroup : ''}`}>
-            {grade === 'Партнёр' && <div className={styles.groupLabel}>Партнёр</div>}
-            <div className={styles.classButtons}>
-              {classNames.map((className) => (
-                <button
-                  key={className}
-                  className={`${styles.classButton} ${currentClass === className ? styles.active : ''} ${classesWithRemaining.has(className) ? styles.hasRemaining : ''} ${partnerClassNameSet.has(className) ? styles.partner : ''}`}
-                  onClick={() => setCurrentClass(className)}
-                >
-                  {className}
-                </button>
-              ))}
+        {groupedClasses.map(([grade, classNames], idx) => {
+          const isPartner = grade.startsWith('partner:');
+          const isFirstPartner = isPartner && !groupedClasses[idx - 1]?.[0].startsWith('partner:');
+          return (
+            <div key={grade} className={`${styles.group} ${isFirstPartner ? styles.partnerGroup : ''}`}>
+              {isFirstPartner && <div className={styles.groupLabel}>Партнёр</div>}
+              <div className={styles.classButtons}>
+                {classNames.map((className) => (
+                  <button
+                    key={className}
+                    className={`${styles.classButton} ${currentClass === className ? styles.active : ''} ${classesWithRemaining.has(className) ? styles.hasRemaining : ''} ${isPartner ? styles.partner : ''}`}
+                    onClick={() => setCurrentClass(className)}
+                  >
+                    {className}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {classes.length === 0 && (
           <div className={styles.empty}>
