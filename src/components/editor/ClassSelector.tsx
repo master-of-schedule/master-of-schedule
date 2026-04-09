@@ -85,7 +85,8 @@ export function ClassSelector() {
 
       <div className={styles.list}>
         {groupedClasses.map(([grade, classNames]) => (
-          <div key={grade} className={styles.group}>
+          <div key={grade} className={`${styles.group} ${grade === 'Партнёр' ? styles.partnerGroup : ''}`}>
+            {grade === 'Партнёр' && <div className={styles.groupLabel}>Партнёр</div>}
             <div className={styles.classButtons}>
               {classNames.map((className) => (
                 <button
