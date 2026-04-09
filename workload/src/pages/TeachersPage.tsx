@@ -4,6 +4,7 @@ import { deriveInitials } from '../logic/groupNames';
 import { importTeachersFromDataXlsx } from '../logic/importTeachers';
 import { computeTeacherTotalHours } from '../logic/teacherHours';
 import { TEACHER_MAX_HOURS } from '../logic/sanpin';
+import { compareClassNames } from '../logic/classSort';
 import { useToast } from '../hooks/useToast';
 import { generateId } from '../utils/generateId';
 import type { RNTeacher } from '../types';
@@ -18,7 +19,7 @@ export function TeachersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
-  const classNames = curriculumPlan?.classNames ?? [];
+  const classNames = [...(curriculumPlan?.classNames ?? [])].sort(compareClassNames);
   const importRef = useRef<HTMLInputElement>(null);
 
   async function handleImportDataXlsx(e: React.ChangeEvent<HTMLInputElement>) {

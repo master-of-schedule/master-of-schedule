@@ -2,6 +2,8 @@
  * Pure helpers extracted from AssignPage for testability.
  */
 
+import { compareClassNames } from './classSort';
+
 /**
  * З6-5: Determine whether a teacher's cell for a subject should be blocked.
  * A cell is blocked when all available slots are already taken by other teachers.
@@ -61,8 +63,10 @@ export function visibleClassesForTable(
   uniqueSubjectNames: string[],
   upHours: (cn: string, subj: string) => number,
 ): string[] {
-  if (isCatchAll) return classNames;
-  return classNames.filter((cn) => uniqueSubjectNames.some((s) => upHours(cn, s) > 0));
+  const result = isCatchAll
+    ? [...classNames]
+    : classNames.filter((cn) => uniqueSubjectNames.some((s) => upHours(cn, s) > 0));
+  return result.sort(compareClassNames);
 }
 
 /**

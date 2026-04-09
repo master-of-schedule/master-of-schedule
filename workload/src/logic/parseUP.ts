@@ -15,6 +15,7 @@
 
 import * as XLSX from 'xlsx';
 import type { CurriculumPlan, GradeBlock, SubjectRow } from '../types';
+import { compareClassNames } from './classSort';
 
 const GRADE_HEADER_RE = /^(\d{1,2})\s*([-–й].*)?класс/i;
 const CLASS_NAME_RE = /^\d{1,2}[-–]?[а-яёА-ЯЁa-zA-Z]/;
@@ -263,5 +264,6 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
     );
   }
 
+  allClassNames.sort(compareClassNames);
   return { grades, classNames: allClassNames };
 }
