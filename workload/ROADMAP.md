@@ -692,7 +692,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W9. 🟡 ⬜ Pending — Composite Zustand selectors в страницах РН
+### RF-W9. 🟡 ✅ Done — Composite Zustand selectors в страницах РН
 
 `AssignPage.tsx` и `ImportPage.tsx` имеют много отдельных подписок. Сгруппировать в `useShallow` по логическим группам. Один коммит на файл.
 
@@ -716,7 +716,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W12. 🟠 ⬜ Pending — Тесты для генераторов экспорта
+### RF-W12. 🟠 ✅ Done — Тесты для генераторов экспорта
 
 `exportWordReport.ts`, `exportPdfReport.ts`, `upTemplate.ts` — ни одного теста. Как минимум один golden-output тест на каждый файл с fixture-планом.
 
@@ -736,8 +736,8 @@ const visibleGrades = allGrades.filter(grade =>
 | RF-W6 | Вынести applyDeptSnapshot в logic/ | Высокий | ✅ Done |
 | RF-W7 | Вынести removeClassFromPlan в logic/planUtils.ts | Средний | ✅ Done |
 | RF-W8 | Оптимизация officialReport.ts (индекс вместо find) | Высокий | ✅ Done |
-| RF-W9 | Composite Zustand selectors в страницах РН | Средний | ⬜ Pending |
+| RF-W9 | Composite Zustand selectors в страницах РН | Средний | ✅ Done |
 | RF-W10 | MAX_UNDO_HISTORY константа | Низкий | ✅ Done |
 | RF-W11 | Window global через interface | Низкий | ✅ Done |
-| RF-W12 | Тесты для генераторов экспорта | Высокий | ⬜ Pending |
+| RF-W12 | Тесты для генераторов экспорта | Высокий | ✅ Done |
 
