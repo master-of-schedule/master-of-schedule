@@ -441,13 +441,35 @@ export function findGaps(
 ): ScheduleGap[] {
   const gaps: ScheduleGap[] = [];
 
-  // Pre-compute group pairs from the Groups table (authoritative source).
-  // This ensures pairs are known even when groups are scheduled at different slots.
-  const staticGroupPairs = new Map<string, Set<string>>();
+  // Pre-compute ALL group pairs once before the loop:
+  //   • Static pairs from the Groups table (authoritative source).
+  //   • Dynamic pairs discovered from co-scheduled groups across the whole schedule.
+  // Building this once avoids O(classes × days) Map copies in the inner loop.
+  const groupPairs = new Map<string, Set<string>>();
   for (const group of groups ?? []) {
     if (group.parallelGroup) {
-      if (!staticGroupPairs.has(group.name)) staticGroupPairs.set(group.name, new Set());
-      staticGroupPairs.get(group.name)!.add(group.parallelGroup);
+      if (!groupPairs.has(group.name)) groupPairs.set(group.name, new Set());
+      groupPairs.get(group.name)!.add(group.parallelGroup);
+    }
+  }
+  for (const [, classDays] of Object.entries(schedule)) {
+    for (const day of DAYS) {
+      for (const n of LESSON_NUMBERS) {
+        const lessons = classDays[day]?.[n]?.lessons ?? [];
+        const groupsInSlot = [...new Set(
+          lessons.map(l => l.group).filter((g): g is string => Boolean(g))
+        )];
+        if (groupsInSlot.length >= 2) {
+          for (const g of groupsInSlot) {
+            for (const other of groupsInSlot) {
+              if (g !== other) {
+                if (!groupPairs.has(g)) groupPairs.set(g, new Set());
+                groupPairs.get(g)!.add(other);
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -468,34 +490,12 @@ export function findGaps(
         }
       }
 
+      if (groupPairs.size === 0) continue; // No paired groups known — skip group-gap checks.
+
       // Z28-1: Group-level gaps — only report when a single-group slot is sandwiched
       // between two "full-class" slots AND the absent group is the known partner of the present one.
 
-      // Step 1: Seed group pairs from the Groups table, then augment with dynamic slot discovery.
-      const groupPairs = new Map<string, Set<string>>();
-      for (const [g, partners] of staticGroupPairs) {
-        groupPairs.set(g, new Set(partners));
-      }
-      for (const n of LESSON_NUMBERS) {
-        const lessons = days[day]?.[n]?.lessons ?? [];
-        const groupsInSlot = [...new Set(
-          lessons.map(l => l.group).filter((g): g is string => Boolean(g))
-        )];
-        if (groupsInSlot.length >= 2) {
-          for (const g of groupsInSlot) {
-            for (const other of groupsInSlot) {
-              if (g !== other) {
-                if (!groupPairs.has(g)) groupPairs.set(g, new Set());
-                groupPairs.get(g)!.add(other);
-              }
-            }
-          }
-        }
-      }
-
-      if (groupPairs.size === 0) continue; // No paired groups known — no group gaps possible.
-
-      // Step 2: Find "full-class" slots: class-wide lesson OR 2+ different groups.
+      // Step 1: Find "full-class" slots: class-wide lesson OR 2+ different groups.
       const fullClassSlots = LESSON_NUMBERS.filter(n => {
         const lessons = days[day]?.[n]?.lessons ?? [];
         if (lessons.some(l => !l.group)) return true; // class-wide lesson
@@ -505,7 +505,7 @@ export function findGaps(
 
       if (fullClassSlots.length === 0) continue; // No full-class boundary — no group window possible.
 
-      // Step 3: For each slot with exactly one group (no class-wide), check if sandwiched.
+      // Step 2: For each slot with exactly one group (no class-wide), check if sandwiched.
       for (const n of LESSON_NUMBERS) {
         const lessons = days[day]?.[n]?.lessons ?? [];
         if (lessons.length === 0) continue;

@@ -9,6 +9,8 @@ export interface Toast {
   duration: number;
 }
 
+const MAX_TOASTS = 3;
+
 const DEFAULT_DURATIONS: Record<ToastType, number> = {
   success: 5000,
   info: 6000,
@@ -32,7 +34,7 @@ export const useToastStore = create<ToastState>()((set) => ({
       duration: duration !== undefined ? duration : DEFAULT_DURATIONS[type],
     };
     set((state) => ({
-      toasts: [...state.toasts.slice(-(3 - 1)), toast],
+      toasts: [...state.toasts.slice(-(MAX_TOASTS - 1)), toast],
     }));
   },
   dismiss(id) {

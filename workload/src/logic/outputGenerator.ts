@@ -7,9 +7,9 @@ import type { Assignment, RNTeacher, HomeroomAssignment, GroupPair } from '../ty
 import type { LessonRequirement } from '../types';
 import { groupPairNames } from './groupNames';
 
-let _idCounter = 0;
-function nextId(): string {
-  return `rn-${++_idCounter}`;
+function makeIdGenerator(): () => string {
+  let counter = 0;
+  return () => `rn-${++counter}`;
 }
 
 /**
@@ -92,7 +92,7 @@ export function generateOutput(
   homeroomAssignments: HomeroomAssignment[],
   groupNameOverrides?: Record<string, Record<string, [string, string]>>,
 ): LessonRequirement[] {
-  _idCounter = 0;
+  const nextId = makeIdGenerator();
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
   const groupPairs = detectGroupPairs(assignments, teachers, groupNameOverrides);
   const groupPairKeys = new Set(groupPairs.map((p) => `${p.className}::${p.subject}`));
