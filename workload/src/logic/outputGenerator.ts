@@ -3,9 +3,10 @@
  * that can be directly imported into РШР via data.xlsx.
  */
 
-import type { Assignment, RNTeacher, HomeroomAssignment, GroupPair } from '../types';
+import type { Assignment, RNTeacher, HomeroomAssignment, GroupPair, CurriculumPlan } from '../types';
 import type { LessonRequirement } from '../types';
 import { groupPairNames } from './groupNames';
+import { getExpectedGroupSlots } from './planUtils';
 
 function makeIdGenerator(): () => string {
   let counter = 0;
@@ -19,11 +20,16 @@ function makeIdGenerator(): () => string {
  *
  * @param groupNameOverrides  Optional З6-9 user-defined name overrides
  *                            (overrides[className][subject] = [nameA, nameB])
+ * @param plan  When provided, validates that the assignment count matches the plan's
+ *              expected slot count before emitting a pair (RF-W3). Assignments that
+ *              don't match plan expectations are skipped here and should be surfaced
+ *              as validation issues via validateWorkload.
  */
 export function detectGroupPairs(
   assignments: Assignment[],
   teachers: RNTeacher[],
   groupNameOverrides?: Record<string, Record<string, [string, string]>>,
+  plan?: CurriculumPlan,
 ): GroupPair[] {
   const byClassSubject = new Map<string, Assignment[]>();
   for (const a of assignments) {
@@ -40,7 +46,11 @@ export function detectGroupPairs(
     const override = groupNameOverrides?.[className]?.[subject];
 
     if (group.length === 2) {
-      // Standard split: two different teachers
+      // Standard split: two different teachers.
+      // When plan is provided, only emit a pair if the plan expects ≥2 slots.
+      // A 2-teacher assignment on a non-split subject is a validation error, not a pair.
+      if (plan && getExpectedGroupSlots(plan, className, subject) < 2) continue;
+
       const [a, b] = group;
       const teacherA = teacherById[a.teacherId];
       const teacherB = teacherById[b.teacherId];
@@ -56,7 +66,7 @@ export function detectGroupPairs(
         groupNameB: nameB,
       });
     } else if (group.length === 1 && group[0].bothGroups) {
-      // З6-8: single teacher handles both groups
+      // З6-8: single teacher handles both groups.
       const a = group[0];
       const teacher = teacherById[a.teacherId];
       if (!teacher) continue;
@@ -91,10 +101,11 @@ export function generateOutput(
   teachers: RNTeacher[],
   homeroomAssignments: HomeroomAssignment[],
   groupNameOverrides?: Record<string, Record<string, [string, string]>>,
+  plan?: CurriculumPlan,
 ): LessonRequirement[] {
   const nextId = makeIdGenerator();
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
-  const groupPairs = detectGroupPairs(assignments, teachers, groupNameOverrides);
+  const groupPairs = detectGroupPairs(assignments, teachers, groupNameOverrides, plan);
   const groupPairKeys = new Set(groupPairs.map((p) => `${p.className}::${p.subject}`));
 
   const result: LessonRequirement[] = [];

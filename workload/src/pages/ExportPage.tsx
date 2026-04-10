@@ -50,7 +50,7 @@ export function ExportPage() {
   // MU-2: dept import
   const deptInputRef = useRef<HTMLInputElement>(null);
 
-  const requirements = generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides);
+  const requirements = generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides, curriculumPlan ?? undefined);
   const classReqs = requirements.filter((r) => r.type === 'class').sort((a, b) => {
     const c = compareClassNames(a.classOrGroup, b.classOrGroup);
     return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');

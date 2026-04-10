@@ -66,7 +66,7 @@ describe('getExpectedGroupSlots', () => {
   function makeSplitPlan(): CurriculumPlan {
     return {
       classNames: ['5-а', '6-а'],
-      groupCounts: { '5-а': 2, '6-а': 3 },
+      groupCounts: { '5-а': 2, '6-а': 1 },
       grades: [
         {
           grade: 5,
@@ -86,8 +86,8 @@ describe('getExpectedGroupSlots', () => {
 
   it('returns groupCounts value for split subject', () => {
     const plan = makeSplitPlan();
-    expect(getExpectedGroupSlots(plan, '5-а', 'Английский')).toBe(2);
-    expect(getExpectedGroupSlots(plan, '6-а', 'Английский')).toBe(3);
+    expect(getExpectedGroupSlots(plan, '5-а', 'Английский')).toBe(2); // groupCounts['5-а'] = 2
+    expect(getExpectedGroupSlots(plan, '6-а', 'Английский')).toBe(1); // groupCounts['6-а'] = 1
   });
 
   it('defaults to 2 when groupSplit=true but no groupCounts entry', () => {

@@ -28,6 +28,31 @@ export function hoursPerClass(assignments: Assignment[]): Record<string, number>
 }
 
 /**
+ * RF-W4: Find className+subject pairs where two split assignments carry different hoursPerWeek.
+ * Returns entries where the two halves disagree, as a list of {className, subject, hours}.
+ */
+export function findDivergentSplitHours(
+  assignments: Assignment[],
+): { className: string; subject: string; hours: number[] }[] {
+  const grouped = new Map<string, number[]>();
+  for (const a of assignments) {
+    const key = `${a.className}::${a.subject}`;
+    const existing = grouped.get(key) ?? [];
+    grouped.set(key, [...existing, a.hoursPerWeek]);
+  }
+  const result: { className: string; subject: string; hours: number[] }[] = [];
+  for (const [key, hours] of grouped.entries()) {
+    if (hours.length < 2) continue;
+    const allSame = hours.every((h) => h === hours[0]);
+    if (!allSame) {
+      const [className, subject] = key.split('::');
+      result.push({ className, subject, hours });
+    }
+  }
+  return result;
+}
+
+/**
  * Total UP hours required for a class (sum of all subject hours in plan for that class).
  */
 export function requiredHoursForClass(plan: CurriculumPlan, className: string): number {
@@ -60,6 +85,15 @@ export function validateWorkload(
   homeroomAssignments: HomeroomAssignment[],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+
+  // ── RF-W4: Divergent hours between split halves ───────────────────────────
+  for (const { className, subject, hours } of findDivergentSplitHours(assignments)) {
+    issues.push({
+      severity: 'warning',
+      message: `${className}: «${subject}» — часы у половин группы расходятся (${hours.join(', ')} ч/нед)`,
+      target: className,
+    });
+  }
 
   // ── СанПиН per class ──────────────────────────────────────────────────────
   const classTotals = hoursPerClass(assignments);
@@ -115,11 +149,12 @@ export function validateWorkload(
     }
   }
 
-  // ── Per-subject over-assignment (З18-3) ────────────────────────────────────
+  // ── Per-subject slot-count check (З18-3 + RF-W3) ─────────────────────────
   for (const { className, subject } of allRequiredSubjects(plan)) {
     const subjectAssignments = assignments.filter(
       (a) => a.className === className && a.subject === subject,
     );
+    if (subjectAssignments.length === 0) continue; // "не назначен" check above covers this
     const assignedSlots = subjectAssignments.reduce(
       (sum, a) => sum + (a.bothGroups ? 2 : 1), 0,
     );
@@ -132,6 +167,13 @@ export function validateWorkload(
       issues.push({
         severity: 'warning',
         message: `${className}: «${subject}» — назначено учителей: ${assignedSlots}, по плану: ${gc}`,
+        target: className,
+      });
+    } else if (assignedSlots < gc) {
+      // RF-W3: split subject assigned to fewer teachers than expected (e.g. one teacher, no bothGroups)
+      issues.push({
+        severity: 'warning',
+        message: `${className}: «${subject}» — не хватает учителей: назначено ${assignedSlots}, по плану: ${gc}`,
         target: className,
       });
     }

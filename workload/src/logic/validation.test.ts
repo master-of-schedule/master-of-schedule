@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hoursPerClass, requiredHoursForClass, validateWorkload } from './validation';
+import { hoursPerClass, requiredHoursForClass, validateWorkload, findDivergentSplitHours } from './validation';
 import { computeTeacherTotalHours } from './teacherHours';
 import type { CurriculumPlan, Assignment, HomeroomAssignment, RNTeacher } from '../types';
 
@@ -97,6 +97,43 @@ describe('computeTeacherTotalHours', () => {
   });
 });
 
+describe('findDivergentSplitHours', () => {
+  it('RF-W4: detects divergent hoursPerWeek between split halves', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 2 }),
+    ];
+    const result = findDivergentSplitHours(assignments);
+    expect(result).toHaveLength(1);
+    expect(result[0].subject).toBe('Физкультура');
+    expect(result[0].hours).toEqual(expect.arrayContaining([3, 2]));
+  });
+
+  it('RF-W4: returns nothing when halves agree', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 3 }),
+    ];
+    expect(findDivergentSplitHours(assignments)).toHaveLength(0);
+  });
+
+  it('RF-W4: single assignment is never divergent', () => {
+    expect(findDivergentSplitHours([makeAssignment()])).toHaveLength(0);
+  });
+
+  it('RF-W4: validateWorkload surfaces divergent split hours as warning', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Физкультура', teacherId: 't2', hoursPerWeek: 2 }),
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const divergent = issues.filter((i) => i.message.includes('расходятся'));
+    expect(divergent).toHaveLength(1);
+    expect(divergent[0].message).toContain('Физкультура');
+  });
+});
+
 describe('requiredHoursForClass', () => {
   it('sums all subject hours for a class', () => {
     expect(requiredHoursForClass(PLAN, '5а')).toBe(8); // 5 math + 3 pe
@@ -189,6 +226,29 @@ describe('validateWorkload', () => {
     const overload = issues.filter((i) => i.severity === 'error' && i.target === TEACHER.name);
     expect(overload).toHaveLength(1);
     expect(overload[0].message).toContain('36');
+  });
+
+  it('RF-W3: warns when groupSplit subject has only 1 teacher (no bothGroups)', () => {
+    // Физкультура is groupSplit=true (2 slots expected). Assign only 1 teacher without bothGroups.
+    // validateWorkload should emit a "not enough teachers" warning.
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Физкультура', teacherId: 't1', hoursPerWeek: 3 }),
+      makeAssignment({ subject: 'Математика', teacherId: 't1', hoursPerWeek: 5 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const missingPartner = issues.filter((i) => i.message.includes('не хватает учителей'));
+    expect(missingPartner).toHaveLength(1);
+    expect(missingPartner[0].message).toContain('Физкультура');
+  });
+
+  it('RF-W3: no missing-partner warning when bothGroups=true covers both slots', () => {
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 3, bothGroups: true }),
+      makeAssignment({ subject: 'Математика', hoursPerWeek: 5 }),
+    ];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const missingPartner = issues.filter((i) => i.message.includes('не хватает учителей'));
+    expect(missingPartner).toHaveLength(0);
   });
 
   it('З17-1: groupSplit does not cause false СанПиН error', () => {
