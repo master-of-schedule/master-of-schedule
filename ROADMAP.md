@@ -31,7 +31,7 @@ Cell content in `ExportPage.tsx` generateHTML() not always escaped. Ensure all u
 #### CR-T7. ✅ Done — Cascade rename error handling (dataStore.ts)
 `cascadeTeacherRename()` awaited without try-catch. DB failure leaves state inconsistent. Wrap and revert on failure.
 
-#### CR-T8. ⬜ Pending — Composite Zustand selectors for large page components
+#### CR-T8. ✅ Done — Composite Zustand selectors for large page components
 `EditorPage.tsx` (39), `ExportPage.tsx` (23+), `StartPage.tsx` (21), `ScheduleGrid.tsx` (23) each have that many individual store subscriptions. Group related fields with `useShallow` composite selectors to reduce re-render surface. One commit per file.
 
 #### CR-T9. ⬜ Pending — getCellStatus() decomposed into focused checks
@@ -40,10 +40,10 @@ Cell content in `ExportPage.tsx` generateHTML() not always escaped. Ensure all u
 #### CR-T10. ⬜ Pending — partnerStore silent error on corrupt data
 Parse error in `initFromDb()` is swallowed silently. Set an error flag or show warning.
 
-#### CR-T11. ⬜ Pending — Extract mergeUnscheduledWithTemporary out of UnscheduledPanel
+#### CR-T11. ✅ Done — Extract mergeUnscheduledWithTemporary out of UnscheduledPanel
 `UnscheduledPanel.tsx:55-95` — 40 lines of inline merge logic in `useMemo`. Extract `mergeUnscheduledWithTemporary(requirements, temporaries): UnscheduledEntry[]` into `src/logic/mergeTemporaryLessons.ts` with unit tests.
 
-#### CR-T12. ⬜ Pending — Unit tests for traversal.ts and generateId.ts
+#### CR-T12. ✅ Done — Unit tests for traversal.ts and generateId.ts
 `src/logic/traversal.ts` (`forEachSlot` / `forEachSlotAt`) has no tests despite heavy cross-app usage. `src/utils/generateId.ts` should assert length, charset, and collision-freeness over a batch.
 
 ### РН App (workload/src/)
