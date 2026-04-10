@@ -10,8 +10,12 @@
   ![Лицензия](https://img.shields.io/badge/лицензия-MIT-blue)
   ![Платформа](https://img.shields.io/badge/платформа-web%20%7C%20macOS%20%7C%20Windows-lightgrey)
   ![Сборка](https://img.shields.io/github/actions/workflow/status/Vanderhoof/timetable/release.yml?label=сборка)
+<<<<<<< Updated upstream
 
   **[master-of-schedule.github.io](https://master-of-schedule.github.io)**
+=======
+  ![Скачиваний](https://img.shields.io/github/downloads/master-of-schedule/master-of-schedule/total?label=скачиваний&color=teal)
+>>>>>>> Stashed changes
 </div>
 
 ---
@@ -65,19 +69,16 @@
 
 ## Быстрый старт
 
-Оба приложения — статические HTML-файлы, которые работают прямо в браузере без сервера. Все данные хранятся локально в браузере.
+Готовые сборки — на странице [Releases](../../releases). Все данные хранятся локально, сервер не нужен.
 
 ### Скачать готовую сборку
-
-Перейдите в [Releases](../../releases) и скачайте нужный вариант:
 
 | Файл | Для чего |
 |------|----------|
 | `РШР-x64.dmg` | Десктоп-приложение macOS |
 | `РШР-x64-setup.exe` | Десктоп-приложение Windows |
 | `РШР-web-vX.Y.Z.zip` | РШР в браузере — распакуйте и откройте `index.html` |
-
-Редактор нагрузки пока выходит только в виде веб-версии (`.zip`).
+| `РН-web-vX.Y.Z.zip` | Редактор нагрузки в браузере |
 
 ### Запустить локально
 
