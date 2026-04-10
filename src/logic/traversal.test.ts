@@ -5,10 +5,10 @@ import type { Schedule, ScheduledLesson } from '@/types';
 function makeLesson(overrides: Partial<ScheduledLesson> = {}): ScheduledLesson {
   return {
     id: 'l1',
+    requirementId: 'req-1',
     subject: 'Математика',
     teacher: 'Иванов',
     room: '201',
-    classOrGroup: '5А',
     ...overrides,
   };
 }
@@ -17,16 +17,16 @@ function makeSchedule(): Schedule {
   return {
     '5А': {
       Пн: {
-        1: { lessons: [makeLesson({ id: 'l1', classOrGroup: '5А' })] },
-        2: { lessons: [makeLesson({ id: 'l2', subject: 'Физкультура', classOrGroup: '5А' })] },
+        1: { lessons: [makeLesson({ id: 'l1' })] },
+        2: { lessons: [makeLesson({ id: 'l2', subject: 'Физкультура' })] },
       },
       Вт: {
-        1: { lessons: [makeLesson({ id: 'l3', subject: 'История', classOrGroup: '5А' })] },
+        1: { lessons: [makeLesson({ id: 'l3', subject: 'История' })] },
       },
     },
     '6Б': {
       Пн: {
-        1: { lessons: [makeLesson({ id: 'l4', classOrGroup: '6Б' })] },
+        1: { lessons: [makeLesson({ id: 'l4' })] },
       },
     },
   } as unknown as Schedule;
@@ -116,10 +116,10 @@ describe('forEachSlotAt', () => {
 
   it('passes an empty array for classes that have no lesson at that slot', () => {
     const schedule = makeSchedule();
-    const results: Record<string, string[]> = {};
+    const results: Record<string, ScheduledLesson[]> = {};
     // Вт lesson 2 exists for neither class
     forEachSlotAt(schedule, 'Вт' as any, 2 as any, (className, lessons) => {
-      results[className] = lessons.map((l) => l.id);
+      results[className] = lessons;
     });
     expect(results['5А']).toEqual([]);
     expect(results['6Б']).toEqual([]);
@@ -127,7 +127,7 @@ describe('forEachSlotAt', () => {
 
   it('handles a missing day gracefully (returns empty array)', () => {
     const schedule = makeSchedule();
-    const results: string[][] = [];
+    const results: ScheduledLesson[][] = [];
     forEachSlotAt(schedule, 'Сб' as any, 1 as any, (_cn, lessons) => {
       results.push(lessons);
     });
