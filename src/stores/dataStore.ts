@@ -47,6 +47,21 @@ import {
 import { usePartnerStore } from './partnerStore';
 import { indexBy } from '@/utils/indexBy';
 
+/** Removes the entry with the given id from a Record<string, T> keyed by a display name. */
+function deleteFromMapById<T extends { id: string }>(
+  map: Record<string, T>,
+  id: string
+): Record<string, T> {
+  const updated = { ...map };
+  for (const [key, val] of Object.entries(updated)) {
+    if (val.id === id) {
+      delete updated[key];
+      break;
+    }
+  }
+  return updated;
+}
+
 interface DataState {
   // Data
   teachers: Record<string, Teacher>;
@@ -310,7 +325,14 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (nameChanged && oldTeacher) {
       const oldName = oldTeacher.name;
       const newName = data.name as string;
-      await cascadeTeacherRename(oldName, newName);
+      try {
+        await cascadeTeacherRename(oldName, newName);
+      } catch (e) {
+        // Cascade failed — revert the teacher record to avoid a split-brain state
+        // where the teacher entity has the new name but lesson slots still reference the old.
+        await dbUpdateTeacher(id, { name: oldName });
+        throw e;
+      }
 
       // Update in-memory lessonRequirements
       set((state) => {
@@ -351,16 +373,7 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   deleteTeacher: async (id) => {
     await dbDeleteTeacher(id);
-    set((state) => {
-      const newTeachers = { ...state.teachers };
-      for (const [name, teacher] of Object.entries(newTeachers)) {
-        if (teacher.id === id) {
-          delete newTeachers[name];
-          break;
-        }
-      }
-      return { teachers: newTeachers };
-    });
+    set((state) => ({ teachers: deleteFromMapById(state.teachers, id) }));
   },
 
   // Mutation actions - Rooms
@@ -436,16 +449,7 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   deleteRoom: async (id) => {
     await dbDeleteRoom(id);
-    set((state) => {
-      const newRooms = { ...state.rooms };
-      for (const [shortName, room] of Object.entries(newRooms)) {
-        if (room.id === id) {
-          delete newRooms[shortName];
-          break;
-        }
-      }
-      return { rooms: newRooms };
-    });
+    set((state) => ({ rooms: deleteFromMapById(state.rooms, id) }));
   },
 
   // Mutation actions - Classes

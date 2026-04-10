@@ -117,7 +117,7 @@ export function AppHeader() {
         {IS_TAURI && (
           <button
             className={styles.exitButton}
-            onClick={() => (window as unknown as Record<string, () => void>).__tauriCloseRequested?.()}
+            onClick={() => window.__tauriCloseRequested?.()}
             title="Закрыть приложение"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

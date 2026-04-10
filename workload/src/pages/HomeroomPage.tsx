@@ -36,6 +36,10 @@ export function HomeroomPage({ plan }: Props) {
     for (const t of teachers) map.set(shortTeacherName(t.name), t.id);
     return map;
   }, [teachers]);
+  const teacherById = useMemo(
+    () => new Map(teachers.map((t) => [t.id, t])),
+    [teachers],
+  );
 
   function handleNameInput(className: string, name: string) {
     if (!name.trim()) {
@@ -81,7 +85,7 @@ export function HomeroomPage({ plan }: Props) {
         <tbody>
           {plan.classNames.map((cn) => {
             const tid = getTeacherId(cn);
-            const teacher = teachers.find((t) => t.id === tid);
+            const teacher = teacherById.get(tid);
             return (
               <tr key={cn}>
                 <td className={styles.className}>{cn}</td>

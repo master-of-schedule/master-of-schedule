@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
@@ -156,17 +156,21 @@ export function AssignPage({ plan }: Props) {
     return subjectName;
   }
 
-  function assignedCount(className: string, subject: string): number {
-    return assignments
-      .filter((a) => a.className === className && a.subject === subject)
-      .reduce((count, a) => count + (a.bothGroups ? 2 : 1), 0);
-  }
+  const assignedCount = useCallback(
+    (className: string, subject: string): number =>
+      assignments
+        .filter((a) => a.className === className && a.subject === subject)
+        .reduce((count, a) => count + (a.bothGroups ? 2 : 1), 0),
+    [assignments],
+  );
 
-  function isAssigned(teacherId: string, className: string, subject: string): boolean {
-    return assignments.some(
-      (a) => a.teacherId === teacherId && a.className === className && a.subject === subject,
-    );
-  }
+  const isAssigned = useCallback(
+    (teacherId: string, className: string, subject: string): boolean =>
+      assignments.some(
+        (a) => a.teacherId === teacherId && a.className === className && a.subject === subject,
+      ),
+    [assignments],
+  );
 
   // З17-1: use hoursPerClass() which deduplicates groupSplit subjects
   const classTotalsMap = useMemo(() => {
@@ -177,15 +181,18 @@ export function AssignPage({ plan }: Props) {
     return totals;
   }, [assignments, homeroomAssignments]);
 
-  function classTotal(className: string): number {
-    return classTotalsMap[className] ?? 0;
-  }
+  const classTotal = useCallback(
+    (className: string): number => classTotalsMap[className] ?? 0,
+    [classTotalsMap],
+  );
 
-  function teacherTotal(teacherId: string): number {
-    return assignments
-      .filter((a) => a.teacherId === teacherId)
-      .reduce((sum, a) => sum + a.hoursPerWeek * (a.bothGroups ? 2 : 1), 0);
-  }
+  const teacherTotal = useCallback(
+    (teacherId: string): number =>
+      assignments
+        .filter((a) => a.teacherId === teacherId)
+        .reduce((sum, a) => sum + a.hoursPerWeek * (a.bothGroups ? 2 : 1), 0),
+    [assignments],
+  );
 
   const allGroupPairs = detectGroupPairs(assignments, teachers, plan.groupNameOverrides);
   const issues = showValidation

@@ -4,8 +4,6 @@ import { useDownloadFolder, isFileSystemAccessSupported } from '../hooks/useDown
 import { useStore } from '../store';
 import { generateOutput } from '../logic/outputGenerator';
 import { validateWorkload } from '../logic/validation';
-import { generateWorkloadReport } from '../logic/workloadReport';
-import { printWorkloadReport } from '../logic/printReport';
 import { buildDeptReportData, printDeptReport } from '../logic/deptReport';
 import { compareClassNames } from '../logic/classSort';
 import { buildOfficialReport } from '../logic/officialReport';
@@ -222,19 +220,14 @@ export function ExportPage() {
 
   function handleDownloadPdf() {
     if (!curriculumPlan) return;
-    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel);
+    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel, deptGroups);
     printOfficialReport(report);
   }
 
   async function handleDownloadWord() {
     if (!curriculumPlan) return;
-    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel);
+    const report = buildOfficialReport(curriculumPlan, assignments, teachers, homeroomAssignments, variantDate, variantLabel, deptGroups);
     await downloadWordReport(report);
-  }
-
-  function handlePrintReport() {
-    const blocks = generateWorkloadReport(assignments, teachers, homeroomAssignments);
-    printWorkloadReport(blocks);
   }
 
   // З11-7: print dept workload PDF for a specific group
@@ -347,14 +340,6 @@ export function ExportPage() {
             </span>
           )}
         </div>
-        <button
-          className={styles.printBtn}
-          onClick={handlePrintReport}
-          disabled={assignments.length === 0}
-          title="Открыть печатную форму нагрузки учителей"
-        >
-          Печатать нагрузку
-        </button>
         {/* З11-7: dept-head mode — single group */}
         {isSingleGroup && (
           <button

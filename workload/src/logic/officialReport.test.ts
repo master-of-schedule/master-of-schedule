@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildOfficialReport, schoolYearFromDate } from './officialReport';
-import type { Assignment, RNTeacher, HomeroomAssignment, CurriculumPlan } from '../types';
+import type { Assignment, RNTeacher, HomeroomAssignment, CurriculumPlan, DeptGroup } from '../types';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -286,5 +286,93 @@ describe('buildOfficialReport — variant and schoolYear', () => {
   it('auto-computes schoolYear', () => {
     const report = buildOfficialReport(BASIC_PLAN, [], TEACHERS, [], '2025-08-18', '');
     expect(report.schoolYear).toBe('2025-2026');
+  });
+});
+
+// ─── Dept-based ordering ──────────────────────────────────────────────────────
+
+describe('buildOfficialReport — dept ordering', () => {
+  const plan: CurriculumPlan = {
+    classNames: ['5а'],
+    grades: [{
+      grade: 5,
+      subjects: [
+        { name: 'Физика', shortName: '', hoursPerClass: { '5а': 2 }, groupSplit: false, part: 'mandatory' },
+        { name: 'Химия', shortName: '', hoursPerClass: { '5а': 2 }, groupSplit: false, part: 'mandatory' },
+        { name: 'Русский язык', shortName: '', hoursPerClass: { '5а': 4 }, groupSplit: false, part: 'mandatory' },
+      ],
+    }],
+  };
+
+  const assignments: Assignment[] = [
+    makeAssignment('t1', '5а', 'Физика', 2),
+    makeAssignment('t2', '5а', 'Химия', 2),
+    makeAssignment('t3', '5а', 'Русский язык', 4),
+  ];
+
+  const deptGroups: DeptGroup[] = [
+    {
+      id: 'g1', name: 'Физики',
+      tables: [{ id: 't1', name: 'Физика', teacherIds: ['t1'], subjectFilter: ['Физика'] }],
+    },
+    {
+      id: 'g2', name: 'Химики',
+      tables: [{ id: 't2', name: 'Химия', teacherIds: ['t2'], subjectFilter: ['Химия'] }],
+    },
+    {
+      id: 'g3', name: 'Филологи',
+      tables: [{ id: 't3', name: 'Русский', teacherIds: ['t3'], subjectFilter: ['Русский язык'] }],
+    },
+  ];
+
+  it('orders subjects by dept group index, not ФОП order', () => {
+    const report = buildOfficialReport(plan, assignments, TEACHERS, [], '2025-08-18', '', deptGroups);
+    const names = report.subjectGroups.map((g) => g.displayName);
+    expect(names).toEqual(['Физика', 'Химия', 'Русский язык']);
+  });
+
+  it('sets deptLabel on the first subject group of each dept section', () => {
+    const report = buildOfficialReport(plan, assignments, TEACHERS, [], '2025-08-18', '', deptGroups);
+    const labels = report.subjectGroups.map((g) => g.deptLabel ?? null);
+    expect(labels).toEqual(['Физики', 'Химики', 'Филологи']);
+  });
+
+  it('does not set deptLabel when no deptGroups provided', () => {
+    const report = buildOfficialReport(plan, assignments, TEACHERS, [], '2025-08-18', '');
+    expect(report.subjectGroups.every((g) => !g.deptLabel)).toBe(true);
+  });
+
+  it('unmatched subjects go last, no deptLabel', () => {
+    const partialDepts: DeptGroup[] = [
+      {
+        id: 'g1', name: 'Физики',
+        tables: [{ id: 't1', name: 'Физика', teacherIds: ['t1'], subjectFilter: ['Физика'] }],
+      },
+    ];
+    const report = buildOfficialReport(plan, assignments, TEACHERS, [], '2025-08-18', '', partialDepts);
+    const names = report.subjectGroups.map((g) => g.displayName);
+    expect(names[0]).toBe('Физика');
+    const unmatched = report.subjectGroups.filter((g) => !g.deptLabel);
+    expect(unmatched.map((g) => g.displayName)).toContain('Химия');
+    expect(unmatched.map((g) => g.displayName)).toContain('Русский язык');
+  });
+
+  it('two tables in same dept: only first subject gets deptLabel', () => {
+    const twoTableDept: DeptGroup[] = [
+      {
+        id: 'g1', name: 'Естественные науки',
+        tables: [
+          { id: 't1', name: 'Физика', teacherIds: ['t1'], subjectFilter: ['Физика'] },
+          { id: 't2', name: 'Химия', teacherIds: ['t2'], subjectFilter: ['Химия'] },
+        ],
+      },
+    ];
+    const report = buildOfficialReport(plan, assignments, TEACHERS, [], '2025-08-18', '', twoTableDept);
+    const labeled = report.subjectGroups.filter((g) => g.deptLabel);
+    expect(labeled).toHaveLength(1);
+    expect(labeled[0].deptLabel).toBe('Естественные науки');
+    const names = report.subjectGroups.slice(0, 2).map((g) => g.displayName);
+    expect(names).toContain('Физика');
+    expect(names).toContain('Химия');
   });
 });
