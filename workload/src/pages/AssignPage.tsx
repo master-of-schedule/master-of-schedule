@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 
 const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { shortTeacherName } from '../logic/groupNames';
@@ -26,7 +27,17 @@ export function AssignPage({ plan }: Props) {
     bulkSetAssignments,
     setGroupNameOverride,
     activeTab,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    teachers: s.teachers,
+    deptGroups: s.deptGroups,
+    assignments: s.assignments,
+    homeroomAssignments: s.homeroomAssignments,
+    setAssignment: s.setAssignment,
+    removeAssignment: s.removeAssignment,
+    bulkSetAssignments: s.bulkSetAssignments,
+    setGroupNameOverride: s.setGroupNameOverride,
+    activeTab: s.activeTab,
+  })));
   const [activeDeptId, setActiveDeptId] = useState<string>(() => deptGroups[0]?.id ?? '');
   const [showValidation, setShowValidation] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
