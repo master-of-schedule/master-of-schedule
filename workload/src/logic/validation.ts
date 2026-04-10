@@ -4,6 +4,7 @@
 
 import type { CurriculumPlan, RNTeacher, Assignment, HomeroomAssignment, ValidationIssue } from '../types';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from './sanpin';
+import { computeTeacherTotalHours } from './teacherHours';
 
 /**
  * Total hours assigned per class across all assignments.
@@ -22,20 +23,6 @@ export function hoursPerClass(assignments: Assignment[]): Record<string, number>
     if (seen.has(key)) continue;
     seen.add(key);
     result[a.className] = (result[a.className] ?? 0) + a.hoursPerWeek;
-  }
-  return result;
-}
-
-/**
- * Total hours assigned per teacher (by teacherId).
- * З7-2: homeroom (Разговоры о важном) is NOT counted — it is paid separately.
- */
-export function hoursPerTeacher(
-  assignments: Assignment[],
-): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const a of assignments) {
-    result[a.teacherId] = (result[a.teacherId] ?? 0) + a.hoursPerWeek;
   }
   return result;
 }
@@ -98,9 +85,11 @@ export function validateWorkload(
   }
 
   // ── Teacher hours ──────────────────────────────────────────────────────────
+  // Uses computeTeacherTotalHours (bothGroups × 2) — consistent with UI display.
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
-  const teacherTotals = hoursPerTeacher(assignments);
-  for (const [tid, hours] of Object.entries(teacherTotals)) {
+  const teacherIds = [...new Set(assignments.map((a) => a.teacherId))];
+  for (const tid of teacherIds) {
+    const hours = computeTeacherTotalHours(tid, assignments);
     const teacher = teacherById[tid];
     const name = teacher?.name ?? tid;
     if (hours > TEACHER_MAX_HOURS) {
