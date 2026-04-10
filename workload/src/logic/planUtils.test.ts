@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyGroupSplitToggle } from './planUtils';
+import { applyGroupSplitToggle, getExpectedGroupSlots } from './planUtils';
 import type { CurriculumPlan } from '../types';
 
 function makePlan(): CurriculumPlan {
@@ -59,5 +59,50 @@ describe('applyGroupSplitToggle', () => {
     const plan = makePlan();
     applyGroupSplitToggle(plan, 5, 'Физкультура', 'mandatory', false);
     expect(plan.grades[0].subjects[0].groupSplit).toBe(false);
+  });
+});
+
+describe('getExpectedGroupSlots', () => {
+  function makeSplitPlan(): CurriculumPlan {
+    return {
+      classNames: ['5-а', '6-а'],
+      groupCounts: { '5-а': 2, '6-а': 1 },
+      grades: [
+        {
+          grade: 5,
+          subjects: [
+            { name: 'Математика', shortName: 'Мат', groupSplit: false, part: 'mandatory', hoursPerClass: { '5-а': 5 } },
+            { name: 'Английский', shortName: 'Англ', groupSplit: true, part: 'mandatory', hoursPerClass: { '5-а': 3, '6-а': 3 } },
+          ],
+        },
+      ],
+    };
+  }
+
+  it('returns 1 for non-split subject', () => {
+    const plan = makeSplitPlan();
+    expect(getExpectedGroupSlots(plan, '5-а', 'Математика')).toBe(1);
+  });
+
+  it('returns groupCounts value for split subject', () => {
+    const plan = makeSplitPlan();
+    expect(getExpectedGroupSlots(plan, '5-а', 'Английский')).toBe(2); // groupCounts['5-а'] = 2
+    expect(getExpectedGroupSlots(plan, '6-а', 'Английский')).toBe(1); // groupCounts['6-а'] = 1
+  });
+
+  it('defaults to 2 when groupSplit=true but no groupCounts entry', () => {
+    const plan = makeSplitPlan();
+    plan.groupCounts = {}; // remove override
+    expect(getExpectedGroupSlots(plan, '5-а', 'Английский')).toBe(2);
+  });
+
+  it('returns 1 for subject not in plan', () => {
+    const plan = makeSplitPlan();
+    expect(getExpectedGroupSlots(plan, '5-а', 'Физкультура')).toBe(1);
+  });
+
+  it('returns 1 for class not in plan', () => {
+    const plan = makeSplitPlan();
+    expect(getExpectedGroupSlots(plan, '9-б', 'Математика')).toBe(1);
   });
 });
