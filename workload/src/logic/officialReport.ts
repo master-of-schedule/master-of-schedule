@@ -9,7 +9,7 @@
  * - Summary totals at the end
  */
 
-import type { Assignment, RNTeacher, HomeroomAssignment, CurriculumPlan } from '../types';
+import type { Assignment, RNTeacher, HomeroomAssignment, CurriculumPlan, DeptGroup } from '../types';
 import { gradeFromClassName, formatSimpleClasses, formatCompoundClasses } from './formatReportCell';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,6 +41,8 @@ export interface ReportSubjectGroup {
   /** Non-empty only for compound groups */
   subjectBreakdown: SubjectBreakdown[];
   teachers: ReportTeacherRow[];
+  /** Set on the first subject group of each department section when dept-ordered. */
+  deptLabel?: string;
 }
 
 export interface ElectiveRow {
@@ -162,6 +164,30 @@ export function schoolYearFromDate(dateStr: string): string {
   return `${y1}-${y1 + 1}`;
 }
 
+// ─── Dept ordering ────────────────────────────────────────────────────────────
+
+/**
+ * Returns [deptGroupIndex, tableIndex] of the first dept table that matches
+ * one of the subject names, or null if no match. Catch-all tables (empty
+ * subjectFilter) are skipped — they never win a position match.
+ */
+function findDeptPosition(
+  subjectNames: string[],
+  deptGroups: DeptGroup[],
+): [number, number] | null {
+  for (let gi = 0; gi < deptGroups.length; gi++) {
+    const group = deptGroups[gi];
+    for (let ti = 0; ti < group.tables.length; ti++) {
+      const table = group.tables[ti];
+      if (table.subjectFilter.length === 0) continue;
+      if (subjectNames.some((s) => table.subjectFilter.includes(s))) {
+        return [gi, ti];
+      }
+    }
+  }
+  return null;
+}
+
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export function buildOfficialReport(
@@ -171,6 +197,7 @@ export function buildOfficialReport(
   homeroomAssignments: HomeroomAssignment[],
   variantDate: string,
   variantLabel: string,
+  deptGroups?: DeptGroup[],
 ): OfficialReport {
   const teacherMap = new Map(teachers.map((t) => [t.id, t]));
   const homeroomMap = new Map(homeroomAssignments.map((h) => [h.teacherId, h.className]));
@@ -399,18 +426,48 @@ export function buildOfficialReport(
 
   // ─── Sort and merge all groups ──────────────────────────────────────────────
 
-  // Assign sort key to each group (compound groups keyed by their first subject)
-  function groupSortKey(g: ReportSubjectGroup): number {
-    return subjectOrderIndex(g.subjects[0]);
-  }
-
   const allGroups = [...compoundGroups, ...simpleGroups, ...razgGroups];
-  allGroups.sort((a, b) => {
-    const ka = groupSortKey(a);
-    const kb = groupSortKey(b);
-    if (ka !== kb) return ka - kb;
-    return a.displayName.localeCompare(b.displayName, 'ru');
-  });
+
+  if (deptGroups && deptGroups.length > 0) {
+    // Dept-based ordering: sort by [deptGroupIndex, tableIndex], unmatched groups last.
+    const positioned = allGroups.map((g) => ({
+      group: g,
+      pos: findDeptPosition(g.subjects, deptGroups),
+    }));
+    positioned.sort((a, b) => {
+      if (a.pos === null && b.pos === null) {
+        return a.group.displayName.localeCompare(b.group.displayName, 'ru');
+      }
+      if (a.pos === null) return 1;
+      if (b.pos === null) return -1;
+      if (a.pos[0] !== b.pos[0]) return a.pos[0] - b.pos[0];
+      if (a.pos[1] !== b.pos[1]) return a.pos[1] - b.pos[1];
+      return a.group.displayName.localeCompare(b.group.displayName, 'ru');
+    });
+
+    // Mark the first subject group in each dept section with a deptLabel header.
+    let lastDeptIdx = -1;
+    for (const { group, pos } of positioned) {
+      if (pos !== null && pos[0] !== lastDeptIdx) {
+        group.deptLabel = deptGroups[pos[0]].name;
+        lastDeptIdx = pos[0];
+      }
+    }
+
+    allGroups.length = 0;
+    allGroups.push(...positioned.map((p) => p.group));
+  } else {
+    // Default ФОП order.
+    function groupSortKey(g: ReportSubjectGroup): number {
+      return subjectOrderIndex(g.subjects[0]);
+    }
+    allGroups.sort((a, b) => {
+      const ka = groupSortKey(a);
+      const kb = groupSortKey(b);
+      if (ka !== kb) return ka - kb;
+      return a.displayName.localeCompare(b.displayName, 'ru');
+    });
+  }
 
   // ─── Electives ─────────────────────────────────────────────────────────────
 

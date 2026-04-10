@@ -25,6 +25,12 @@ export function buildOfficialReportHtml(report: OfficialReport): string {
 
   for (const group of report.subjectGroups) {
     if (group.teachers.length === 0) continue;
+
+    if (group.deptLabel) {
+      rows.push(
+        `<tr><td colspan="6" style="background:#c6efce;font-weight:bold;padding:6px 8px;border:1px solid #bbb;">${esc(group.deptLabel)}</td></tr>`,
+      );
+    }
     const rs = group.teachers.length;
 
     // Build the yellow subject cell content

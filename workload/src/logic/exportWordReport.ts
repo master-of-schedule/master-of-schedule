@@ -152,6 +152,23 @@ function buildHeaderRows(): TableRow[] {
 
 // ─── Data rows ────────────────────────────────────────────────────────────────
 
+function buildDeptHeaderRow(label: string): TableRow {
+  return new TableRow({
+    children: [
+      new TableCell({
+        columnSpan: 6,
+        shading: { fill: 'C6EFCE', type: ShadingType.SOLID, color: 'C6EFCE' },
+        borders: CELL_BORDER,
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: label, bold: true, size: 22 })],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 function buildGroupRows(group: ReportSubjectGroup): TableRow[] {
   const rows: TableRow[] = [];
   const rs = group.teachers.length;
@@ -311,7 +328,10 @@ function formatVariantText(date: string, label: string): string {
 export async function downloadWordReport(report: OfficialReport): Promise<void> {
   const mainTableRows: TableRow[] = [
     ...buildHeaderRows(),
-    ...report.subjectGroups.flatMap((g) => buildGroupRows(g)),
+    ...report.subjectGroups.flatMap((g) => [
+      ...(g.deptLabel ? [buildDeptHeaderRow(g.deptLabel)] : []),
+      ...buildGroupRows(g),
+    ]),
   ];
 
   const mainTable = new Table({
