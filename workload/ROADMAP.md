@@ -666,7 +666,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W6. 🟠 ⬜ Pending — Вынести applyDeptSnapshot в logic/
+### RF-W6. ✅ Done — Вынести applyDeptSnapshot в logic/
 
 `store.ts:390-427` — 40 строк логики прямо в Zustand-экшене. Вынести `applyDeptSnapshotLogic(state, snapshot): Partial<WorkloadState>` в `logic/deptSnapshot.ts`.
 
@@ -674,7 +674,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W7. 🟠 ⬜ Pending — Вынести removeClassFromPlan в logic/planUtils.ts
+### RF-W7. ✅ Done — Вынести removeClassFromPlan в logic/planUtils.ts
 
 `store.ts:377-389` — IIFE внутри spread для удаления ключа из `expectedTotals`. Вынести `removeClassFromPlan(plan, className): CurriculumPlan` в `logic/planUtils.ts`.
 
@@ -682,7 +682,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W8. 🟠 ⬜ Pending — Оптимизация officialReport.ts: индекс вместо find() в цикле
+### RF-W8. ✅ Done — Оптимизация officialReport.ts: индекс вместо find() в цикле
 
 `officialReport.ts:283-284` — `.find()` внутри вложенных циклов (~75k проходов на реальных данных). Построить `Map<className::subject, hoursPerWeek>` перед циклами.
 
@@ -700,7 +700,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W10. 🟡 ⬜ Pending — Константа MAX_UNDO_HISTORY вместо магического 49
+### RF-W10. ✅ Done — Константа MAX_UNDO_HISTORY вместо магического 49
 
 `AssignPage.tsx:45,64` и `ImportPage.tsx:62` используют `slice(-49)` без объяснений. Вынести в `const MAX_UNDO_HISTORY = 50` (или в `utils/history.ts`).
 
@@ -708,7 +708,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 ---
 
-### RF-W11. 🟡 ⬜ Pending — Window global через interface, не через cast
+### RF-W11. ✅ Done — Window global через interface, не через cast
 
 `App.tsx:52,60` — `(window as unknown as Record<string, unknown>)`. Создать `workload/src/types/globals.d.ts` по аналогии с главным приложением.
 
@@ -733,11 +733,11 @@ const visibleGrades = allGrades.filter(grade =>
 | RF-W3 | detectGroupPairs: использовать план вместо эвристики | Высокий | ✅ Done |
 | RF-W4 | hoursPerClass: обнаруживать расхождение часов | Высокий | ✅ Done |
 | RF-W5 | Тесты для RF-W1, RF-W3, RF-W4 | Высокий | ✅ Done |
-| RF-W6 | Вынести applyDeptSnapshot в logic/ | Высокий | ⬜ Pending |
-| RF-W7 | Вынести removeClassFromPlan в logic/planUtils.ts | Средний | ⬜ Pending |
-| RF-W8 | Оптимизация officialReport.ts (индекс вместо find) | Высокий | ⬜ Pending |
+| RF-W6 | Вынести applyDeptSnapshot в logic/ | Высокий | ✅ Done |
+| RF-W7 | Вынести removeClassFromPlan в logic/planUtils.ts | Средний | ✅ Done |
+| RF-W8 | Оптимизация officialReport.ts (индекс вместо find) | Высокий | ✅ Done |
 | RF-W9 | Composite Zustand selectors в страницах РН | Средний | ⬜ Pending |
-| RF-W10 | MAX_UNDO_HISTORY константа | Низкий | ⬜ Pending |
-| RF-W11 | Window global через interface | Низкий | ⬜ Pending |
+| RF-W10 | MAX_UNDO_HISTORY константа | Низкий | ✅ Done |
+| RF-W11 | Window global через interface | Низкий | ✅ Done |
 | RF-W12 | Тесты для генераторов экспорта | Высокий | ⬜ Pending |
 
