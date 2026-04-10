@@ -7,6 +7,7 @@ import { GridCell } from './GridCell';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber, CellStatusInfo } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore, usePartnerStore } from '@/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { getCellStatus, getSlotLessons } from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
 import styles from './ScheduleGrid.module.css';
@@ -20,34 +21,59 @@ interface ScheduleGridProps {
 }
 
 export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavigateToClass, onForceAssign }: ScheduleGridProps) {
-  const schedule = useScheduleStore((state) => state.schedule);
-  const versionType = useScheduleStore((state) => state.versionType);
-  const mondayDate = useScheduleStore((state) => state.mondayDate);
-  const versionDaysPerWeek = useScheduleStore((state) => state.versionDaysPerWeek);
-  const settingsDaysPerWeek = useDataStore((state) => state.daysPerWeek);
-  const settingsLessonsPerDay = useDataStore((state) => state.lessonsPerDay);
+  const { schedule, versionType, mondayDate, versionDaysPerWeek } = useScheduleStore(useShallow((s) => ({
+    schedule: s.schedule,
+    versionType: s.versionType,
+    mondayDate: s.mondayDate,
+    versionDaysPerWeek: s.versionDaysPerWeek,
+  })));
+
+  const { settingsDaysPerWeek, settingsLessonsPerDay, teachers, groups, classes } = useDataStore(useShallow((s) => ({
+    settingsDaysPerWeek: s.daysPerWeek,
+    settingsLessonsPerDay: s.lessonsPerDay,
+    teachers: s.teachers,
+    groups: s.groups,
+    classes: s.classes,
+  })));
+
+  const {
+    selectedLesson, selectedCells, searchResults, focusedCell,
+    highlightedMovableCell, highlightedMovableTeacher, absentDay, absentLessons,
+    openContextMenu, selectCell, toggleCellSelection, setFocusedCell, moveFocus,
+    clearCellSelection, clearHighlightedMovableCell, clearHighlightedMovableTeacher,
+    copiedLesson, movingLesson,
+  } = useUIStore(useShallow((s) => ({
+    selectedLesson: s.selectedLesson,
+    selectedCells: s.selectedCells,
+    searchResults: s.searchResults,
+    focusedCell: s.focusedCell,
+    highlightedMovableCell: s.highlightedMovableCell,
+    highlightedMovableTeacher: s.highlightedMovableTeacher,
+    absentDay: s.absentDay,
+    absentLessons: s.absentLessons,
+    openContextMenu: s.openContextMenu,
+    selectCell: s.selectCell,
+    toggleCellSelection: s.toggleCellSelection,
+    setFocusedCell: s.setFocusedCell,
+    moveFocus: s.moveFocus,
+    clearCellSelection: s.clearCellSelection,
+    clearHighlightedMovableCell: s.clearHighlightedMovableCell,
+    clearHighlightedMovableTeacher: s.clearHighlightedMovableTeacher,
+    copiedLesson: s.copiedLesson,
+    movingLesson: s.movingLesson,
+  })));
+
+  const { partnerBusySet, isPartnerBusy } = usePartnerStore(useShallow((s) => ({
+    partnerBusySet: s.partnerBusySet,
+    isPartnerBusy: s.isPartnerBusy,
+  })));
+
   const effectiveDays = DAYS.slice(0, versionDaysPerWeek ?? settingsDaysPerWeek);
   const effectiveLessons = LESSON_NUMBERS.slice(0, settingsLessonsPerDay);
-  const selectedLesson = useUIStore((state) => state.selectedLesson);
-  const selectedCells = useUIStore((state) => state.selectedCells);
-  const searchResults = useUIStore((state) => state.searchResults);
-  const focusedCell = useUIStore((state) => state.focusedCell);
-  const teachers = useDataStore((state) => state.teachers);
-  const groups = useDataStore((state) => state.groups);
-
-  const partnerBusySet = usePartnerStore((state) => state.partnerBusySet);
-  const isPartnerBusy = usePartnerStore((state) => state.isPartnerBusy);
-  const classes = useDataStore((state) => state.classes);
   const partnerClassNames = useMemo(
     () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
     [classes]
   );
-
-  const highlightedMovableCell = useUIStore((state) => state.highlightedMovableCell);
-  const highlightedMovableTeacher = useUIStore((state) => state.highlightedMovableTeacher);
-  const absentDay = useUIStore((state) => state.absentDay);
-  const absentLessons = useUIStore((state) => state.absentLessons);
-  const { openContextMenu, selectCell, toggleCellSelection, setFocusedCell, moveFocus, clearCellSelection, clearHighlightedMovableCell, clearHighlightedMovableTeacher } = useUIStore();
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Check if a cell is selected
@@ -142,8 +168,7 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusedCell, moveFocus, effectiveDays.length, effectiveLessons.length]);
 
-  const copiedLesson = useUIStore((state) => state.copiedLesson);
-  const movingLesson = useUIStore((state) => state.movingLesson);
+
 
   // Get cell status based on selected lesson or copied lesson
   const getCellStatusForLesson = useCallback(

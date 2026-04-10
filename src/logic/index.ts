@@ -63,6 +63,9 @@ export type { ClassProgress } from './counting';
 // Schedule traversal
 export { forEachSlot, forEachSlotAt } from './traversal';
 
+// Unscheduled panel helpers
+export { computeMergedTemps } from './mergeTemporaryLessons';
+
 // Telegram image export
 export {
   getChangedClassesData,

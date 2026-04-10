@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { Day, LessonNumber, Room, ScheduledLesson, CellRef, LessonRequirement, Teacher } from '@/types';
 import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson } from '@/logic';
@@ -28,46 +29,69 @@ import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import styles from './EditorPage.module.css';
 
 export function EditorPage() {
-  const currentClass = useUIStore((state) => state.currentClass);
-  const classes = useDataStore((state) => state.classes);
-  const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
-  const setCurrentClass = useUIStore((state) => state.setCurrentClass);
-  const selectedLesson = useUIStore((state) => state.selectedLesson);
-  const selectLesson = useUIStore((state) => state.selectLesson);
-  const contextMenu = useUIStore((state) => state.contextMenu);
-  const closeContextMenu = useUIStore((state) => state.closeContextMenu);
+  const {
+    currentClass, setCurrentClass, selectedLesson, selectLesson,
+    contextMenu, closeContextMenu, selectedCells, clearCellSelection,
+    copiedLesson, setCopiedLesson, movingLesson, setMovingLesson,
+    clearMovingLesson, absentTeacher,
+  } = useUIStore(useShallow((s) => ({
+    currentClass: s.currentClass,
+    setCurrentClass: s.setCurrentClass,
+    selectedLesson: s.selectedLesson,
+    selectLesson: s.selectLesson,
+    contextMenu: s.contextMenu,
+    closeContextMenu: s.closeContextMenu,
+    selectedCells: s.selectedCells,
+    clearCellSelection: s.clearCellSelection,
+    copiedLesson: s.copiedLesson,
+    setCopiedLesson: s.setCopiedLesson,
+    movingLesson: s.movingLesson,
+    setMovingLesson: s.setMovingLesson,
+    clearMovingLesson: s.clearMovingLesson,
+    absentTeacher: s.absentTeacher,
+  })));
 
-  const { assignLesson, removeLesson, removeLessons, changeRoom } = useScheduleStore();
-  const { undo, redo } = useScheduleStore();
-  const historyIndex = useScheduleStore((state) => state.historyIndex);
-  const historyLength = useScheduleStore((state) => state.history.length);
-  const selectedCells = useUIStore((state) => state.selectedCells);
-  const clearCellSelection = useUIStore((state) => state.clearCellSelection);
-  const schedule = useScheduleStore((state) => state.schedule);
-  const versionId = useScheduleStore((state) => state.versionId);
-  const versionType = useScheduleStore((state) => state.versionType);
-  const versionName = useScheduleStore((state) => state.versionName);
-  const isDirty = useScheduleStore((state) => state.isDirty);
-  const jsonIsDirty = useScheduleStore((state) => state.jsonIsDirty);
-  const markSaved = useScheduleStore((state) => state.markSaved);
-  const markJsonSaved = useScheduleStore((state) => state.markJsonSaved);
-  const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
-  const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
-  const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
-  const mondayDate = useScheduleStore((state) => state.mondayDate);
-  const versionDaysPerWeek = useScheduleStore((state) => state.versionDaysPerWeek);
-  const requirements = useDataStore((state) => state.lessonRequirements);
-  const teachers = useDataStore((state) => state.teachers);
-  const rooms = useDataStore((state) => state.rooms);
-  const copiedLesson = useUIStore((state) => state.copiedLesson);
-  const setCopiedLesson = useUIStore((state) => state.setCopiedLesson);
-  const movingLesson = useUIStore((state) => state.movingLesson);
-  const setMovingLesson = useUIStore((state) => state.setMovingLesson);
-  const clearMovingLesson = useUIStore((state) => state.clearMovingLesson);
-  const absentTeacher = useUIStore((state) => state.absentTeacher);
+  const { classes, gapExcludedClasses, requirements, teachers, rooms } = useDataStore(useShallow((s) => ({
+    classes: s.classes,
+    gapExcludedClasses: s.gapExcludedClasses,
+    requirements: s.lessonRequirements,
+    teachers: s.teachers,
+    rooms: s.rooms,
+  })));
 
-  const partnerData = usePartnerStore((state) => state.partnerData);
-  const clearPartnerFile = usePartnerStore((state) => state.clearPartnerFile);
+  const {
+    assignLesson, removeLesson, removeLessons, changeRoom, undo, redo,
+    historyIndex, historyLength, schedule, versionId, versionType, versionName,
+    isDirty, jsonIsDirty, markSaved, markJsonSaved, temporaryLessons,
+    lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek,
+  } = useScheduleStore(useShallow((s) => ({
+    assignLesson: s.assignLesson,
+    removeLesson: s.removeLesson,
+    removeLessons: s.removeLessons,
+    changeRoom: s.changeRoom,
+    undo: s.undo,
+    redo: s.redo,
+    historyIndex: s.historyIndex,
+    historyLength: s.history.length,
+    schedule: s.schedule,
+    versionId: s.versionId,
+    versionType: s.versionType,
+    versionName: s.versionName,
+    isDirty: s.isDirty,
+    jsonIsDirty: s.jsonIsDirty,
+    markSaved: s.markSaved,
+    markJsonSaved: s.markJsonSaved,
+    temporaryLessons: s.temporaryLessons,
+    lessonStatuses: s.lessonStatuses,
+    acknowledgedConflictKeys: s.acknowledgedConflictKeys,
+    mondayDate: s.mondayDate,
+    versionDaysPerWeek: s.versionDaysPerWeek,
+  })));
+
+  const { partnerData, clearPartnerFile } = usePartnerStore(useShallow((s) => ({
+    partnerData: s.partnerData,
+    clearPartnerFile: s.clearPartnerFile,
+  })));
 
   const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();

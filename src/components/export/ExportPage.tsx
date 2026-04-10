@@ -9,6 +9,7 @@ import type { GridSelection } from '@/hooks/useGridSelection';
 import { useMultiFolders } from '@/hooks/useMultiFolders';
 import { FolderSettingsDialog } from './FolderSettingsDialog';
 import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability } from '@/logic';
@@ -49,22 +50,29 @@ const DAY_FULL_NAMES: Record<string, string> = {
 type GridView = 'classes' | 'teachers' | 'rooms';
 
 export function ExportPage() {
-  const schedule = useScheduleStore((state) => state.schedule);
-  const versionType = useScheduleStore((state) => state.versionType);
-  const versionName = useScheduleStore((state) => state.versionName);
-  const mondayDate = useScheduleStore((state) => state.mondayDate);
-  const baseTemplateSchedule = useScheduleStore((state) => state.baseTemplateSchedule);
-  const classes = useDataStore((state) => state.classes);
-  const teachers = useDataStore((state) => state.teachers);
-  const rooms = useDataStore((state) => state.rooms);
-  const substitutions = useScheduleStore((state) => state.substitutions);
-  const { showToast } = useToast();
+  const { schedule, versionType, versionName, mondayDate, baseTemplateSchedule, substitutions } = useScheduleStore(useShallow((s) => ({
+    schedule: s.schedule,
+    versionType: s.versionType,
+    versionName: s.versionName,
+    mondayDate: s.mondayDate,
+    baseTemplateSchedule: s.baseTemplateSchedule,
+    substitutions: s.substitutions,
+  })));
 
-  // Active view state (persisted in store to survive tab switches)
-  const activeView = useUIStore((state) => state.exportView);
-  const setActiveView = useUIStore((state) => state.setExportView);
-  const selectedDay = useUIStore((state) => state.exportSelectedDay);
-  const setSelectedDay = useUIStore((state) => state.setExportSelectedDay);
+  const { classes, teachers, rooms } = useDataStore(useShallow((s) => ({
+    classes: s.classes,
+    teachers: s.teachers,
+    rooms: s.rooms,
+  })));
+
+  const { activeView, setActiveView, selectedDay, setSelectedDay } = useUIStore(useShallow((s) => ({
+    activeView: s.exportView,
+    setActiveView: s.setExportView,
+    selectedDay: s.exportSelectedDay,
+    setSelectedDay: s.setExportSelectedDay,
+  })));
+
+  const { showToast } = useToast();
 
   // Grid selection state
   const { selection, isInSelection, handleGridMouseDown, handleGridMouseMove, handleGridMouseUp, clearSelection } = useGridSelection();
