@@ -194,7 +194,7 @@ export function AssignPage({ plan }: Props) {
     [assignments],
   );
 
-  const allGroupPairs = detectGroupPairs(assignments, teachers, plan.groupNameOverrides);
+  const allGroupPairs = detectGroupPairs(assignments, teachers, plan.groupNameOverrides, plan);
   const issues = showValidation
     ? validateWorkload(plan, teachers, assignments, homeroomAssignments)
     : [];
