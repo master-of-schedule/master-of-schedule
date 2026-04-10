@@ -20,6 +20,11 @@ import { compareClassNames } from './classSort';
 const GRADE_HEADER_RE = /^(\d{1,2})\s*([-–й].*)?класс/i;
 const CLASS_NAME_RE = /^\d{1,2}[-–]?[а-яёА-ЯЁa-zA-Z]/;
 
+// Column indices in the UP sheet (0-based)
+const COL_SECTION = 0;    // Section label (optional, e.g. "Обязательная часть")
+const COL_SUBJECT = 1;    // Subject name or grade-header cell ("X класс")
+const COL_FIRST_CLASS = 2; // First class hours column; class columns continue to the right
+
 const GROUP_SPLIT_PATTERNS = [/физкультур/i, /физическая культура/i, /труд/i, /технолог/i, /информатик/i];
 
 function defaultGroupSplit(subjectName: string): boolean {
@@ -98,7 +103,7 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
   // ── Locate all grade-header rows (col[1] matches "X класс") ───────────────
   const gradeStarts: { rowIndex: number; grade: number }[] = [];
   for (let ri = 0; ri < rows.length; ri++) {
-    const col1 = rows[ri][1];
+    const col1 = rows[ri][COL_SUBJECT];
     if (typeof col1 === 'string') {
       const m = col1.trim().match(GRADE_HEADER_RE);
       if (m) gradeStarts.push({ rowIndex: ri, grade: parseInt(m[1], 10) });
@@ -132,8 +137,8 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
 
     const headerRow = rows[rowIndex];
     const sameRowClasses = headerRow
-      .slice(2)
-      .map((v, i) => ({ ci: i + 2, v }))
+      .slice(COL_FIRST_CLASS)
+      .map((v, i) => ({ ci: i + COL_FIRST_CLASS, v }))
       .filter(({ v }) => isClassNameCell(v));
 
     if (sameRowClasses.length >= 1) {
@@ -145,15 +150,15 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
       // Keep reading rows until we hit a subject row (non-empty col[1] that is not a class name).
       for (let ri = rowIndex + 1; ri < Math.min(rowIndex + 10, nextGradeRow); ri++) {
         const row = rows[ri];
-        const col1 = row[1];
+        const col1 = row[COL_SUBJECT];
         const col1Str = col1 !== null && col1 !== undefined ? String(col1).trim() : '';
 
-        // Non-empty col[1] that isn't itself a class name means subject rows have started
+        // Non-empty col[COL_SUBJECT] that isn't itself a class name means subject rows have started
         if (col1Str !== '' && !isClassNameCell(col1) && classColIndices.length > 0) break;
 
         const candidates = row
-          .slice(1)
-          .map((v, i) => ({ ci: i + 1, v }))
+          .slice(COL_SUBJECT)
+          .map((v, i) => ({ ci: i + COL_SUBJECT, v }))
           .filter(({ v }) => isClassNameCell(v));
 
         if (candidates.length >= 1) {
@@ -183,12 +188,12 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
 
     for (let ri = subjectStartRow; ri < nextGradeRow; ri++) {
       const row = rows[ri];
-      const col1 = row[1];
+      const col1 = row[COL_SUBJECT];
 
-      // Rows with empty col[1]: may be section dividers or итого rows
+      // Rows with empty col[COL_SUBJECT]: may be section dividers or итого rows
       if (col1 === null || col1 === undefined || String(col1).trim() === '') {
-        // З11-1: Check col[0] for section header keywords
-        const col0 = row[0];
+        // З11-1: Check col[COL_SECTION] for section header keywords
+        const col0 = row[COL_SECTION];
         if (col0 !== null && col0 !== undefined) {
           const col0Str = String(col0).trim().toLowerCase();
           if (/школьн|вариатив|формируемая/.test(col0Str)) {
@@ -211,8 +216,8 @@ export async function parseUP(file: File): Promise<CurriculumPlan> {
 
       const subjectName = String(col1).trim();
 
-      // З11-1: Also check col[0] on subject rows for section header (some UP formats put it on the same row)
-      const col0 = row[0];
+      // З11-1: Also check col[COL_SECTION] on subject rows for section header (some UP formats put it on the same row)
+      const col0 = row[COL_SECTION];
       if (col0 !== null && col0 !== undefined) {
         const col0Str = String(col0).trim().toLowerCase();
         if (/школьн|вариатив|формируемая/.test(col0Str)) {
