@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { VersionListItem, VersionType } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile, downloadExcelTemplate } from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { getVersionsByType, getVersion, deleteVersion, setActiveTemplate, getActiveTemplate, updateVersionSchedule, updateVersionMetadata } from '@/db';
@@ -103,15 +104,17 @@ export function StartPage() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  const teachers = useDataStore((state) => state.teachers);
-  const rooms = useDataStore((state) => state.rooms);
-  const classes = useDataStore((state) => state.classes);
-  const requirements = useDataStore((state) => state.lessonRequirements);
-  const reloadData = useDataStore((state) => state.reloadData);
-  const settingsDaysPerWeek = useDataStore((state) => state.daysPerWeek);
-  const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
-  const isReadOnlyYear = useDataStore((state) => state.isReadOnlyYear);
-  const readOnlyVersions = useDataStore((state) => state.readOnlyVersions);
+  const { teachers, rooms, classes, requirements, reloadData, settingsDaysPerWeek, gapExcludedClasses, isReadOnlyYear, readOnlyVersions } = useDataStore(useShallow((s) => ({
+    teachers: s.teachers,
+    rooms: s.rooms,
+    classes: s.classes,
+    requirements: s.lessonRequirements,
+    reloadData: s.reloadData,
+    settingsDaysPerWeek: s.daysPerWeek,
+    gapExcludedClasses: s.gapExcludedClasses,
+    isReadOnlyYear: s.isReadOnlyYear,
+    readOnlyVersions: s.readOnlyVersions,
+  })));
 
   /** Returns the first class in the visual order (non-excluded grades first). */
   const pickFirstClass = useCallback((): string | undefined => {
@@ -120,18 +123,22 @@ export function StartPage() {
     return sorted[0]?.[1][0] ?? classes[0].name;
   }, [classes, gapExcludedClasses]);
 
-  const setActiveTab = useUIStore((state) => state.setActiveTab);
-  const setCurrentClass = useUIStore((state) => state.setCurrentClass);
+  const { setActiveTab, setCurrentClass } = useUIStore(useShallow((s) => ({
+    setActiveTab: s.setActiveTab,
+    setCurrentClass: s.setCurrentClass,
+  })));
 
-  const newSchedule = useScheduleStore((state) => state.newSchedule);
-  const loadSchedule = useScheduleStore((state) => state.loadSchedule);
-  const isDirty = useScheduleStore((state) => state.isDirty);
-  const jsonIsDirty = useScheduleStore((state) => state.jsonIsDirty);
-  const versionId = useScheduleStore((state) => state.versionId);
-  const versionName = useScheduleStore((state) => state.versionName);
-  const schedule = useScheduleStore((state) => state.schedule);
-  const markSaved = useScheduleStore((state) => state.markSaved);
-  const markJsonSaved = useScheduleStore((state) => state.markJsonSaved);
+  const { newSchedule, loadSchedule, isDirty, jsonIsDirty, versionId, versionName, schedule, markSaved, markJsonSaved } = useScheduleStore(useShallow((s) => ({
+    newSchedule: s.newSchedule,
+    loadSchedule: s.loadSchedule,
+    isDirty: s.isDirty,
+    jsonIsDirty: s.jsonIsDirty,
+    versionId: s.versionId,
+    versionName: s.versionName,
+    schedule: s.schedule,
+    markSaved: s.markSaved,
+    markJsonSaved: s.markJsonSaved,
+  })));
 
   const hasData = Object.keys(teachers).length > 0 || classes.length > 0 || requirements.length > 0;
 
