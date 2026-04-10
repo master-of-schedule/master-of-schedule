@@ -274,15 +274,18 @@ export function buildOfficialReport(
         const teacherAssignments = allCompoundAssignments.filter((a) => a.teacherId === tid);
         const classNames = [...new Set(teacherAssignments.map((a) => a.className))];
 
+        // RF-W8: pre-build index to avoid O(n²) find() inside the class loop
+        const hoursByClassSubject = new Map<string, number>();
+        for (const a of teacherAssignments) {
+          hoursByClassSubject.set(`${a.className}::${a.subject}`, a.hoursPerWeek);
+        }
+
         // Build compound entries per class: hoursPerSubject[i] = hours for actualSubjects[i]
         const entries59: { className: string; hoursPerSubject: number[] }[] = [];
         const entries1011: { className: string; hoursPerSubject: number[] }[] = [];
 
         for (const cn of classNames) {
-          const hoursPerSubject = actualSubjects.map((s) => {
-            const match = teacherAssignments.find((a) => a.className === cn && a.subject === s);
-            return match ? match.hoursPerWeek : 0;
-          });
+          const hoursPerSubject = actualSubjects.map((s) => hoursByClassSubject.get(`${cn}::${s}`) ?? 0);
           const grade = gradeFromClassName(cn);
           const entry = { className: cn, hoursPerSubject };
           if (grade >= 5 && grade <= 9) entries59.push(entry);
@@ -308,11 +311,16 @@ export function buildOfficialReport(
       .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ru'));
 
     // Per-subject breakdown for the yellow cell
+    // RF-W8: single pass per subject instead of three separate filter() passes
     const subjectBreakdown: SubjectBreakdown[] = actualSubjects.map((s) => {
-      const sa = allCompoundAssignments.filter((a) => a.subject === s);
-      const t = sa.reduce((acc, a) => acc + a.hoursPerWeek, 0);
-      const t5 = sa.filter((a) => gradeFromClassName(a.className) <= 9).reduce((acc, a) => acc + a.hoursPerWeek, 0);
-      const t10 = sa.filter((a) => gradeFromClassName(a.className) >= 10).reduce((acc, a) => acc + a.hoursPerWeek, 0);
+      let t = 0, t5 = 0, t10 = 0;
+      for (const a of allCompoundAssignments) {
+        if (a.subject !== s) continue;
+        t += a.hoursPerWeek;
+        const grade = gradeFromClassName(a.className);
+        if (grade <= 9) t5 += a.hoursPerWeek;
+        else if (grade >= 10) t10 += a.hoursPerWeek;
+      }
       return { name: s, total: t, hours5to9: t5, hours10to11: t10 };
     });
 

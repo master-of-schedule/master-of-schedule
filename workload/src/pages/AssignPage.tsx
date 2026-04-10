@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+
+const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
 import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
@@ -42,7 +44,7 @@ export function AssignPage({ plan }: Props) {
   const [futureLen, setFutureLen] = useState(0);
 
   function pushHistory(description?: string) {
-    historyRef.current = [...historyRef.current.slice(-49), { assignments: [...assignmentsRef.current], description }];
+    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current], description }];
     futureRef.current = [];
     setHistoryLen(historyRef.current.length);
     setFutureLen(0);
@@ -61,7 +63,7 @@ export function AssignPage({ plan }: Props) {
 
   function handleRedo() {
     if (futureRef.current.length === 0) return;
-    historyRef.current = [...historyRef.current.slice(-49), { assignments: [...assignmentsRef.current] }];
+    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current] }];
     const next = futureRef.current[0];
     futureRef.current = futureRef.current.slice(1);
     setHistoryLen(historyRef.current.length);

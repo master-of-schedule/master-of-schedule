@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+
+const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
 import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
@@ -59,7 +61,7 @@ export function ImportPage() {
       entry.assignments = [...assignments];
       entry.homeroom = [...homeroomAssignments];
     }
-    undoStack.current = [...undoStack.current.slice(-49), entry];
+    undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_HISTORY - 1)), entry];
     redoStack.current = [];
   }
 

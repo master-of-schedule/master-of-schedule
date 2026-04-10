@@ -49,7 +49,7 @@ export function App() {
   // Register Tauri close interceptor
   useEffect(() => {
     if (!IS_TAURI) return;
-    (window as unknown as Record<string, unknown>).__tauriCloseRequested = () => {
+    window.__tauriCloseRequested = () => {
       if (!isDirtyRef.current) {
         import('@tauri-apps/api/core').then(({ invoke }) => invoke('confirm_and_exit'));
       } else {
@@ -57,7 +57,7 @@ export function App() {
       }
     };
     return () => {
-      delete (window as unknown as Record<string, unknown>).__tauriCloseRequested;
+      delete window.__tauriCloseRequested;
     };
   }, []);
 
