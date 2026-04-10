@@ -133,3 +133,16 @@ jobs:
         run: |
           EXE=$(find workload/src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
           gh release upload "$GITHUB_REF_NAME" "$EXE" --clobber
+
+  # ── Rebuild website to update download links ──────────────────────────────
+  rebuild-website:
+    needs: [build-web, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger website rebuild
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.WEBSITE_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/master-of-schedule/master-of-schedule.github.io/dispatches" \
+            -d '{"event_type":"release"}'
