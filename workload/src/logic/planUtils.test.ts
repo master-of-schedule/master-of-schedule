@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyGroupSplitToggle, getExpectedGroupSlots } from './planUtils';
+import { applyGroupSplitToggle, getExpectedGroupSlots, removeClassFromPlan } from './planUtils';
 import type { CurriculumPlan } from '../types';
 
 function makePlan(): CurriculumPlan {
@@ -59,6 +59,65 @@ describe('applyGroupSplitToggle', () => {
     const plan = makePlan();
     applyGroupSplitToggle(plan, 5, 'Физкультура', 'mandatory', false);
     expect(plan.grades[0].subjects[0].groupSplit).toBe(false);
+  });
+});
+
+describe('removeClassFromPlan (RF-W7)', () => {
+  function makeFullPlan(): CurriculumPlan {
+    return {
+      classNames: ['5-а', '5-б', '6-а'],
+      groupCounts: { '5-а': 2, '5-б': 2, '6-а': 2 },
+      grades: [
+        {
+          grade: 5,
+          subjects: [
+            { name: 'Математика', shortName: 'Мат', groupSplit: false, part: 'mandatory', hoursPerClass: { '5-а': 5, '5-б': 5 } },
+          ],
+          expectedTotals: { '5-а': 29, '5-б': 29 },
+        },
+      ],
+    };
+  }
+
+  it('removes className from classNames list', () => {
+    const plan = makeFullPlan();
+    const result = removeClassFromPlan(plan, '5-а');
+    expect(result.classNames).not.toContain('5-а');
+    expect(result.classNames).toContain('5-б');
+  });
+
+  it('removes className from hoursPerClass in all subjects', () => {
+    const plan = makeFullPlan();
+    const result = removeClassFromPlan(plan, '5-а');
+    expect(result.grades[0].subjects[0].hoursPerClass['5-а']).toBeUndefined();
+    expect(result.grades[0].subjects[0].hoursPerClass['5-б']).toBe(5);
+  });
+
+  it('removes className from groupCounts', () => {
+    const plan = makeFullPlan();
+    const result = removeClassFromPlan(plan, '5-а');
+    expect(result.groupCounts?.['5-а']).toBeUndefined();
+    expect(result.groupCounts?.['5-б']).toBe(2);
+  });
+
+  it('removes className from expectedTotals', () => {
+    const plan = makeFullPlan();
+    const result = removeClassFromPlan(plan, '5-а');
+    expect(result.grades[0].expectedTotals?.['5-а']).toBeUndefined();
+    expect(result.grades[0].expectedTotals?.['5-б']).toBe(29);
+  });
+
+  it('does not mutate the original plan', () => {
+    const plan = makeFullPlan();
+    removeClassFromPlan(plan, '5-а');
+    expect(plan.classNames).toContain('5-а');
+    expect(plan.grades[0].subjects[0].hoursPerClass['5-а']).toBe(5);
+  });
+
+  it('handles missing class gracefully', () => {
+    const plan = makeFullPlan();
+    const result = removeClassFromPlan(plan, '9-г');
+    expect(result.classNames).toEqual(plan.classNames);
   });
 });
 

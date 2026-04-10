@@ -25,6 +25,29 @@ export function getExpectedGroupSlots(plan: CurriculumPlan, className: string, s
 }
 
 /**
+ * Returns a new CurriculumPlan with className removed from all hoursPerClass maps,
+ * from the classNames list, and from groupCounts. Extracted from the deleteClass
+ * store action for testability (RF-W7).
+ */
+export function removeClassFromPlan(plan: CurriculumPlan, className: string): CurriculumPlan {
+  const grades = plan.grades.map((g) => {
+    const subjects = g.subjects.map((s) => {
+      const { [className]: _removed, ...rest } = s.hoursPerClass;
+      return { ...s, hoursPerClass: rest };
+    });
+    const expectedTotals = g.expectedTotals
+      ? (() => { const { [className]: _r, ...rest } = g.expectedTotals!; return rest; })()
+      : undefined;
+    return { ...g, subjects, ...(expectedTotals !== undefined ? { expectedTotals } : {}) };
+  });
+  const classNames = plan.classNames.filter((cn) => cn !== className);
+  const groupCounts = plan.groupCounts
+    ? (() => { const { [className]: _r, ...rest } = plan.groupCounts!; return rest as Record<string, 1 | 2>; })()
+    : undefined;
+  return { ...plan, grades, classNames, ...(groupCounts !== undefined ? { groupCounts } : {}) };
+}
+
+/**
  * Toggles groupSplit for a subject across parallels.
  * @param onlyThisGrade  If true, only the given grade is affected; otherwise all grades
  *                       with the same (name, part) are toggled together.
