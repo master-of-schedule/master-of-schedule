@@ -4,6 +4,7 @@ import {
   parseDeptSnapshot,
   validateDeptSnapshot,
   applyDeptMerge,
+  applyDeptSnapshotState,
   getGroupSubjects,
   detectSnapshotConflicts,
   type DeptSnapshotFile,
@@ -306,5 +307,62 @@ describe('detectSnapshotConflicts', () => {
     const snap = makeSnap([]);
     const result = detectSnapshotConflicts(snap, MASTER_PLAN);
     expect(result).toEqual({ unknownSubjects: [], unknownClassNames: [], orphanedCount: 0 });
+  });
+});
+
+describe('applyDeptSnapshotState (RF-W6)', () => {
+  const baseGroup: import('../types').DeptGroup = {
+    id: 'math', name: 'Математики',
+    tables: [{ id: 'tbl-m', name: 'Математика', subjectFilter: ['Математика'], teacherIds: ['t1'] }],
+  };
+
+  const baseState = {
+    deptGroups: [baseGroup],
+    assignments: [
+      { teacherId: 't1', className: '5а', subject: 'Математика', hoursPerWeek: 4 },
+      { teacherId: 't3', className: '5а', subject: 'Физкультура', hoursPerWeek: 3 },
+    ] as import('../types').Assignment[],
+    teachers: [
+      { id: 't1', name: 'Иванов', initials: 'И.И.', subjects: [] },
+    ] as import('../types').RNTeacher[],
+  };
+
+  it('replaces group assignments and keeps others', () => {
+    const result = applyDeptSnapshotState(
+      { groupId: 'math', assignments: [{ teacherId: 't2', className: '5б', subject: 'Математика', hoursPerWeek: 5 }], teachers: [], deptGroup: baseGroup },
+      baseState,
+    );
+    expect(result).not.toBeNull();
+    const assignments = result!.assignments!;
+    // Old math assignment replaced, PE kept
+    expect(assignments.find((a) => a.subject === 'Физкультура')).toBeDefined();
+    expect(assignments.find((a) => a.className === '5а' && a.subject === 'Математика')).toBeUndefined();
+    expect(assignments.find((a) => a.className === '5б' && a.subject === 'Математика')).toBeDefined();
+  });
+
+  it('merges new teachers from snapshot', () => {
+    const newTeacher = { id: 't-new', name: 'Новый', initials: 'Н.Н.', subjects: [] };
+    const result = applyDeptSnapshotState(
+      { groupId: 'math', assignments: [], teachers: [newTeacher], deptGroup: baseGroup },
+      baseState,
+    );
+    expect(result!.teachers!.find((t) => t.id === 't-new')).toBeDefined();
+    expect(result!.teachers!.find((t) => t.id === 't1')).toBeDefined(); // existing kept
+  });
+
+  it('does not duplicate existing teachers', () => {
+    const result = applyDeptSnapshotState(
+      { groupId: 'math', assignments: [], teachers: [{ id: 't1', name: 'Иванов', initials: 'И.И.', subjects: [] }], deptGroup: baseGroup },
+      baseState,
+    );
+    expect(result!.teachers!.filter((t) => t.id === 't1')).toHaveLength(1);
+  });
+
+  it('returns null for unknown groupId', () => {
+    const result = applyDeptSnapshotState(
+      { groupId: 'nonexistent', assignments: [], teachers: [], deptGroup: baseGroup },
+      baseState,
+    );
+    expect(result).toBeNull();
   });
 });
