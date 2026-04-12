@@ -208,13 +208,14 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     [selectedLesson, copiedLesson, movingLesson, getCellStatusForLesson, className, selectCell, onAssignLesson, setFocusedCell, clearHighlightedMovableCell, clearHighlightedMovableTeacher]
   );
 
-  // Handle context menu
+  // Handle context menu — also select the cell so the user can see which cell was right-clicked
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, day: Day, lessonNum: LessonNumber, lessonIndex: number | null) => {
       e.preventDefault();
+      selectCell({ className, day, lessonNum });
       openContextMenu(e.clientX, e.clientY, { className, day, lessonNum }, lessonIndex);
     },
-    [className, openContextMenu]
+    [className, selectCell, openContextMenu]
   );
 
   // Handle Ctrl+click for multi-select
