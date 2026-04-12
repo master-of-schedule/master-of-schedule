@@ -22,6 +22,8 @@ interface AddTemporaryLessonModalProps {
   initialTeacher?: string;
   /** Pre-fill subject field (e.g. when opening from partner flow) */
   initialSubject?: string;
+  /** Called with the created requirement right before closing (partner merge flow) */
+  onSaved?: (lesson: LessonRequirement) => void;
 }
 
 
@@ -36,6 +38,7 @@ export function AddTemporaryLessonModal({
   currentClass,
   initialTeacher,
   initialSubject,
+  onSaved,
 }: AddTemporaryLessonModalProps) {
   const teachers = useDataStore((state) => state.teachers);
   const classes = useDataStore((state) => state.classes);
@@ -129,8 +132,9 @@ export function AddTemporaryLessonModal({
     setGroupSuffix('');
     setCompensationType('none');
     setConfirmState(null);
+    onSaved?.(lesson);
     onClose();
-  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, addTemporaryLesson, onClose, lessonRequirements, temporaryLessons, addCustomSubject]);
+  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, addTemporaryLesson, onClose, onSaved, lessonRequirements, temporaryLessons, addCustomSubject]);
 
   const handleSave = useCallback(() => {
     if (!canSave) return;

@@ -8,7 +8,7 @@ import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/s
 import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
-import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson } from '@/logic';
+import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons } from '@/logic';
 import { ClassSelector, groupClassesByGrade } from './ClassSelector';
 import { ScheduleGrid } from './ScheduleGrid';
 import { UnscheduledPanel } from './UnscheduledPanel';
@@ -158,8 +158,14 @@ export function EditorPage() {
     lessonNum: LessonNumber;
   }>();
 
-  // Partner modal state (Z35-4: open AddTemporaryLessonModal from ReplacementPanel partner section)
-  const [partnerModal, setPartnerModal] = useState<{ teacher: string; subject: string } | null>(null);
+  // Partner modal state (Z35-4 / Z39-3: open AddTemporaryLessonModal from ReplacementPanel partner section)
+  const [partnerModal, setPartnerModal] = useState<{
+    teacher: string;
+    subject: string;
+    /** Source slot — used on confirm to remove original group lessons and open room picker */
+    sourceDay: Day;
+    sourceLessonNum: LessonNumber;
+  } | null>(null);
 
   // Paste warning state (replaces window.confirm/alert to avoid React crash)
   const [pasteWarning, setPasteWarning] = useState<{
@@ -661,11 +667,36 @@ export function EditorPage() {
     [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
   );
 
-  // Handle partner select (Z35-4): open AddTemporaryLessonModal with pre-filled teacher + subject
+  // Handle partner select (Z35-4 / Z39-3): open AddTemporaryLessonModal with pre-filled teacher + subject
   const handlePartnerSelect = useCallback((teacher: string, subject: string) => {
-    setPartnerModal({ teacher, subject });
+    if (!replacementPicker.data) return;
+    setPartnerModal({
+      teacher,
+      subject,
+      sourceDay: replacementPicker.data.day,
+      sourceLessonNum: replacementPicker.data.lessonNum,
+    });
     replacementPicker.close();
   }, [replacementPicker]);
+
+  // Handle partner merge saved (Z39-3): remove original group lessons + auto-open room picker
+  const handlePartnerMergeSaved = useCallback((lesson: LessonRequirement) => {
+    if (!partnerModal || !currentClass) return;
+    const { sourceDay, sourceLessonNum } = partnerModal;
+
+    // Remove all original lessons at the source slot
+    const originals = getSlotLessons(schedule, currentClass, sourceDay, sourceLessonNum);
+    if (originals.length > 0) {
+      removeLessons(
+        originals.map((_, i) => ({ className: currentClass, day: sourceDay, lessonNum: sourceLessonNum, lessonIndex: i }))
+          .reverse()
+      );
+    }
+
+    // Select the new merged lesson and open room picker at the same slot
+    selectLesson(lesson);
+    roomPicker.open({ day: sourceDay, lessonNum: sourceLessonNum });
+  }, [partnerModal, currentClass, schedule, removeLessons, selectLesson, roomPicker]);
 
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
@@ -851,7 +882,7 @@ export function EditorPage() {
         />
       )}
 
-      {/* Partner modal: AddTemporaryLessonModal pre-filled from ReplacementPanel partner (Z35-4) */}
+      {/* Partner modal: AddTemporaryLessonModal pre-filled from ReplacementPanel partner (Z35-4 / Z39-3) */}
       {currentClass && (
         <AddTemporaryLessonModal
           isOpen={!!partnerModal}
@@ -859,6 +890,7 @@ export function EditorPage() {
           currentClass={currentClass}
           initialTeacher={partnerModal?.teacher}
           initialSubject={partnerModal?.subject}
+          onSaved={handlePartnerMergeSaved}
         />
       )}
 
