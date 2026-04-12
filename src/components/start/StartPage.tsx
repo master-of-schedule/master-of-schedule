@@ -374,13 +374,19 @@ export function StartPage() {
       return;
     }
 
-    // Show unsaved changes modal if dirty
-    if (isDirty) {
+    // Show unsaved changes modal if dirty — but not when returning to the same version
+    if (isDirty && loadVersionId !== versionId) {
       setUnsavedChanges({
         isOpen: true,
         pendingVersionId: loadVersionId,
         pendingAction: 'load',
       });
+      return;
+    }
+
+    // Returning to the currently open (dirty) version — just switch back to editor
+    if (isDirty && loadVersionId === versionId) {
+      setActiveTab('editor');
       return;
     }
 
