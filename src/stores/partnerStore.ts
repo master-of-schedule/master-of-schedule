@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import type { Day, LessonNumber } from '@/types';
+import type { Schedule } from '@/types/schedule';
 import type { PartnerAvailabilityFile } from '@/types/partner';
 import {
   parsePartnerFile,
@@ -13,6 +14,7 @@ import {
 } from '@/logic/partner';
 import {
   getPartnerFileJson,
+  getSavedPartnerScheduleJson,
   savePartnerFileToDB,
   clearPartnerFileFromDB,
 } from '@/db/partnerFiles';
@@ -21,15 +23,26 @@ interface PartnerState {
   partnerData: PartnerAvailabilityFile | null;
   matchedTeachers: Set<string>;
   partnerBusySet: Set<string>;
+  /**
+   * Snapshot of the isPartner classes' schedule as it was before the partner JSON
+   * was loaded. Null if no partner file is active or no partner classes had lessons.
+   * Used to restore the schedule on clearPartnerFile().
+   */
+  savedPartnerSchedule: Schedule | null;
 
   /**
    * Load + validate a partner JSON string, build the busy set, persist to IDB.
-   * Throws a user-friendly error string if the JSON is invalid.
+   * Throws a user-friendly Error if the JSON is invalid.
+   *
+   * @param savedSchedule - Current schedule slice for isPartner classes, captured
+   *   by the caller before clearing those classes. If a savedPartnerSchedule is
+   *   already in state (user clicked "Обновить"), the existing one is preserved so
+   *   we always restore to the original pre-partner state.
    */
-  loadPartnerFile: (json: string, ourTeacherNames: string[]) => Promise<void>;
+  loadPartnerFile: (json: string, ourTeacherNames: string[], savedSchedule?: Schedule) => Promise<void>;
 
-  /** Clear partner data from memory and IDB */
-  clearPartnerFile: () => Promise<void>;
+  /** Clear partner data from memory and IDB. Returns the saved schedule for the caller to restore. */
+  clearPartnerFile: () => Promise<Schedule | null>;
 
   /**
    * Re-load partner data from IDB on app start.
@@ -45,31 +58,43 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
   partnerData: null,
   matchedTeachers: new Set(),
   partnerBusySet: new Set(),
+  savedPartnerSchedule: null,
 
-  loadPartnerFile: async (json, ourTeacherNames) => {
-    // parsePartnerFile throws user-friendly Error on invalid input
+  loadPartnerFile: async (json, ourTeacherNames, savedSchedule) => {
     const parsed = parsePartnerFile(json);
     const matchedTeachers = computeMatchedTeachers(parsed.slots, ourTeacherNames);
     const partnerBusySet = buildPartnerBusySet(parsed, matchedTeachers);
 
-    await savePartnerFileToDB(json);
-    set({ partnerData: parsed, matchedTeachers, partnerBusySet });
+    // Preserve the existing restore point if one is already set (user clicked "Обновить")
+    const existing = get().savedPartnerSchedule;
+    const scheduleToSave = existing ?? savedSchedule ?? null;
+
+    const savedJson = scheduleToSave ? JSON.stringify(scheduleToSave) : undefined;
+    await savePartnerFileToDB(json, savedJson);
+
+    set({ partnerData: parsed, matchedTeachers, partnerBusySet, savedPartnerSchedule: scheduleToSave });
   },
 
   clearPartnerFile: async () => {
+    const { savedPartnerSchedule } = get();
     await clearPartnerFileFromDB();
-    set({ partnerData: null, matchedTeachers: new Set(), partnerBusySet: new Set() });
+    set({ partnerData: null, matchedTeachers: new Set(), partnerBusySet: new Set(), savedPartnerSchedule: null });
+    return savedPartnerSchedule;
   },
 
   initFromDb: async (ourTeacherNames) => {
     const json = await getPartnerFileJson();
-    if (!json) return; // nothing saved — stay null
+    if (!json) return;
 
     try {
       const parsed = parsePartnerFile(json);
       const matchedTeachers = computeMatchedTeachers(parsed.slots, ourTeacherNames);
       const partnerBusySet = buildPartnerBusySet(parsed, matchedTeachers);
-      set({ partnerData: parsed, matchedTeachers, partnerBusySet });
+
+      const savedJson = await getSavedPartnerScheduleJson();
+      const savedPartnerSchedule: Schedule | null = savedJson ? JSON.parse(savedJson) : null;
+
+      set({ partnerData: parsed, matchedTeachers, partnerBusySet, savedPartnerSchedule });
     } catch {
       // Saved file is corrupt or from incompatible version — ignore silently
     }

@@ -92,6 +92,7 @@ export function EditorPage() {
     partnerData: s.partnerData,
     clearPartnerFile: s.clearPartnerFile,
   })));
+  const restorePartnerClassLessons = useScheduleStore((s) => s.restorePartnerClassLessons);
 
   const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();
@@ -242,6 +243,14 @@ export function EditorPage() {
     },
     [selectedLesson, roomPicker, currentClass, assignLesson, selectLesson, clearCellSelection]
   );
+
+  // Clear partner file and restore saved partner class schedules
+  const handleClearPartnerFile = useCallback(async () => {
+    const savedSchedule = await clearPartnerFile();
+    if (savedSchedule && Object.keys(savedSchedule).length > 0) {
+      restorePartnerClassLessons(savedSchedule);
+    }
+  }, [clearPartnerFile, restorePartnerClassLessons]);
 
   // Handle save
   const handleSave = useCallback(async () => {
@@ -701,7 +710,7 @@ export function EditorPage() {
                   <Button
                     variant="secondary"
                     size="small"
-                    onClick={clearPartnerFile}
+                    onClick={handleClearPartnerFile}
                     title="Убрать загруженный JSON партнёра"
                   >
                     Отменить JSON партнёра

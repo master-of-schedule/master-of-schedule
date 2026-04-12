@@ -121,6 +121,18 @@ interface ScheduleState {
   goToHistoryEntry: (index: number) => void;
   clearHistory: () => void;
 
+  // Actions - Partner class schedule management (system ops — not added to undo history)
+  /**
+   * Remove all lessons for the given class names from the current schedule.
+   * Used when loading a partner JSON so partnerBusySet becomes the sole source of partner occupancy.
+   */
+  clearPartnerClassLessons: (classNames: string[]) => void;
+  /**
+   * Merge a previously saved partner-class schedule slice back into the current schedule.
+   * Used when the partner file is cleared/reverted.
+   */
+  restorePartnerClassLessons: (savedSchedule: Schedule) => void;
+
   // Actions - Conflict acknowledgement
   acknowledgeConflict: (key: string) => void;
   clearConflictAcks: (day: Day, lessonNum: LessonNumber) => void;
@@ -284,6 +296,28 @@ export const useScheduleStore = create<ScheduleState>()(
         isDirty: true,
         jsonIsDirty: true,
       });
+    },
+
+    // Partner class schedule management — system ops, no undo history
+    clearPartnerClassLessons: (classNames) => {
+      if (classNames.length === 0) return;
+      const state = get();
+      const newSchedule = cloneSchedule(state.schedule);
+      for (const name of classNames) {
+        delete newSchedule[name];
+      }
+      set({ schedule: newSchedule, isDirty: true, jsonIsDirty: true });
+    },
+
+    restorePartnerClassLessons: (savedSchedule) => {
+      const entries = Object.entries(savedSchedule);
+      if (entries.length === 0) return;
+      const state = get();
+      const newSchedule = cloneSchedule(state.schedule);
+      for (const [name, classSchedule] of entries) {
+        newSchedule[name] = classSchedule;
+      }
+      set({ schedule: newSchedule, isDirty: true, jsonIsDirty: true });
     },
 
     // Change room for a lesson
