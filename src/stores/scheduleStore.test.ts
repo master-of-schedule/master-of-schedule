@@ -535,3 +535,87 @@ describe('lessonStatuses — conducted count', () => {
     expect(useScheduleStore.getState().lessonStatuses['req1']).toBe('completed');
   });
 });
+
+describe('clearPartnerClassLessons', () => {
+  beforeEach(() => {
+    useScheduleStore.setState({
+      schedule: {
+        '5а': { 'Пн': { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова', room: '101' }] } } },
+        '6б': { 'Вт': { 2: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петров', room: '102' }] } } },
+        '7в': { 'Ср': { 3: { lessons: [] } } },
+      },
+      history: [],
+      historyIndex: -1,
+      isDirty: false,
+      jsonIsDirty: false,
+    });
+  });
+
+  it('removes all lessons for specified class names', () => {
+    useScheduleStore.getState().clearPartnerClassLessons(['5а', '7в']);
+    const schedule = useScheduleStore.getState().schedule;
+    expect(schedule['5а']).toBeUndefined();
+    expect(schedule['7в']).toBeUndefined();
+    expect(schedule['6б']).toBeDefined(); // non-partner class untouched
+  });
+
+  it('does NOT add an entry to undo history', () => {
+    const historyBefore = useScheduleStore.getState().history.length;
+    useScheduleStore.getState().clearPartnerClassLessons(['5а']);
+    expect(useScheduleStore.getState().history.length).toBe(historyBefore);
+  });
+
+  it('marks schedule as dirty', () => {
+    useScheduleStore.getState().clearPartnerClassLessons(['5а']);
+    expect(useScheduleStore.getState().isDirty).toBe(true);
+    expect(useScheduleStore.getState().jsonIsDirty).toBe(true);
+  });
+
+  it('is a no-op when classNames is empty', () => {
+    const scheduleBefore = useScheduleStore.getState().schedule;
+    useScheduleStore.getState().clearPartnerClassLessons([]);
+    expect(useScheduleStore.getState().schedule).toBe(scheduleBefore); // same reference
+  });
+});
+
+describe('restorePartnerClassLessons', () => {
+  beforeEach(() => {
+    useScheduleStore.setState({
+      schedule: {
+        '6б': { 'Вт': { 2: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петров', room: '102' }] } } },
+      },
+      history: [],
+      historyIndex: -1,
+      isDirty: false,
+      jsonIsDirty: false,
+    });
+  });
+
+  it('merges saved partner class schedules back into current schedule', () => {
+    const saved = {
+      '5а': { 'Пн': { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова', room: '101' }] } } },
+    };
+    useScheduleStore.getState().restorePartnerClassLessons(saved);
+    const schedule = useScheduleStore.getState().schedule;
+    expect(schedule['5а']).toBeDefined();
+    expect(schedule['6б']).toBeDefined(); // existing class untouched
+  });
+
+  it('does NOT add an entry to undo history', () => {
+    const historyBefore = useScheduleStore.getState().history.length;
+    useScheduleStore.getState().restorePartnerClassLessons({ '5а': {} });
+    expect(useScheduleStore.getState().history.length).toBe(historyBefore);
+  });
+
+  it('marks schedule as dirty', () => {
+    useScheduleStore.getState().restorePartnerClassLessons({ '5а': {} });
+    expect(useScheduleStore.getState().isDirty).toBe(true);
+    expect(useScheduleStore.getState().jsonIsDirty).toBe(true);
+  });
+
+  it('is a no-op when savedSchedule is empty', () => {
+    const scheduleBefore = useScheduleStore.getState().schedule;
+    useScheduleStore.getState().restorePartnerClassLessons({});
+    expect(useScheduleStore.getState().schedule).toBe(scheduleBefore); // same reference
+  });
+});

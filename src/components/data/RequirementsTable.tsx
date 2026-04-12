@@ -118,11 +118,11 @@ export function RequirementsTable() {
             </Button>
           ))}
         </div>
-        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
-          {copyLabel}
-        </Button>
         <Button variant="primary" onClick={openNew} title="Добавить запись вручную">
           + Добавить
+        </Button>
+        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
+          {copyLabel}
         </Button>
       </div>
 

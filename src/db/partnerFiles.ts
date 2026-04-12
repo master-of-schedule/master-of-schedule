@@ -14,10 +14,23 @@ export async function getPartnerFileJson(): Promise<string | null> {
 }
 
 /**
- * Save (upsert) partner file JSON with id='current'
+ * Get the serialised Schedule snapshot for partner classes saved at import time,
+ * or null if not present.
  */
-export async function savePartnerFileToDB(json: string): Promise<void> {
-  await db.partnerFiles.put({ id: 'current', json, importedAt: new Date() });
+export async function getSavedPartnerScheduleJson(): Promise<string | null> {
+  const record = await db.partnerFiles.get('current');
+  return record?.savedPartnerScheduleJson ?? null;
+}
+
+/**
+ * Save (upsert) partner file JSON with id='current'.
+ * Optionally persists the serialised partner-class schedule snapshot for restore.
+ */
+export async function savePartnerFileToDB(
+  json: string,
+  savedPartnerScheduleJson?: string
+): Promise<void> {
+  await db.partnerFiles.put({ id: 'current', json, importedAt: new Date(), savedPartnerScheduleJson });
 }
 
 /**
