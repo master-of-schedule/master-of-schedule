@@ -81,10 +81,21 @@ export function ValidationPanel() {
   const classGaps = gaps.filter(g => g.type === 'class');
   const groupGaps = gaps.filter(g => g.type === 'group');
 
+  const groupByName = useMemo(
+    () => new Map(Object.values(groups).map(g => [g.name, g])),
+    [groups]
+  );
+
   const handleGapClick = (gap: ScheduleGap) => {
     if (gap.type === 'class') {
       setCurrentClass(gap.name);
       setFocusedCell(gap.day, gap.lessonNum);
+    } else if (gap.type === 'group') {
+      const group = groupByName.get(gap.name);
+      if (group) {
+        setCurrentClass(group.className);
+        setFocusedCell(gap.day, gap.lessonNum);
+      }
     }
   };
 
@@ -185,6 +196,7 @@ export function ValidationPanel() {
               <div
                 key={`gg-${index}`}
                 className={styles.gap}
+                onClick={() => handleGapClick(gap)}
               >
                 <span className={styles.gapName}>{gap.name}</span>
                 <span className={styles.gapDetails}>{gap.day} ур. {gap.lessonNum}</span>
