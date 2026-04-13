@@ -492,20 +492,13 @@ export function findGaps(
 
       if (groupPairs.size === 0) continue; // No paired groups known — skip group-gap checks.
 
-      // Z28-1: Group-level gaps — only report when a single-group slot is sandwiched
-      // between two "full-class" slots AND the absent group is the known partner of the present one.
-
-      // Step 1: Find "full-class" slots: class-wide lesson OR 2+ different groups.
-      const fullClassSlots = LESSON_NUMBERS.filter(n => {
-        const lessons = days[day]?.[n]?.lessons ?? [];
-        if (lessons.some(l => !l.group)) return true; // class-wide lesson
-        const groups = new Set(lessons.map(l => l.group).filter(Boolean));
-        return groups.size >= 2;
-      });
-
-      if (fullClassSlots.length === 0) continue; // No full-class boundary — no group window possible.
-
-      // Step 2: For each slot with exactly one group (no class-wide), check if sandwiched.
+      // Z28-1/Z32: Group-level gaps — report when a single-group slot S leaves the absent
+      // partner group sandwiched: the partner must have a lesson (class-wide OR their own group)
+      // both BEFORE and AFTER slot S on the same day.
+      //
+      // This handles the case of two consecutive different-group slots (e.g. slot 5 = В.Е.,
+      // slot 6 = Ю.И.) where neither is "full-class" — Ю.И. still has a window at slot 5
+      // because Ю.И. has class-wide lessons before (1-4) and their own lesson after (slot 6).
       for (const n of LESSON_NUMBERS) {
         const lessons = days[day]?.[n]?.lessons ?? [];
         if (lessons.length === 0) continue;
@@ -514,19 +507,27 @@ export function findGaps(
         const groupsAtSlot = new Set(
           lessons.map(l => l.group).filter((g): g is string => Boolean(g))
         );
-        if (groupsAtSlot.size !== 1) continue; // Two or more groups — full-class, skip.
+        if (groupsAtSlot.size !== 1) continue; // Two or more groups present — full-class, skip.
 
         const [presentGroup] = groupsAtSlot;
         const partners = groupPairs.get(presentGroup);
         if (!partners) continue; // No known partner for this group — skip.
 
-        // Sandwiched = full-class slot exists both before and after slot n.
-        const hasBefore = fullClassSlots.some(m => m < n);
-        const hasAfter = fullClassSlots.some(m => m > n);
-        if (!hasBefore || !hasAfter) continue;
-
-        // Report a window for each absent partner group.
+        // Report a window for each absent partner if the partner has a lesson
+        // (class-wide OR the partner's own group) both before AND after slot n.
         for (const partner of partners) {
+          const hasBefore = LESSON_NUMBERS.some(m => {
+            if (m >= n) return false;
+            const mLessons = days[day]?.[m]?.lessons ?? [];
+            return mLessons.some(l => !l.group) || mLessons.some(l => l.group === partner);
+          });
+          if (!hasBefore) continue;
+          const hasAfter = LESSON_NUMBERS.some(m => {
+            if (m <= n) return false;
+            const mLessons = days[day]?.[m]?.lessons ?? [];
+            return mLessons.some(l => !l.group) || mLessons.some(l => l.group === partner);
+          });
+          if (!hasAfter) continue;
           gaps.push({ type: 'group', name: partner, day, lessonNum: n });
         }
       }
