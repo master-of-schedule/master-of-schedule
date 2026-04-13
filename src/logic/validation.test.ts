@@ -1503,4 +1503,37 @@ describe('findGaps — Z27-5/Z28-1 group gap detection', () => {
     const groupGaps = gapsWithTable.filter(g => g.type === 'group');
     expect(groupGaps.some(g => g.name === '7е(С.П.)' && g.lessonNum === 2)).toBe(true);
   });
+
+  // Z32 regression: two consecutive single-group slots with DIFFERENT groups.
+  // Reported: slot 5 = group В.Е. (Труд), slot 6 = group Ю.И. (Английский) — app missed the window.
+  it('Z32: consecutive slots with different groups — absent partner has a window at the other group\'s slot', () => {
+    // Slots 1-4: class-wide. Slot 5: В.Е. only. Slot 6: Ю.И. only.
+    // Ю.И. is absent at slot 5 (В.Е. is there) but has a lesson at slot 6 → window for Ю.И. at slot 5.
+    // В.Е. has no lesson after slot 5 → NO window for В.Е. at slot 6.
+    const schedule: Schedule = {
+      '7б': {
+        'Вт': {
+          1: { lessons: [{ id: 'c1', requirementId: 'r0', subject: 'Разговоры', teacher: 'Иванова Т.С.', room: '-220-' }] },
+          2: { lessons: [{ id: 'c2', requirementId: 'r0', subject: 'Алгебра', teacher: 'Иванова Т.С.', room: '-220-' }] },
+          3: { lessons: [{ id: 'c3', requirementId: 'r0', subject: 'Русский', teacher: 'Петрова А.П.', room: '-204-' }] },
+          4: { lessons: [{ id: 'c4', requirementId: 'r0', subject: 'Геометрия', teacher: 'Иванова Т.С.', room: '-220-' }] },
+          5: { lessons: [{ id: 'g5', requirementId: 'r1', subject: 'Труд', teacher: 'Тимофеев А.Б.', room: '-314-', group: '7б(В.Е.)' }] },
+          6: { lessons: [{ id: 'g6', requirementId: 'r2', subject: 'Английский', teacher: 'Решитько Ю.И.', room: '-222-', group: '7б(Ю.И.)' }] },
+        },
+      },
+    };
+
+    const groups: Group[] = [
+      { id: 'g1', name: '7б(В.Е.)', className: '7б', index: '(В.Е.)', parallelGroup: '7б(Ю.И.)' },
+      { id: 'g2', name: '7б(Ю.И.)', className: '7б', index: '(Ю.И.)', parallelGroup: '7б(В.Е.)' },
+    ];
+
+    const gaps = findGaps(schedule, {}, undefined, groups);
+    const groupGaps = gaps.filter(g => g.type === 'group');
+
+    // Ю.И. has a window at slot 5: В.Е. is present, Ю.И. had class-wide lessons before and Ю.И.-own lesson after
+    expect(groupGaps.some(g => g.name === '7б(Ю.И.)' && g.lessonNum === 5)).toBe(true);
+    // В.Е. does NOT have a window at slot 6: В.Е.'s last lesson is slot 5 (nothing after for В.Е.)
+    expect(groupGaps.some(g => g.name === '7б(В.Е.)' && g.lessonNum === 6)).toBe(false);
+  });
 });
