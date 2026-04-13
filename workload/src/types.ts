@@ -166,6 +166,8 @@ export type ValidationSeverity = 'error' | 'warning';
 export interface ValidationIssue {
   severity: ValidationSeverity;
   message: string;
+  /** Optional extra context shown below the message (e.g. subject breakdown for SanPiN overloads) */
+  detail?: string;
   /** Optional: class or teacher name this applies to */
   target?: string;
 }
