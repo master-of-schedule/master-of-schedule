@@ -94,9 +94,14 @@ export function ExportPage() {
 
   const hasSchedule = Object.keys(schedule).length > 0;
 
-  // Partner school class names — excluded from partner availability export
+  // Partner school class names — excluded from partner availability export and messenger images
   const partnerClassNames = useMemo(
     () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
+  );
+  // Non-partner class names — used for the messenger images (classes image)
+  const ownClassNames = useMemo(
+    () => classes.filter(c => !c.isPartner).map(c => c.name),
     [classes]
   );
 
@@ -408,17 +413,18 @@ export function ExportPage() {
     const result: Array<[HTMLCanvasElement, string]> = [];
 
     // Download order: teachers → absent → classes (Z14-1e)
-    const teachersData = getTeacherImageData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames);
+    // Partner classes excluded from all images — their changes don't belong in our school's messenger feed
+    const teachersData = getTeacherImageData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames, partnerClassNames);
     if (teachersData.changes.length > 0) {
       result.push([renderTeachersImage(teachersData, titleStr), `${ts}_changes_${selectedDay}.png`]);
     }
 
-    const absentData = getAbsentTeachersData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames);
+    const absentData = getAbsentTeachersData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames, partnerClassNames);
     if (absentData.length > 0) {
       result.push([renderAbsentImage(absentData, titleStr), `${ts}_absent_${selectedDay}.png`]);
     }
 
-    const classesData = getChangedClassesData(schedule, baseTemplateSchedule, classNames, selectedDay);
+    const classesData = getChangedClassesData(schedule, baseTemplateSchedule, ownClassNames, selectedDay);
     const classesCanvases = renderClassesImage(classesData, titleStr);
     classesCanvases.forEach((c, i) => {
       const suffix = classesCanvases.length === 1 ? '' : `_${i + 1}`;
@@ -426,7 +432,7 @@ export function ExportPage() {
     });
 
     return result;
-  }, [selectedDay, baseTemplateSchedule, mondayDate, substitutions, schedule, classNames, teachers]);
+  }, [selectedDay, baseTemplateSchedule, mondayDate, substitutions, schedule, ownClassNames, partnerClassNames, teachers]);
 
   // Save canvases to a folder handle (or fall back to blob downloads)
   const saveCanvases = useCallback(async (dirHandle: FileSystemDirectoryHandle | null) => {
