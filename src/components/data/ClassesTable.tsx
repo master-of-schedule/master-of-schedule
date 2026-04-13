@@ -65,11 +65,11 @@ export function ClassesTable() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
-          {copyLabel}
-        </Button>
         <Button variant="primary" onClick={openNew} title="Добавить класс">
           + Добавить
+        </Button>
+        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
+          {copyLabel}
         </Button>
       </div>
 

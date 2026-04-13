@@ -1,5 +1,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+
+const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
 import { applyGroupSplitToggle } from '../logic/planUtils';
@@ -39,7 +42,18 @@ export function ImportPage() {
     curriculumPlan, setCurriculumPlan, setSubjectShortName, assignments,
     homeroomAssignments, deleteClass, subjectShortNames,
     bulkSetAssignments, bulkSetHomeroomAssignments, activeTab,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    curriculumPlan: s.curriculumPlan,
+    setCurriculumPlan: s.setCurriculumPlan,
+    setSubjectShortName: s.setSubjectShortName,
+    assignments: s.assignments,
+    homeroomAssignments: s.homeroomAssignments,
+    deleteClass: s.deleteClass,
+    subjectShortNames: s.subjectShortNames,
+    bulkSetAssignments: s.bulkSetAssignments,
+    bulkSetHomeroomAssignments: s.bulkSetHomeroomAssignments,
+    activeTab: s.activeTab,
+  })));
   const { notify } = useToast();
   const [draft, setDraft] = useState<CurriculumPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +73,7 @@ export function ImportPage() {
       entry.assignments = [...assignments];
       entry.homeroom = [...homeroomAssignments];
     }
-    undoStack.current = [...undoStack.current.slice(-49), entry];
+    undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_HISTORY - 1)), entry];
     redoStack.current = [];
   }
 

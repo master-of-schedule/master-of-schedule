@@ -4,6 +4,7 @@
 
 import type { CurriculumPlan, RNTeacher, Assignment, HomeroomAssignment, ValidationIssue } from '../types';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from './sanpin';
+import { computeTeacherTotalHours } from './teacherHours';
 
 /**
  * Total hours assigned per class across all assignments.
@@ -27,15 +28,26 @@ export function hoursPerClass(assignments: Assignment[]): Record<string, number>
 }
 
 /**
- * Total hours assigned per teacher (by teacherId).
- * З7-2: homeroom (Разговоры о важном) is NOT counted — it is paid separately.
+ * RF-W4: Find className+subject pairs where two split assignments carry different hoursPerWeek.
+ * Returns entries where the two halves disagree, as a list of {className, subject, hours}.
  */
-export function hoursPerTeacher(
+export function findDivergentSplitHours(
   assignments: Assignment[],
-): Record<string, number> {
-  const result: Record<string, number> = {};
+): { className: string; subject: string; hours: number[] }[] {
+  const grouped = new Map<string, number[]>();
   for (const a of assignments) {
-    result[a.teacherId] = (result[a.teacherId] ?? 0) + a.hoursPerWeek;
+    const key = `${a.className}::${a.subject}`;
+    const existing = grouped.get(key) ?? [];
+    grouped.set(key, [...existing, a.hoursPerWeek]);
+  }
+  const result: { className: string; subject: string; hours: number[] }[] = [];
+  for (const [key, hours] of grouped.entries()) {
+    if (hours.length < 2) continue;
+    const allSame = hours.every((h) => h === hours[0]);
+    if (!allSame) {
+      const [className, subject] = key.split('::');
+      result.push({ className, subject, hours });
+    }
   }
   return result;
 }
@@ -74,6 +86,15 @@ export function validateWorkload(
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
+  // ── RF-W4: Divergent hours between split halves ───────────────────────────
+  for (const { className, subject, hours } of findDivergentSplitHours(assignments)) {
+    issues.push({
+      severity: 'warning',
+      message: `${className}: «${subject}» — часы у половин группы расходятся (${hours.join(', ')} ч/нед)`,
+      target: className,
+    });
+  }
+
   // ── СанПиН per class ──────────────────────────────────────────────────────
   const classTotals = hoursPerClass(assignments);
   // Add Разговоры (1h per class with homeroom)
@@ -98,9 +119,11 @@ export function validateWorkload(
   }
 
   // ── Teacher hours ──────────────────────────────────────────────────────────
+  // Uses computeTeacherTotalHours (bothGroups × 2) — consistent with UI display.
   const teacherById = Object.fromEntries(teachers.map((t) => [t.id, t]));
-  const teacherTotals = hoursPerTeacher(assignments);
-  for (const [tid, hours] of Object.entries(teacherTotals)) {
+  const teacherIds = [...new Set(assignments.map((a) => a.teacherId))];
+  for (const tid of teacherIds) {
+    const hours = computeTeacherTotalHours(tid, assignments);
     const teacher = teacherById[tid];
     const name = teacher?.name ?? tid;
     if (hours > TEACHER_MAX_HOURS) {
@@ -126,11 +149,12 @@ export function validateWorkload(
     }
   }
 
-  // ── Per-subject over-assignment (З18-3) ────────────────────────────────────
+  // ── Per-subject slot-count check (З18-3 + RF-W3) ─────────────────────────
   for (const { className, subject } of allRequiredSubjects(plan)) {
     const subjectAssignments = assignments.filter(
       (a) => a.className === className && a.subject === subject,
     );
+    if (subjectAssignments.length === 0) continue; // "не назначен" check above covers this
     const assignedSlots = subjectAssignments.reduce(
       (sum, a) => sum + (a.bothGroups ? 2 : 1), 0,
     );
@@ -143,6 +167,13 @@ export function validateWorkload(
       issues.push({
         severity: 'warning',
         message: `${className}: «${subject}» — назначено учителей: ${assignedSlots}, по плану: ${gc}`,
+        target: className,
+      });
+    } else if (assignedSlots < gc) {
+      // RF-W3: split subject assigned to fewer teachers than expected (e.g. one teacher, no bothGroups)
+      issues.push({
+        severity: 'warning',
+        message: `${className}: «${subject}» — не хватает учителей: назначено ${assignedSlots}, по плану: ${gc}`,
         target: className,
       });
     }

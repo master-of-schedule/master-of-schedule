@@ -43,6 +43,8 @@ export interface StoredPartnerFile {
   id: 'current';
   json: string;
   importedAt: Date;
+  /** JSON-serialised Schedule slice for isPartner classes — used to restore on clearPartnerFile */
+  savedPartnerScheduleJson?: string;
 }
 
 /** Folder purpose IDs for the 4 autosave destinations */

@@ -67,11 +67,11 @@ export function RoomsTable() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
-          {copyLabel}
-        </Button>
         <Button variant="primary" onClick={openNew} title="Добавить запись вручную">
           + Добавить
+        </Button>
+        <Button variant="secondary" onClick={handleCopyTable} title="Скопировать таблицу в буфер обмена (TSV)">
+          {copyLabel}
         </Button>
       </div>
 
