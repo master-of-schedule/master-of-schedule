@@ -17,12 +17,21 @@ jobs:
   # ── Create the GitHub release with changelog notes ─────────────────────────
   create-release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.name }}
     steps:
       - uses: actions/checkout@v6
 
+      - name: Resolve tag name
+        id: tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Extract changelog section for this version
         run: |
-          VERSION="${GITHUB_REF_NAME#workload/v}"
+          VERSION="${{ steps.tag.outputs.name }}"
+          VERSION="${VERSION#workload/v}"
           awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found" workload/CHANGELOG.md \
             | sed '/^[[:space:]]*$/d' \
             > /tmp/release-notes.md
@@ -33,8 +42,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "РН $GITHUB_REF_NAME" \
+          TAG="${{ steps.tag.outputs.name }}"
+          gh release create "$TAG" \
+            --title "РН $TAG" \
             --notes-file /tmp/release-notes.md
 
   # ── Web build: single-file HTML app ───────────────────────────────────────
@@ -55,7 +65,8 @@ jobs:
 
       - name: Package web app
         run: |
-          VERSION="${GITHUB_REF_NAME#workload/v}"
+          TAG="${{ needs.create-release.outputs.tag }}"
+          VERSION="${TAG#workload/v}"
           FOLDER="master-of-workload-web-v${VERSION}"
           mkdir -p "$FOLDER"
           cp workload/dist/index.html "$FOLDER/index.html"
@@ -66,8 +77,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#workload/v}"
-          gh release upload "$GITHUB_REF_NAME" "master-of-workload-web-v${VERSION}.zip" --clobber
+          TAG="${{ needs.create-release.outputs.tag }}"
+          VERSION="${TAG#workload/v}"
+          gh release upload "$TAG" "master-of-workload-web-v${VERSION}.zip" --clobber
 
   # ── macOS desktop build (.dmg) ────────────────────────────────────────────
   build-macos:
@@ -101,8 +113,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
           DMG=$(find workload/src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
-          gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
+          gh release upload "$TAG" "$DMG" --clobber
 
   # ── Windows desktop build (.exe installer) ───────────────────────────────
   build-windows:
@@ -137,8 +150,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
           EXE=$(find workload/src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
-          gh release upload "$GITHUB_REF_NAME" "$EXE" --clobber
+          gh release upload "$TAG" "$EXE" --clobber
 
   # ── Rebuild website to update download links ──────────────────────────────
   rebuild-website:
