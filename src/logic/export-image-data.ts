@@ -216,12 +216,13 @@ export function getTeacherImageData(
   _teachers: Record<string, Teacher>,
   day: Day,
   absentTeachers: string[],
+  excludeClassNames?: Set<string>,
 ): TeacherImageData {
   const absentSet = new Set(absentTeachers);
   const allClassNames = [...new Set([
     ...Object.keys(schedule),
     ...Object.keys(baseTemplateSchedule),
-  ])];
+  ])].filter(cn => !excludeClassNames?.has(cn));
 
   // Build a map: teacher -> Set<className> for changed slots
   const teacherClassesMap = new Map<string, Set<string>>();
@@ -270,12 +271,13 @@ export function getAbsentTeachersData(
   teachers: Record<string, Teacher>,
   day: Day,
   absentTeachers: string[],
+  excludeClassNames?: Set<string>,
 ): string[] {
   const absentSet = new Set(absentTeachers);
   const allClassNames = [...new Set([
     ...Object.keys(schedule),
     ...Object.keys(baseTemplateSchedule),
-  ])];
+  ])].filter(cn => !excludeClassNames?.has(cn));
 
   const result: string[] = [];
   const teacherNames = Object.keys(teachers);
