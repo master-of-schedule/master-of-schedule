@@ -52,6 +52,7 @@ jobs:
           FOLDER="master-of-schedule-web-${GITHUB_REF_NAME}"
           mkdir -p "$FOLDER"
           cp dist/index.html "$FOLDER/index.html"
+          cp 'Прочитай!.txt' "$FOLDER/"
           zip -r "${FOLDER}.zip" "$FOLDER/"
 
       - name: Upload to release

@@ -54,6 +54,7 @@ jobs:
           FOLDER="master-of-workload-web-v${VERSION}"
           mkdir -p "$FOLDER"
           cp workload/dist/index.html "$FOLDER/index.html"
+          cp 'Прочитай!.txt' "$FOLDER/"
           zip -r "${FOLDER}.zip" "$FOLDER/"
 
       - name: Upload to release
