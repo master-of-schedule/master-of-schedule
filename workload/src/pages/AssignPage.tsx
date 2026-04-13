@@ -866,7 +866,10 @@ function ValidationPanel({ issues }: { issues: ValidationIssue[] }) {
   return (
     <div className={styles.validPanel}>
       {errors.map((i, idx) => (
-        <div key={idx} className={styles.validError}>⚠ {i.message}</div>
+        <div key={idx} className={styles.validError}>
+          ⚠ {i.message}
+          {i.detail && <div className={styles.validDetail}>{i.detail}</div>}
+        </div>
       ))}
       {warnings.map((i, idx) => (
         <div key={idx} className={styles.validWarn}>○ {i.message}</div>
