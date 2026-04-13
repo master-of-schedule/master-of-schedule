@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'workload/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. workload/v1.17.2)'
+        required: true
 
 permissions:
   contents: write
