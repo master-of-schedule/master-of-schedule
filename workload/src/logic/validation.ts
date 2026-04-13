@@ -78,11 +78,29 @@ export function allRequiredSubjects(plan: CurriculumPlan): { className: string; 
   return result;
 }
 
+/**
+ * Build a subject breakdown string for a class, sorted by hours descending.
+ * Used in SanPiN overload messages to show what's contributing to the total.
+ */
+function classSubjectBreakdown(className: string, assignments: Assignment[]): string {
+  const seen = new Set<string>();
+  const subjects: { name: string; hours: number }[] = [];
+  for (const a of assignments) {
+    if (a.className !== className) continue;
+    const key = `${a.className}::${a.subject}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    subjects.push({ name: a.subject, hours: a.hoursPerWeek });
+  }
+  subjects.sort((a, b) => b.hours - a.hours);
+  return subjects.map(s => `${s.name} ${s.hours}ч`).join(', ');
+}
+
 export function validateWorkload(
   plan: CurriculumPlan,
   teachers: RNTeacher[],
   assignments: Assignment[],
-  homeroomAssignments: HomeroomAssignment[],
+  _homeroomAssignments: HomeroomAssignment[],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -96,17 +114,17 @@ export function validateWorkload(
   }
 
   // ── СанПиН per class ──────────────────────────────────────────────────────
+  // NOTE: «Разговоры о важном» (homeroomAssignments) is a mandatory extracurricular
+  // event, NOT part of the academic UP load. It does not count against the SanPiN
+  // academic hour limit, so it is intentionally excluded from this check.
   const classTotals = hoursPerClass(assignments);
-  // Add Разговоры (1h per class with homeroom)
-  for (const h of homeroomAssignments) {
-    classTotals[h.className] = (classTotals[h.className] ?? 0) + 1;
-  }
   for (const [cn, hours] of Object.entries(classTotals)) {
     const max = sanpinMaxForClass(cn);
     if (max !== null && hours > max) {
       issues.push({
         severity: 'error',
         message: `Класс ${cn}: ${hours} ч/нед превышает СанПиН (макс. ${max})`,
+        detail: `Предметы: ${classSubjectBreakdown(cn, assignments)}`,
         target: cn,
       });
     } else if (max !== null && hours > max - 2) {

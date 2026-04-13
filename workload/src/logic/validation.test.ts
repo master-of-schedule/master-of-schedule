@@ -152,7 +152,7 @@ describe('validateWorkload', () => {
     ];
     const homeroom: HomeroomAssignment[] = [{ className: '5а', teacherId: 't1' }];
     const issues = validateWorkload(PLAN, [TEACHER], assignments, homeroom);
-    // Total: 5+3+1=9 < СанПиН 29, all subjects assigned
+    // Total: 5+3=8 < СанПиН 29 (homeroom/Разговоры не входит в лимит), all subjects assigned
     expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
     expect(issues.filter((i) => i.message.includes('не назначен'))).toHaveLength(0);
   });
@@ -268,5 +268,40 @@ describe('validateWorkload', () => {
     const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
     const sanpinErrors = issues.filter((i) => i.severity === 'error' && i.message.includes('СанПиН'));
     expect(sanpinErrors).toHaveLength(0);
+  });
+
+  it('homeroom assignment does not contribute to SanPiN class total', () => {
+    // 5а UP is exactly at the SanPiN limit (5+3+... = 29). Adding a homeroom assignment
+    // must NOT push the class over the limit.
+    const assignments: Assignment[] = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        makeAssignment({ subject: `Предмет${i}`, hoursPerWeek: 5 }),
+      ),
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 4 }),
+    ]; // total = 29 (exactly at limit)
+    const homeroom: HomeroomAssignment[] = [{ className: '5а', teacherId: 't1' }];
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, homeroom);
+    // homeroom must NOT push total to 30 and trigger a false SanPiN error
+    expect(issues.filter((i) => i.severity === 'error' && i.message.includes('СанПиН'))).toHaveLength(0);
+  });
+
+  it('SanPiN overload error includes subject breakdown in detail field', () => {
+    // 30 hours total — over the 29 limit for grade 5
+    const assignments: Assignment[] = [
+      makeAssignment({ subject: 'Математика', hoursPerWeek: 6 }),
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Русский язык', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'История', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Биология', hoursPerWeek: 5 }),
+      makeAssignment({ subject: 'Химия', hoursPerWeek: 4 }),
+    ]; // total = 30
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    const sanpinError = issues.find((i) => i.severity === 'error' && i.message.includes('СанПиН'));
+    expect(sanpinError).toBeDefined();
+    expect(sanpinError!.detail).toBeDefined();
+    expect(sanpinError!.detail).toContain('Математика 6ч');
+    // Subjects should be sorted descending by hours (6ч before 5ч)
+    const detailText = sanpinError!.detail!;
+    expect(detailText.indexOf('Математика 6ч')).toBeLessThan(detailText.indexOf('Химия 4ч'));
   });
 });

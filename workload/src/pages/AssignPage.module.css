@@ -89,6 +89,13 @@
   padding: 3px 0;
 }
 
+.validDetail {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 2px;
+  padding-left: 16px;
+}
+
 .deptTabs {
   display: flex;
   flex-wrap: wrap;
