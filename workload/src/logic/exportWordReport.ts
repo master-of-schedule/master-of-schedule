@@ -325,7 +325,8 @@ function formatVariantText(date: string, label: string): string {
   return label ? `Вариант_ ${formatted} — ${label}` : `Вариант_ ${formatted}`;
 }
 
-export async function downloadWordReport(report: OfficialReport): Promise<void> {
+/** Builds the Word Document object for the official report. Exported for testing. */
+export function buildWordDocument(report: OfficialReport): Document {
   const mainTableRows: TableRow[] = [
     ...buildHeaderRows(),
     ...report.subjectGroups.flatMap((g) => [
@@ -377,7 +378,7 @@ export async function downloadWordReport(report: OfficialReport): Promise<void> 
     buildSummaryTable(report),
   ];
 
-  const doc = new Document({
+  return new Document({
     sections: [
       {
         properties: {
@@ -389,7 +390,10 @@ export async function downloadWordReport(report: OfficialReport): Promise<void> 
       },
     ],
   });
+}
 
+export async function downloadWordReport(report: OfficialReport): Promise<void> {
+  const doc = buildWordDocument(report);
   const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -6,6 +6,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { migrateInitials } from './logic/groupNames';
 import type { SnapshotConflicts } from './logic/deptSnapshot';
+import { applyDeptSnapshotState } from './logic/deptSnapshot';
+import { removeClassFromPlan } from './logic/planUtils';
 import type {
   CurriculumPlan,
   RNTeacher,
@@ -377,61 +379,15 @@ export const useStore = create<RNState>()(
       deleteClass: (className) =>
         set((s) => {
           if (!s.curriculumPlan) return {};
-          const grades = s.curriculumPlan.grades.map((g) => ({
-            ...g,
-            subjects: g.subjects.map((subj) => {
-              const { [className]: _removed, ...rest } = subj.hoursPerClass;
-              return { ...subj, hoursPerClass: rest };
-            }),
-            expectedTotals: g.expectedTotals
-              ? (() => { const { [className]: _r, ...rest } = g.expectedTotals!; return rest; })()
-              : undefined,
-          }));
-          const classNames = s.curriculumPlan.classNames.filter((cn) => cn !== className);
-          const groupCounts = s.curriculumPlan.groupCounts
-            ? (() => { const { [className]: _r, ...rest } = s.curriculumPlan.groupCounts!; return rest as Record<string, 1|2>; })()
-            : undefined;
           return {
-            curriculumPlan: { ...s.curriculumPlan, grades, classNames, groupCounts },
+            curriculumPlan: removeClassFromPlan(s.curriculumPlan, className),
             assignments: s.assignments.filter((a) => a.className !== className),
             homeroomAssignments: s.homeroomAssignments.filter((h) => h.className !== className),
           };
         }),
 
-      applyDeptSnapshot: ({ groupId, assignments: snapAssignments, teachers: snapTeachers, deptGroup: snapDeptGroup }) =>
-        set((s) => {
-          const group = s.deptGroups.find((g) => g.id === groupId);
-          if (!group) return {};
-          const groupSubjects = new Set(group.tables.flatMap((t) => t.subjectFilter));
-          const toKeep = s.assignments.filter((a) => !groupSubjects.has(a.subject));
-
-          // Merge teachers: add any new teachers from the snapshot not yet in master list
-          const existingIds = new Set(s.teachers.map((t) => t.id));
-          const newTeachers = snapTeachers.filter((t) => !existingIds.has(t.id));
-          const mergedTeachers = newTeachers.length > 0 ? [...s.teachers, ...newTeachers] : s.teachers;
-
-          // З18-6: Keep master's deptGroup structure, only merge new teacherIds from snapshot
-          const snapTeacherIdsByTable = new Map(snapDeptGroup.tables.map((t) => [t.id, new Set(t.teacherIds)]));
-          const mergedDeptGroups = s.deptGroups.map((g) => {
-            if (g.id !== groupId) return g;
-            return {
-              ...g,
-              tables: g.tables.map((t) => {
-                const snapIds = snapTeacherIdsByTable.get(t.id);
-                if (!snapIds) return t;
-                const existing = new Set(t.teacherIds);
-                const added = [...snapIds].filter((id) => !existing.has(id));
-                return added.length > 0 ? { ...t, teacherIds: [...t.teacherIds, ...added] } : t;
-              }),
-            };
-          });
-
-          return {
-            assignments: [...toKeep, ...snapAssignments],
-            teachers: mergedTeachers,
-            deptGroups: mergedDeptGroups,
-          };
-        }),
+      applyDeptSnapshot: (input) =>
+        set((s) => applyDeptSnapshotState(input, s) ?? {}),
 
       bulkSetAssignments: (newAssignments) => set({ assignments: newAssignments }),
 

@@ -178,6 +178,70 @@ export function validateDeptSnapshot(
   return null;
 }
 
+// ── Apply full snapshot to store state (RF-W6) ───────────────────────────────
+
+export interface DeptSnapshotApplyInput {
+  groupId: string;
+  assignments: Assignment[];
+  teachers: RNTeacher[];
+  deptGroup: DeptGroup;
+}
+
+export interface DeptSnapshotApplyState {
+  deptGroups: DeptGroup[];
+  assignments: Assignment[];
+  teachers: RNTeacher[];
+}
+
+/**
+ * Computes the state update to apply after importing a dept snapshot.
+ * Returns null when groupId is not found in the current deptGroups.
+ *
+ * Extracted from the store action so it can be unit-tested independently (RF-W6).
+ *
+ * Rules:
+ * - Assignments for the group's subjects are replaced by snapshot assignments.
+ * - New teachers (by id) from the snapshot are appended to the master list.
+ * - З18-6: Master deptGroup structure is preserved; only new teacherIds from the
+ *   snapshot are merged into matching tables.
+ */
+export function applyDeptSnapshotState(
+  input: DeptSnapshotApplyInput,
+  state: DeptSnapshotApplyState,
+): Partial<DeptSnapshotApplyState> | null {
+  const { groupId, assignments: snapAssignments, teachers: snapTeachers, deptGroup: snapDeptGroup } = input;
+  const group = state.deptGroups.find((g) => g.id === groupId);
+  if (!group) return null;
+
+  const groupSubjects = new Set(group.tables.flatMap((t) => t.subjectFilter));
+  const toKeep = state.assignments.filter((a) => !groupSubjects.has(a.subject));
+
+  const existingIds = new Set(state.teachers.map((t) => t.id));
+  const newTeachers = snapTeachers.filter((t) => !existingIds.has(t.id));
+  const mergedTeachers = newTeachers.length > 0 ? [...state.teachers, ...newTeachers] : state.teachers;
+
+  const snapTeacherIdsByTable = new Map(snapDeptGroup.tables.map((t) => [t.id, new Set(t.teacherIds)]));
+  const mergedDeptGroups = state.deptGroups.map((g) => {
+    if (g.id !== groupId) return g;
+    return {
+      ...g,
+      tables: g.tables.map((t) => {
+        const snapIds = snapTeacherIdsByTable.get(t.id);
+        if (!snapIds) return t;
+        const existing = new Set(t.teacherIds);
+        const added = [...snapIds].filter((id) => !existing.has(id));
+        return added.length > 0 ? { ...t, teacherIds: [...t.teacherIds, ...added] } : t;
+      }),
+    };
+  });
+
+  return {
+    assignments: [...toKeep, ...snapAssignments],
+    teachers: mergedTeachers,
+    deptGroups: mergedDeptGroups,
+  };
+}
+
 // ── Apply merge (MU-2) ───────────────────────────────────────────────────────
 
 export function applyDeptMerge(

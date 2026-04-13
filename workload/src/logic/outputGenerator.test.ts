@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectGroupPairs, generateOutput } from './outputGenerator';
-import type { Assignment, RNTeacher, HomeroomAssignment } from '../types';
+import type { Assignment, RNTeacher, HomeroomAssignment, CurriculumPlan } from '../types';
 
 const T1: RNTeacher = {
   id: 't1',
@@ -45,6 +45,55 @@ describe('detectGroupPairs', () => {
     const peC: Assignment = { ...peA, teacherId: 't4' };
     const pairs = detectGroupPairs([peA, peB, peC], [T1, T2, t4]);
     expect(pairs).toHaveLength(0); // length !== 2 → not a pair
+  });
+});
+
+// ── RF-W3: plan-based silent failure cases ──────────────────────────────────
+
+function makePlan(subjectName: string, groupSplit: boolean): CurriculumPlan {
+  return {
+    classNames: ['5а'],
+    groupCounts: { '5а': 2 },
+    grades: [{ grade: 5, subjects: [
+      { name: subjectName, shortName: subjectName, groupSplit, part: 'mandatory', hoursPerClass: { '5а': 3 } },
+    ]}],
+  };
+}
+
+describe('detectGroupPairs — RF-W3 plan-based validation', () => {
+  it('three teachers on same class+subject: not emitted as pair (silent failure prevented)', () => {
+    const t4: RNTeacher = { id: 't4', name: 'Третий', initials: 'Т', subjects: [] };
+    const peC: Assignment = { ...peA, teacherId: 't4' };
+    const plan = makePlan('Физкультура', true);
+    // 3 teachers on a 2-slot subject → no pair (count doesn't match expected 2)
+    const pairs = detectGroupPairs([peA, peB, peC], [T1, T2, t4], undefined, plan);
+    expect(pairs).toHaveLength(0);
+  });
+
+  it('one teacher (no bothGroups) on groupSplit=true subject: not emitted as pair', () => {
+    const plan = makePlan('Физкультура', true);
+    // Only 1 teacher, not bothGroups → missing partner, should NOT silently become class lesson
+    // detectGroupPairs returns 0 (the missing-partner warning comes from validateWorkload)
+    const pairs = detectGroupPairs([peA], [T1], undefined, plan);
+    expect(pairs).toHaveLength(0);
+  });
+
+  it('two teachers on groupSplit=false subject: not emitted as pair (plan says 1 slot)', () => {
+    const plan = makePlan('Математика', false); // non-split
+    const twoOnNonSplit: Assignment[] = [
+      { ...peA, subject: 'Математика' },
+      { ...peB, subject: 'Математика' },
+    ];
+    // Without plan: would be emitted as a pair (old heuristic)
+    // With plan: not a pair (validateWorkload already flags overassignment via З18-3)
+    const pairs = detectGroupPairs(twoOnNonSplit, [T1, T2], undefined, plan);
+    expect(pairs).toHaveLength(0);
+  });
+
+  it('without plan: still uses length heuristic (backward compat)', () => {
+    // No plan → length === 2 triggers pair regardless of subject type
+    const pairs = detectGroupPairs([peA, peB], [T1, T2]);
+    expect(pairs).toHaveLength(1);
   });
 });
 

@@ -3,11 +3,12 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useDataStore, usePartnerStore, useUIStore } from '@/stores';
+import { useDataStore, usePartnerStore, useScheduleStore, useUIStore } from '@/stores';
 import { clearDatabase, pickJsonFile } from '@/db';
 import { getYearSnapshots, addYearSnapshot, deleteYearSnapshot } from '@/db/yearSnapshots';
 import type { YearSnapshot } from '@/db/database';
 import { saveJsonFile, parseExportData } from '@/db/import-export';
+import type { Schedule } from '@/types/schedule';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
 import { useToast } from '@/components/common/Toast';
@@ -28,10 +29,14 @@ export function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
 
+  const classes = useDataStore((state) => state.classes);
   const partnerData = usePartnerStore((state) => state.partnerData);
   const matchedTeachers = usePartnerStore((state) => state.matchedTeachers);
   const loadPartnerFile = usePartnerStore((state) => state.loadPartnerFile);
   const clearPartnerFile = usePartnerStore((state) => state.clearPartnerFile);
+  const clearPartnerClassLessons = useScheduleStore((state) => state.clearPartnerClassLessons);
+  const restorePartnerClassLessons = useScheduleStore((state) => state.restorePartnerClassLessons);
+  const currentSchedule = useScheduleStore((state) => state.schedule);
 
   const loadSnapshots = useCallback(async () => {
     setSnapshots(await getYearSnapshots());
@@ -102,17 +107,39 @@ export function SettingsPage() {
 
     try {
       const text = await file.text();
-      await loadPartnerFile(text, Object.keys(teachers));
+
+      // Snapshot current schedule for partner-flagged classes before clearing them.
+      // This becomes the restore point used by clearPartnerFile / "Отменить JSON партнёра".
+      const partnerClassNames = classes.filter(c => c.isPartner).map(c => c.name);
+      const savedSchedule: Schedule = {};
+      for (const name of partnerClassNames) {
+        if (currentSchedule[name]) savedSchedule[name] = currentSchedule[name];
+      }
+
+      await loadPartnerFile(
+        text,
+        Object.keys(teachers),
+        Object.keys(savedSchedule).length > 0 ? savedSchedule : undefined
+      );
+
+      // Clear partner class lessons so partnerBusySet is the sole occupancy source
+      if (partnerClassNames.length > 0) {
+        clearPartnerClassLessons(partnerClassNames);
+      }
+
       showToast('Файл партнёра загружен', 'success');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Ошибка при загрузке файла', 'error');
     }
-  }, [teachers, loadPartnerFile, showToast]);
+  }, [teachers, classes, currentSchedule, loadPartnerFile, clearPartnerClassLessons, showToast]);
 
   const handleClearPartner = useCallback(async () => {
-    await clearPartnerFile();
+    const savedSchedule = await clearPartnerFile();
+    if (savedSchedule && Object.keys(savedSchedule).length > 0) {
+      restorePartnerClassLessons(savedSchedule);
+    }
     showToast('Расписание партнёра удалено', 'success');
-  }, [clearPartnerFile, showToast]);
+  }, [clearPartnerFile, restorePartnerClassLessons, showToast]);
 
   const formatDate = (isoString: string) => {
     try {

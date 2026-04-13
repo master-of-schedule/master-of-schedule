@@ -7,7 +7,7 @@ export { db, TimetableDatabase, initializeDatabase, clearDatabase, getSettings, 
 export type { AppSettings, StoredPartnerFile } from './database';
 
 // Partner files persistence
-export { getPartnerFileJson, savePartnerFileToDB, clearPartnerFileFromDB } from './partnerFiles';
+export { getPartnerFileJson, getSavedPartnerScheduleJson, savePartnerFileToDB, clearPartnerFileFromDB } from './partnerFiles';
 
 // Version management
 export {

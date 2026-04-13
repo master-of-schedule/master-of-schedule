@@ -9,6 +9,7 @@ import type { GridSelection } from '@/hooks/useGridSelection';
 import { useMultiFolders } from '@/hooks/useMultiFolders';
 import { FolderSettingsDialog } from './FolderSettingsDialog';
 import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability } from '@/logic';
@@ -49,22 +50,29 @@ const DAY_FULL_NAMES: Record<string, string> = {
 type GridView = 'classes' | 'teachers' | 'rooms';
 
 export function ExportPage() {
-  const schedule = useScheduleStore((state) => state.schedule);
-  const versionType = useScheduleStore((state) => state.versionType);
-  const versionName = useScheduleStore((state) => state.versionName);
-  const mondayDate = useScheduleStore((state) => state.mondayDate);
-  const baseTemplateSchedule = useScheduleStore((state) => state.baseTemplateSchedule);
-  const classes = useDataStore((state) => state.classes);
-  const teachers = useDataStore((state) => state.teachers);
-  const rooms = useDataStore((state) => state.rooms);
-  const substitutions = useScheduleStore((state) => state.substitutions);
-  const { showToast } = useToast();
+  const { schedule, versionType, versionName, mondayDate, baseTemplateSchedule, substitutions } = useScheduleStore(useShallow((s) => ({
+    schedule: s.schedule,
+    versionType: s.versionType,
+    versionName: s.versionName,
+    mondayDate: s.mondayDate,
+    baseTemplateSchedule: s.baseTemplateSchedule,
+    substitutions: s.substitutions,
+  })));
 
-  // Active view state (persisted in store to survive tab switches)
-  const activeView = useUIStore((state) => state.exportView);
-  const setActiveView = useUIStore((state) => state.setExportView);
-  const selectedDay = useUIStore((state) => state.exportSelectedDay);
-  const setSelectedDay = useUIStore((state) => state.setExportSelectedDay);
+  const { classes, teachers, rooms } = useDataStore(useShallow((s) => ({
+    classes: s.classes,
+    teachers: s.teachers,
+    rooms: s.rooms,
+  })));
+
+  const { activeView, setActiveView, selectedDay, setSelectedDay } = useUIStore(useShallow((s) => ({
+    activeView: s.exportView,
+    setActiveView: s.setExportView,
+    selectedDay: s.exportSelectedDay,
+    setSelectedDay: s.setExportSelectedDay,
+  })));
+
+  const { showToast } = useToast();
 
   // Grid selection state
   const { selection, isInSelection, handleGridMouseDown, handleGridMouseMove, handleGridMouseUp, clearSelection } = useGridSelection();
@@ -86,9 +94,14 @@ export function ExportPage() {
 
   const hasSchedule = Object.keys(schedule).length > 0;
 
-  // Partner school class names — excluded from partner availability export
+  // Partner school class names — excluded from partner availability export and messenger images
   const partnerClassNames = useMemo(
     () => new Set(classes.filter(c => c.isPartner).map(c => c.name)),
+    [classes]
+  );
+  // Non-partner class names — used for the messenger images (classes image)
+  const ownClassNames = useMemo(
+    () => classes.filter(c => !c.isPartner).map(c => c.name),
     [classes]
   );
 
@@ -400,17 +413,18 @@ export function ExportPage() {
     const result: Array<[HTMLCanvasElement, string]> = [];
 
     // Download order: teachers → absent → classes (Z14-1e)
-    const teachersData = getTeacherImageData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames);
+    // Partner classes excluded from all images — their changes don't belong in our school's messenger feed
+    const teachersData = getTeacherImageData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames, partnerClassNames);
     if (teachersData.changes.length > 0) {
       result.push([renderTeachersImage(teachersData, titleStr), `${ts}_changes_${selectedDay}.png`]);
     }
 
-    const absentData = getAbsentTeachersData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames);
+    const absentData = getAbsentTeachersData(schedule, baseTemplateSchedule, teachers, selectedDay, absentTeacherNames, partnerClassNames);
     if (absentData.length > 0) {
       result.push([renderAbsentImage(absentData, titleStr), `${ts}_absent_${selectedDay}.png`]);
     }
 
-    const classesData = getChangedClassesData(schedule, baseTemplateSchedule, classNames, selectedDay);
+    const classesData = getChangedClassesData(schedule, baseTemplateSchedule, ownClassNames, selectedDay);
     const classesCanvases = renderClassesImage(classesData, titleStr);
     classesCanvases.forEach((c, i) => {
       const suffix = classesCanvases.length === 1 ? '' : `_${i + 1}`;
@@ -418,7 +432,7 @@ export function ExportPage() {
     });
 
     return result;
-  }, [selectedDay, baseTemplateSchedule, mondayDate, substitutions, schedule, classNames, teachers]);
+  }, [selectedDay, baseTemplateSchedule, mondayDate, substitutions, schedule, ownClassNames, partnerClassNames, teachers]);
 
   // Save canvases to a folder handle (or fall back to blob downloads)
   const saveCanvases = useCallback(async (dirHandle: FileSystemDirectoryHandle | null) => {

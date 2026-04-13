@@ -5,7 +5,7 @@
 import { useMemo, useCallback, useState } from 'react';
 import type { LessonRequirement, UnscheduledLesson } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
-import { getUnscheduledLessons, mergeWithTemporaryLessons, getLessonKey } from '@/logic';
+import { getUnscheduledLessons, mergeWithTemporaryLessons, computeMergedTemps } from '@/logic';
 import { extractGroupIndex } from '@/utils/formatLesson';
 import { ContextMenu, ContextMenuItem } from '@/components/common/ContextMenu';
 import { AddTemporaryLessonModal } from './AddTemporaryLessonModal';
@@ -49,49 +49,11 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     [temporaryLessons]
   );
 
-  // Get unscheduled lessons for this class.
-  // Also detect which unscheduled entries have temporary lessons merged into them
-  // so we can show the "×" button on the correct row.
+  // Get unscheduled lessons for this class, then annotate which entries have
+  // temporary lessons merged into them so the "×" button appears on the correct row.
   const { unscheduled, mergedTempsByEntryId } = useMemo(() => {
     const list = getUnscheduledLessons(mergedRequirements, schedule, className);
-    const mergedTemps = new Map<string, LessonRequirement>();
-
-    for (const temp of temporaryLessons) {
-      const isForThisClass =
-        (temp.type === 'class' && temp.classOrGroup === className) ||
-        (temp.type === 'group' && temp.className === className);
-      if (!isForThisClass) continue;
-
-      // Temp is already in list by its own ID (standalone new subject/teacher)
-      if (list.some(item => item.requirement.id === temp.id)) continue;
-
-      // Check if temp was merged into an existing entry (same lesson key + classOrGroup).
-      // When merged, getUnscheduledLessons returns the entry under the ORIGINAL requirement's ID.
-      const tempKey = getLessonKey({
-        subject: temp.subject,
-        teacher: temp.teacher,
-        group: temp.type === 'group' ? temp.classOrGroup : undefined,
-      });
-      const mergedEntry = list.find(item => {
-        if (item.requirement.classOrGroup !== temp.classOrGroup) return false;
-        const itemKey = getLessonKey({
-          subject: item.requirement.subject,
-          teacher: item.requirement.teacher,
-          group: item.requirement.type === 'group' ? item.requirement.classOrGroup : undefined,
-        });
-        return itemKey === tempKey;
-      });
-
-      if (mergedEntry) {
-        // Temp was merged into this entry — show × button on that entry, not a phantom 0-count row
-        mergedTemps.set(mergedEntry.requirement.id, temp);
-      } else {
-        // Temp is fully scheduled (no entry in list at all) — add with remaining=0 for × button
-        list.push({ requirement: temp, remaining: 0 });
-      }
-    }
-
-    return { unscheduled: list, mergedTempsByEntryId: mergedTemps };
+    return computeMergedTemps(list, temporaryLessons, className);
   }, [mergedRequirements, schedule, className, temporaryLessons]);
 
   const isCompleted = useCallback(

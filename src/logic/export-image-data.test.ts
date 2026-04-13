@@ -482,6 +482,68 @@ describe('getAbsentTeachersData', () => {
   });
 });
 
+// ─── Partner class exclusion from messenger images ───────────────
+
+describe('getTeacherImageData — excludeClassNames', () => {
+  it('excludes changes that happen only in partner classes', () => {
+    const partnerLesson = createLesson({ teacher: 'Иванова Т.С.', room: '101' });
+    // Teacher's lesson in partner class changes (room)
+    const template: Schedule = { 'партнёрШкола_5а': { 'Пн': { 1: { lessons: [partnerLesson] } } } };
+    const weekly: Schedule = { 'партнёрШкола_5а': { 'Пн': { 1: { lessons: [{ ...partnerLesson, room: '202' }] } } } };
+
+    // Without exclusion — teacher appears as having changes
+    const withoutFilter = getTeacherImageData(weekly, template, {}, 'Пн' as never, []);
+    expect(withoutFilter.changes.map(c => c.teacher)).toContain('Иванова Т.С.');
+
+    // With partner class excluded — no changes
+    const withFilter = getTeacherImageData(weekly, template, {}, 'Пн' as never, [], new Set(['партнёрШкола_5а']));
+    expect(withFilter.changes).toHaveLength(0);
+  });
+
+  it('still shows changes in own classes when partner class is excluded', () => {
+    const ownLesson = createLesson({ teacher: 'Иванова Т.С.', room: '101' });
+    const partnerLesson = createLesson({ id: 'l-p', teacher: 'Иванова Т.С.', room: '999' });
+    const template: Schedule = {
+      '10а': { 'Пн': { 1: { lessons: [ownLesson] } } },
+      'партнёрШкола_5а': { 'Пн': { 2: { lessons: [partnerLesson] } } },
+    };
+    const weekly: Schedule = {
+      '10а': { 'Пн': { 1: { lessons: [{ ...ownLesson, room: '202' }] } } }, // own class changed
+      'партнёрШкола_5а': { 'Пн': { 2: { lessons: [{ ...partnerLesson, room: '888' }] } } }, // partner changed too
+    };
+
+    const result = getTeacherImageData(weekly, template, {}, 'Пн' as never, [], new Set(['партнёрШкола_5а']));
+    // Teacher shows up because of own-class change
+    expect(result.changes.map(c => c.teacher)).toContain('Иванова Т.С.');
+    // But the listed class must be the own class, not the partner
+    const teacherChange = result.changes.find(c => c.teacher === 'Иванова Т.С.')!;
+    expect(teacherChange.classes).toContain('10а');
+    expect(teacherChange.classes).not.toContain('партнёрШкола_5а');
+  });
+});
+
+describe('getAbsentTeachersData — excludeClassNames', () => {
+  const makeTeacher2 = (name: string): Teacher => ({
+    id: `t-${name}`, name, subjects: [], bans: {},
+  });
+
+  it('does not flag teacher as absent when their only template lesson is in a partner class', () => {
+    const partnerLesson = createLesson({ teacher: 'Иванова Т.С.' });
+    // Template has teacher in partner class, weekly schedule is empty for that class (cleared by Z39-2)
+    const template: Schedule = { 'партнёр_5а': { 'Пн': { 1: { lessons: [partnerLesson] } } } };
+    const weekly: Schedule = {}; // partner class cleared
+    const teachers = { 'Иванова Т.С.': makeTeacher2('Иванова Т.С.') };
+
+    // Without exclusion — falsely appears absent
+    const withoutFilter = getAbsentTeachersData(weekly, template, teachers, 'Пн' as never, []);
+    expect(withoutFilter).toContain('Иванова Т.С.');
+
+    // With exclusion — correctly NOT absent (partner class ignored)
+    const withFilter = getAbsentTeachersData(weekly, template, teachers, 'Пн' as never, [], new Set(['партнёр_5а']));
+    expect(withFilter).not.toContain('Иванова Т.С.');
+  });
+});
+
 // ─── QI-13: getTeacherImageData — no template ─────────────────
 
 describe('getTeacherImageData — no template (QI-13)', () => {

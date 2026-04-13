@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+
+const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { shortTeacherName } from '../logic/groupNames';
@@ -24,7 +27,17 @@ export function AssignPage({ plan }: Props) {
     bulkSetAssignments,
     setGroupNameOverride,
     activeTab,
-  } = useStore();
+  } = useStore(useShallow((s) => ({
+    teachers: s.teachers,
+    deptGroups: s.deptGroups,
+    assignments: s.assignments,
+    homeroomAssignments: s.homeroomAssignments,
+    setAssignment: s.setAssignment,
+    removeAssignment: s.removeAssignment,
+    bulkSetAssignments: s.bulkSetAssignments,
+    setGroupNameOverride: s.setGroupNameOverride,
+    activeTab: s.activeTab,
+  })));
   const [activeDeptId, setActiveDeptId] = useState<string>(() => deptGroups[0]?.id ?? '');
   const [showValidation, setShowValidation] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -42,7 +55,7 @@ export function AssignPage({ plan }: Props) {
   const [futureLen, setFutureLen] = useState(0);
 
   function pushHistory(description?: string) {
-    historyRef.current = [...historyRef.current.slice(-49), { assignments: [...assignmentsRef.current], description }];
+    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current], description }];
     futureRef.current = [];
     setHistoryLen(historyRef.current.length);
     setFutureLen(0);
@@ -61,7 +74,7 @@ export function AssignPage({ plan }: Props) {
 
   function handleRedo() {
     if (futureRef.current.length === 0) return;
-    historyRef.current = [...historyRef.current.slice(-49), { assignments: [...assignmentsRef.current] }];
+    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current] }];
     const next = futureRef.current[0];
     futureRef.current = futureRef.current.slice(1);
     setHistoryLen(historyRef.current.length);
@@ -194,7 +207,7 @@ export function AssignPage({ plan }: Props) {
     [assignments],
   );
 
-  const allGroupPairs = detectGroupPairs(assignments, teachers, plan.groupNameOverrides);
+  const allGroupPairs = detectGroupPairs(assignments, teachers, plan.groupNameOverrides, plan);
   const issues = showValidation
     ? validateWorkload(plan, teachers, assignments, homeroomAssignments)
     : [];
