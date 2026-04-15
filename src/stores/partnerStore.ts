@@ -29,6 +29,11 @@ interface PartnerState {
    * Used to restore the schedule on clearPartnerFile().
    */
   savedPartnerSchedule: Schedule | null;
+  /**
+   * Set when initFromDb() fails to parse the stored partner file (corrupt or incompatible).
+   * Null when no error occurred. Cleared on the next successful load or clearPartnerFile().
+   */
+  loadError: string | null;
 
   /**
    * Load + validate a partner JSON string, build the busy set, persist to IDB.
@@ -59,6 +64,7 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
   matchedTeachers: new Set(),
   partnerBusySet: new Set(),
   savedPartnerSchedule: null,
+  loadError: null,
 
   loadPartnerFile: async (json, ourTeacherNames, savedSchedule) => {
     const parsed = parsePartnerFile(json);
@@ -72,13 +78,13 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
     const savedJson = scheduleToSave ? JSON.stringify(scheduleToSave) : undefined;
     await savePartnerFileToDB(json, savedJson);
 
-    set({ partnerData: parsed, matchedTeachers, partnerBusySet, savedPartnerSchedule: scheduleToSave });
+    set({ partnerData: parsed, matchedTeachers, partnerBusySet, savedPartnerSchedule: scheduleToSave, loadError: null });
   },
 
   clearPartnerFile: async () => {
     const { savedPartnerSchedule } = get();
     await clearPartnerFileFromDB();
-    set({ partnerData: null, matchedTeachers: new Set(), partnerBusySet: new Set(), savedPartnerSchedule: null });
+    set({ partnerData: null, matchedTeachers: new Set(), partnerBusySet: new Set(), savedPartnerSchedule: null, loadError: null });
     return savedPartnerSchedule;
   },
 
@@ -95,8 +101,10 @@ export const usePartnerStore = create<PartnerState>((set, get) => ({
       const savedPartnerSchedule: Schedule | null = savedJson ? JSON.parse(savedJson) : null;
 
       set({ partnerData: parsed, matchedTeachers, partnerBusySet, savedPartnerSchedule });
-    } catch {
-      // Saved file is corrupt or from incompatible version — ignore silently
+    } catch (e) {
+      // Saved file is corrupt or from incompatible version — clear it and surface the error
+      await clearPartnerFileFromDB();
+      set({ loadError: e instanceof Error ? e.message : 'Повреждённый файл партнёра' });
     }
   },
 
