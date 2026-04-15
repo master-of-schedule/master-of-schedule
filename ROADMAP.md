@@ -35,10 +35,10 @@ Cascade logic extracted to `src/db/cascade.ts` with `cascadeTeacherRename()` and
 #### CR-T8. ✅ Done — Composite Zustand selectors for large page components
 `EditorPage.tsx` (39), `ExportPage.tsx` (23+), `StartPage.tsx` (21), `ScheduleGrid.tsx` (23) each have that many individual store subscriptions. Group related fields with `useShallow` composite selectors to reduce re-render surface. One commit per file.
 
-#### CR-T9. ⬜ Pending — getCellStatus() decomposed into focused checks
+#### CR-T9. ✅ Done — getCellStatus() decomposed into focused checks
 90-line if-return chain in `validation.ts`. Extract `checkBan()`, `checkBusy()`, `checkOccupied()` etc.
 
-#### CR-T10. ⬜ Pending — partnerStore silent error on corrupt data
+#### CR-T10. ✅ Done — partnerStore silent error on corrupt data
 Parse error in `initFromDb()` is swallowed silently. Set an error flag or show warning.
 
 #### CR-T11. ✅ Done — Extract mergeUnscheduledWithTemporary out of UnscheduledPanel
@@ -52,7 +52,7 @@ Parse error in `initFromDb()` is swallowed silently. Set an error flag or show w
 #### CR-W1. ✅ Done — useCallback for assignment helpers in AssignPage
 `assignedCount()`, `isAssigned()`, `classTotal()`, `teacherTotal()` redefined every render. Wrapped in useCallback with correct deps.
 
-#### CR-W2. ⬜ Pending — useMemo for generateOutput() in ExportPage
+#### CR-W2. ✅ Done — useMemo for generateOutput() in ExportPage
 `generateOutput()` and `validateWorkload()` called unconditionally on every render. Wrap in useMemo.
 
 #### CR-W3. ✅ Done — Pre-compute teacher Map in HomeroomPage
@@ -67,13 +67,13 @@ Parse error in `initFromDb()` is swallowed silently. Set an error flag or show w
 #### CR-W6. ✅ Done — Map.get()! non-null assertions (deptReport.ts)
 Already uses the safe ensure-and-get pattern (`if (!map.has(k)) map.set(k, []); map.get(k)!.push()`) — no changes needed.
 
-#### CR-W7. ⬜ Pending — Store migration functions split into per-version fns
+#### CR-W7. ✅ Done — Store migration functions split into per-version fns
 Migration logic in `store.ts` is one flat function. Split into `migrateV0ToV1()`, `migrateV1ToV2()` etc.
 
-#### CR-W8. ⬜ Pending — Extract shared useHistory() hook
+#### CR-W8. ✅ Done — Extract shared useHistory() hook
 Undo/redo logic duplicated between ImportPage and AssignPage. Extract `useHistory<T>()`.
 
-#### CR-W9. ⬜ Pending — Extract handleSendToPrincipal / handleExportDept duplication
+#### CR-W9. ✅ Done — Extract handleSendToPrincipal / handleExportDept duplication
 Nearly identical in ExportPage. Parameterise into one `exportDeptSnapshot(groupId)`.
 
 #### CR-W10. ✅ Done — Global _idCounter in outputGenerator.ts replaced

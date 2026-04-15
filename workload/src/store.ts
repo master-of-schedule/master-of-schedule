@@ -191,6 +191,67 @@ export const DEFAULT_DEPT_GROUPS: DeptGroup[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Store migration helpers — one function per schema version step
+// ---------------------------------------------------------------------------
+
+type MigrateState = Record<string, unknown> & {
+  teachers?: RNTeacher[];
+  departments?: Department[];
+  deptGroups?: DeptGroup[];
+  curriculumPlan?: CurriculumPlan | null;
+};
+
+/** v0 → v1: convert old "Н.В." initials to "НВ" format (З3-7) */
+function migrateV0ToV1(s: MigrateState): void {
+  s.teachers = (s.teachers ?? []).map((t) => ({
+    ...t,
+    initials: migrateInitials(t.initials),
+  }));
+}
+
+/** v1 → v2: flat Department[] → DeptGroup[] (З7-3) */
+function migrateV1ToV2(s: MigrateState): void {
+  if (s.departments && !s.deptGroups) {
+    s.deptGroups = (s.departments as Department[]).map((d) => ({
+      id: d.id,
+      name: d.name,
+      tables: [{
+        id: `${d.id}-t1`,
+        name: d.name,
+        teacherIds: (d as DeptTable & { teacherIds?: string[] }).teacherIds ?? [],
+        subjectFilter: (d as DeptTable & { subjectFilter?: string[] }).subjectFilter ?? [],
+      }],
+    }));
+  } else if (!s.deptGroups) {
+    s.deptGroups = DEFAULT_DEPT_GROUPS;
+  }
+  delete s.departments;
+}
+
+/** v2 → v3: backfill part='mandatory' for all existing SubjectRow entries (З11-1) */
+function migrateV2ToV3(s: MigrateState): void {
+  if (s.curriculumPlan) {
+    s.curriculumPlan = {
+      ...s.curriculumPlan,
+      grades: s.curriculumPlan.grades.map((g) => ({
+        ...g,
+        subjects: g.subjects.map((subj) => ({
+          ...subj,
+          part: ((subj as unknown as Record<string, unknown>).part as ('mandatory' | 'optional') | undefined) ?? 'mandatory',
+        })),
+      })),
+    };
+  }
+}
+
+/** v3 → v4: add subjectShortNames map (З11-5) */
+function migrateV3ToV4(s: MigrateState): void {
+  if (!s.subjectShortNames) s.subjectShortNames = {};
+}
+
+// ---------------------------------------------------------------------------
+
 const initialState = {
   curriculumPlan: null,
   teachers: [],
@@ -425,56 +486,11 @@ export const useStore = create<RNState>()(
         return rest;
       },
       migrate: (persistedState: unknown, version: number) => {
-        const s = persistedState as Record<string, unknown> & {
-          teachers?: RNTeacher[];
-          departments?: Department[];
-          deptGroups?: DeptGroup[];
-          curriculumPlan?: CurriculumPlan | null;
-        };
-        if (version < 1) {
-          // З3-7: convert old "Н.В." initials to "НВ" format
-          s.teachers = (s.teachers ?? []).map((t) => ({
-            ...t,
-            initials: migrateInitials(t.initials),
-          }));
-        }
-        if (version < 2) {
-          // З7-3: migrate flat Department[] → DeptGroup[] (each dept becomes a group with 1 table)
-          if (s.departments && !s.deptGroups) {
-            s.deptGroups = (s.departments as Department[]).map((d) => ({
-              id: d.id,
-              name: d.name,
-              tables: [{
-                id: `${d.id}-t1`,
-                name: d.name,
-                teacherIds: d.teacherIds ?? [],
-                subjectFilter: d.subjectFilter ?? [],
-              }],
-            }));
-          } else if (!s.deptGroups) {
-            s.deptGroups = DEFAULT_DEPT_GROUPS;
-          }
-          delete s.departments;
-        }
-        if (version < 4) {
-          // З11-5: add subjectShortNames map (empty — populated on first edit)
-          if (!s.subjectShortNames) s.subjectShortNames = {};
-        }
-        if (version < 3) {
-          // З11-1: backfill part='mandatory' for all existing SubjectRow entries
-          if (s.curriculumPlan) {
-            s.curriculumPlan = {
-              ...s.curriculumPlan,
-              grades: s.curriculumPlan.grades.map((g) => ({
-                ...g,
-                subjects: g.subjects.map((subj) => ({
-                  ...subj,
-                  part: ((subj as unknown as Record<string, unknown>).part as ('mandatory' | 'optional') | undefined) ?? 'mandatory',
-                })),
-              })),
-            };
-          }
-        }
+        const s = persistedState as MigrateState;
+        if (version < 1) migrateV0ToV1(s);
+        if (version < 2) migrateV1ToV2(s);
+        if (version < 3) migrateV2ToV3(s);
+        if (version < 4) migrateV3ToV4(s);
         return s as unknown as RNState;
       },
     },
