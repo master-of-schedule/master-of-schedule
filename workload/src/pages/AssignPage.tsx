@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-
-const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { validateWorkload, hoursPerClass } from '../logic/validation';
@@ -9,6 +7,7 @@ import { shortTeacherName } from '../logic/groupNames';
 import { isTeacherBlocked, computeDeptPlanned, visibleClassesForTable } from '../logic/assignHelpers';
 import { detectGroupPairs } from '../logic/outputGenerator';
 import { useToast } from '../hooks/useToast';
+import { useHistory } from '../hooks/useHistory';
 import type { CurriculumPlan, Assignment, GroupPair, DeptTable, RNTeacher, ValidationIssue } from '../types';
 import styles from './AssignPage.module.css';
 
@@ -44,43 +43,28 @@ export function AssignPage({ plan }: Props) {
 
   const { notify } = useToast();
 
-  type HistoryEntry = { assignments: Assignment[]; description?: string };
-
-  // З9-3а: Undo/Redo history (session-only, stored in refs for stable callbacks)
-  const historyRef = useRef<HistoryEntry[]>([]);
-  const futureRef = useRef<HistoryEntry[]>([]);
+  // З9-3а: Undo/Redo history (session-only)
+  type AssignSnapshot = { assignments: Assignment[] };
+  const history = useHistory<AssignSnapshot>();
   const assignmentsRef = useRef(assignments);
   assignmentsRef.current = assignments;
-  const [historyLen, setHistoryLen] = useState(0);
-  const [futureLen, setFutureLen] = useState(0);
 
   function pushHistory(description?: string) {
-    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current], description }];
-    futureRef.current = [];
-    setHistoryLen(historyRef.current.length);
-    setFutureLen(0);
+    history.push({ assignments: [...assignmentsRef.current] }, description);
   }
 
   function handleUndo() {
-    if (historyRef.current.length === 0) return;
-    const prev = historyRef.current[historyRef.current.length - 1];
-    futureRef.current = [{ assignments: [...assignmentsRef.current] }, ...futureRef.current.slice(0, 49)];
-    historyRef.current = historyRef.current.slice(0, -1);
-    setHistoryLen(historyRef.current.length);
-    setFutureLen(futureRef.current.length);
-    bulkSetAssignments(prev.assignments);
-    notify(prev.description ? `Отменено: ${prev.description}` : 'Назначения: изменение отменено', 'info');
+    const entry = history.undo({ assignments: [...assignmentsRef.current] });
+    if (!entry) return;
+    bulkSetAssignments(entry.snapshot.assignments);
+    notify(entry.description ? `Отменено: ${entry.description}` : 'Назначения: изменение отменено', 'info');
   }
 
   function handleRedo() {
-    if (futureRef.current.length === 0) return;
-    historyRef.current = [...historyRef.current.slice(-(MAX_UNDO_HISTORY - 1)), { assignments: [...assignmentsRef.current] }];
-    const next = futureRef.current[0];
-    futureRef.current = futureRef.current.slice(1);
-    setHistoryLen(historyRef.current.length);
-    setFutureLen(futureRef.current.length);
-    bulkSetAssignments(next.assignments);
-    notify(next.description ? `Возвращено: ${next.description}` : 'Назначения: изменение возвращено', 'info');
+    const entry = history.redo({ assignments: [...assignmentsRef.current] });
+    if (!entry) return;
+    bulkSetAssignments(entry.snapshot.assignments);
+    notify(entry.description ? `Возвращено: ${entry.description}` : 'Назначения: изменение возвращено', 'info');
   }
 
   // Stable refs so the keyboard handler never goes stale
@@ -231,13 +215,13 @@ export function AssignPage({ plan }: Props) {
           <button
             className={styles.undoBtn}
             onClick={handleUndo}
-            disabled={historyLen === 0}
+            disabled={!history.canUndo}
             title="Отменить (Ctrl+Z)"
           >↩ Отменить</button>
           <button
             className={styles.undoBtn}
             onClick={handleRedo}
-            disabled={futureLen === 0}
+            disabled={!history.canRedo}
             title="Повторить (Ctrl+Shift+Z)"
           >↪ Повторить</button>
         </div>
