@@ -270,7 +270,7 @@ const visibleGrades = allGrades.filter(grade =>
 
 **Приоритет:** Средний
 
-**Статус:** 🔲 Pending
+**Статус:** ✅ Done
 
 ---
 
