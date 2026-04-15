@@ -610,8 +610,16 @@ function GradeTable({
     computedTotals[cn] = subjects.reduce((sum, s) => sum + (s.hoursPerClass[cn] ?? 0), 0);
   }
 
-  // З11-1: Detect where optional section starts for separator row
-  const firstOptionalIdx = subjects.findIndex((s) => s.part === 'optional');
+  // З21-3: Always show mandatory subjects first, then optional — regardless of array order.
+  // This keeps the display consistent with the source Excel structure after any manual edits
+  // (part changes, manual additions) that may have reordered the underlying array.
+  const mandatorySubjects = subjects.filter((s) => s.part === 'mandatory');
+  const optionalSubjects  = subjects.filter((s) => s.part === 'optional');
+  const sortedSubjects    = [...mandatorySubjects, ...optionalSubjects];
+  // Insert the section separator at the boundary only when both sections are non-empty.
+  const sectionSeparatorIdx = mandatorySubjects.length > 0 && optionalSubjects.length > 0
+    ? mandatorySubjects.length
+    : -1;
 
   const colSpanAll = 4 + classNames.length + (readOnly ? 0 : 2);
 
@@ -666,10 +674,10 @@ function GradeTable({
           </tr>
         </thead>
         <tbody>
-          {subjects.map((s, idx) => (
+          {sortedSubjects.map((s, idx) => (
             <Fragment key={`${s.name}::${s.part}`}>
-              {/* З11-1: Section separator before the first optional subject */}
-              {idx === firstOptionalIdx && firstOptionalIdx > 0 && (
+              {/* З21-3: Section separator between mandatory and optional sections */}
+              {idx === sectionSeparatorIdx && (
                 <tr className={styles.sectionSeparator}>
                   <td colSpan={colSpanAll} className={styles.sectionSeparatorCell}>
                     Школьная / вариативная часть
