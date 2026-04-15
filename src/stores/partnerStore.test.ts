@@ -202,5 +202,28 @@ describe('partnerStore', () => {
       ).resolves.not.toThrow();
       expect(usePartnerStore.getState().partnerData).toBeNull();
     });
+
+    it('sets loadError when saved JSON is corrupt', async () => {
+      vi.mocked(partnerFilesMock.getPartnerFileJson).mockResolvedValue('corrupt{data');
+      await usePartnerStore.getState().initFromDb(['Иванова Т.С.']);
+      expect(usePartnerStore.getState().loadError).not.toBeNull();
+    });
+
+    it('clears the stored file when saved JSON is corrupt', async () => {
+      vi.mocked(partnerFilesMock.getPartnerFileJson).mockResolvedValue('corrupt{data');
+      await usePartnerStore.getState().initFromDb(['Иванова Т.С.']);
+      expect(partnerFilesMock.clearPartnerFileFromDB).toHaveBeenCalled();
+    });
+
+    it('clears loadError on successful loadPartnerFile', async () => {
+      // Seed an error first
+      vi.mocked(partnerFilesMock.getPartnerFileJson).mockResolvedValue('corrupt{data');
+      await usePartnerStore.getState().initFromDb(['Иванова Т.С.']);
+      expect(usePartnerStore.getState().loadError).not.toBeNull();
+      // Now load a valid file
+      const validJson = JSON.stringify(validFile);
+      await usePartnerStore.getState().loadPartnerFile(validJson, ['Иванова Т.С.']);
+      expect(usePartnerStore.getState().loadError).toBeNull();
+    });
   });
 });

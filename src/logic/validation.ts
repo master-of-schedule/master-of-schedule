@@ -201,6 +201,102 @@ export function canAssignLesson(
   return { allowed: true };
 }
 
+// ---------------------------------------------------------------------------
+// getCellStatus helpers — each returns a status or null (= check not triggered)
+// ---------------------------------------------------------------------------
+
+function checkSameLesson(
+  existingLessons: ScheduledLesson[],
+  selectedLesson: LessonRequirement,
+): CellStatusInfo | null {
+  for (const lesson of existingLessons) {
+    if (
+      lesson.subject === selectedLesson.subject &&
+      lesson.teacher === selectedLesson.teacher &&
+      (selectedLesson.type === 'class' || lesson.group === selectedLesson.classOrGroup)
+    ) {
+      return { status: 'same' };
+    }
+  }
+  return null;
+}
+
+function checkTeacherBanned(
+  teachers: Record<string, Teacher>,
+  selectedLesson: LessonRequirement,
+  day: Day,
+  lessonNum: LessonNumber,
+): CellStatusInfo | null {
+  if (isTeacherBanned(teachers, selectedLesson.teacher, day, lessonNum)) {
+    return { status: 'teacher_banned' };
+  }
+  if (selectedLesson.teacher2 && isTeacherBanned(teachers, selectedLesson.teacher2, day, lessonNum)) {
+    return { status: 'teacher_banned' };
+  }
+  return null;
+}
+
+function checkTeacherBusy(
+  schedule: Schedule,
+  selectedLesson: LessonRequirement,
+  className: string,
+  day: Day,
+  lessonNum: LessonNumber,
+  partnerClassNames?: Set<string>,
+): CellStatusInfo | null {
+  const conflict = getTeacherConflict(schedule, selectedLesson.teacher, day, lessonNum, className);
+  if (conflict) {
+    if (partnerClassNames?.has(conflict.className)) {
+      return { status: 'partner_busy', teacherName: selectedLesson.teacher };
+    }
+    return { status: 'teacher_busy', conflictClass: conflict.className, conflictSubject: conflict.subject };
+  }
+  if (selectedLesson.teacher2) {
+    const conflict2 = getTeacherConflict(schedule, selectedLesson.teacher2, day, lessonNum, className);
+    if (conflict2) {
+      if (partnerClassNames?.has(conflict2.className)) {
+        return { status: 'partner_busy', teacherName: selectedLesson.teacher2 };
+      }
+      return { status: 'teacher_busy', conflictClass: conflict2.className, conflictSubject: conflict2.subject };
+    }
+  }
+  return null;
+}
+
+function checkPartnerBusy(
+  partnerBusySet: Set<string> | undefined,
+  selectedLesson: LessonRequirement,
+  day: Day,
+  lessonNum: LessonNumber,
+): CellStatusInfo | null {
+  if (!partnerBusySet) return null;
+  if (partnerBusySet.has(`${selectedLesson.teacher}|${day}|${lessonNum}`)) {
+    return { status: 'partner_busy', teacherName: selectedLesson.teacher };
+  }
+  if (selectedLesson.teacher2 && partnerBusySet.has(`${selectedLesson.teacher2}|${day}|${lessonNum}`)) {
+    return { status: 'partner_busy', teacherName: selectedLesson.teacher2 };
+  }
+  return null;
+}
+
+function checkClassOccupied(
+  existingLessons: ScheduledLesson[],
+  selectedLesson: LessonRequirement,
+  groups?: Group[],
+): CellStatusInfo | null {
+  if (existingLessons.length === 0) return null;
+  if (selectedLesson.type === 'group') {
+    const allCanCoexist = existingLessons.every(
+      existing => canLessonsCoexist(existing, {
+        group: selectedLesson.classOrGroup,
+        parallelGroup: selectedLesson.parallelGroup,
+      }, groups)
+    );
+    return allCanCoexist ? null : { status: 'class_occupied' };
+  }
+  return { status: 'class_occupied' };
+}
+
 /**
  * Get the cell status for display (color coding)
  * Used when a lesson is selected from the unscheduled list
@@ -208,8 +304,8 @@ export function canAssignLesson(
  * Priority order:
  * 1. same → blue
  * 2. teacher_banned → pink
- * 3. teacher_busy → orange
- * 4. partner_busy → gray (NEW)
+ * 3. teacher_busy → orange (or partner_busy if conflict is in partner class)
+ * 4. partner_busy → gray
  * 5. class_occupied → cream
  * 6. available → white
  */
@@ -226,101 +322,14 @@ export function getCellStatus(
 ): CellStatusInfo {
   const existingLessons = getSlotLessons(schedule, className, day, lessonNum);
 
-  // Check if same lesson is already in this slot (Blue)
-  for (const lesson of existingLessons) {
-    if (
-      lesson.subject === selectedLesson.subject &&
-      lesson.teacher === selectedLesson.teacher &&
-      (selectedLesson.type === 'class' || lesson.group === selectedLesson.classOrGroup)
-    ) {
-      return { status: 'same' };
-    }
-  }
-
-  // Check teacher ban (Pink)
-  if (isTeacherBanned(teachers, selectedLesson.teacher, day, lessonNum)) {
-    return { status: 'teacher_banned' };
-  }
-
-  // Check teacher2 ban (Pink)
-  if (selectedLesson.teacher2 && isTeacherBanned(teachers, selectedLesson.teacher2, day, lessonNum)) {
-    return { status: 'teacher_banned' };
-  }
-
-  // Check teacher busy in another class (Orange, or partner_busy if in partner class)
-  const conflict = getTeacherConflict(
-    schedule,
-    selectedLesson.teacher,
-    day,
-    lessonNum,
-    className
+  return (
+    checkSameLesson(existingLessons, selectedLesson) ??
+    checkTeacherBanned(teachers, selectedLesson, day, lessonNum) ??
+    checkTeacherBusy(schedule, selectedLesson, className, day, lessonNum, partnerClassNames) ??
+    checkPartnerBusy(partnerBusySet, selectedLesson, day, lessonNum) ??
+    checkClassOccupied(existingLessons, selectedLesson, groups) ??
+    { status: 'available' }
   );
-  if (conflict) {
-    if (partnerClassNames?.has(conflict.className)) {
-      return { status: 'partner_busy', teacherName: selectedLesson.teacher };
-    }
-    return {
-      status: 'teacher_busy',
-      conflictClass: conflict.className,
-      conflictSubject: conflict.subject,
-    };
-  }
-
-  // Check teacher2 busy in another class (Orange, or partner_busy if in partner class)
-  if (selectedLesson.teacher2) {
-    const conflict2 = getTeacherConflict(
-      schedule,
-      selectedLesson.teacher2,
-      day,
-      lessonNum,
-      className
-    );
-    if (conflict2) {
-      if (partnerClassNames?.has(conflict2.className)) {
-        return { status: 'partner_busy', teacherName: selectedLesson.teacher2 };
-      }
-      return {
-        status: 'teacher_busy',
-        conflictClass: conflict2.className,
-        conflictSubject: conflict2.subject,
-      };
-    }
-  }
-
-  // Check partner busy (Gray) — after teacher_busy, before class_occupied
-  if (partnerBusySet) {
-    const key1 = `${selectedLesson.teacher}|${day}|${lessonNum}`;
-    if (partnerBusySet.has(key1)) {
-      return { status: 'partner_busy', teacherName: selectedLesson.teacher };
-    }
-    if (selectedLesson.teacher2) {
-      const key2 = `${selectedLesson.teacher2}|${day}|${lessonNum}`;
-      if (partnerBusySet.has(key2)) {
-        return { status: 'partner_busy', teacherName: selectedLesson.teacher2 };
-      }
-    }
-  }
-
-  // Check class occupied (Cream)
-  if (existingLessons.length > 0) {
-    // Allow if parallel groups can coexist
-    if (selectedLesson.type === 'group') {
-      const allCanCoexist = existingLessons.every(
-        existing => canLessonsCoexist(existing, {
-          group: selectedLesson.classOrGroup,
-          parallelGroup: selectedLesson.parallelGroup,
-        }, groups)
-      );
-      if (!allCanCoexist) {
-        return { status: 'class_occupied' };
-      }
-    } else {
-      return { status: 'class_occupied' };
-    }
-  }
-
-  // Available (White)
-  return { status: 'available' };
 }
 
 /**
