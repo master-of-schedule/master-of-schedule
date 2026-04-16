@@ -1,6 +1,17 @@
 import type { CurriculumPlan, SubjectRow } from '../types';
 
 /**
+ * З21-3/З21-6: Returns subjects sorted so mandatory entries always precede optional ones.
+ * The relative order within each group is preserved (stable sort).
+ */
+export function sortSubjectsMandatoryFirst(subjects: SubjectRow[]): SubjectRow[] {
+  return [
+    ...subjects.filter((s) => s.part === 'mandatory'),
+    ...subjects.filter((s) => s.part === 'optional'),
+  ];
+}
+
+/**
  * Returns the expected number of teacher-assignment slots for a given class+subject
  * according to the curriculum plan.
  *
