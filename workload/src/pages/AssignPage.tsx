@@ -5,6 +5,7 @@ import { validateWorkload, hoursPerClass } from '../logic/validation';
 import { sanpinMaxForClass, TEACHER_MAX_HOURS } from '../logic/sanpin';
 import { shortTeacherName } from '../logic/groupNames';
 import { isTeacherBlocked, computeDeptPlanned, visibleClassesForTable } from '../logic/assignHelpers';
+import { sortSubjectsMandatoryFirst } from '../logic/planUtils';
 import { detectGroupPairs } from '../logic/outputGenerator';
 import { useToast } from '../hooks/useToast';
 import { useHistory } from '../hooks/useHistory';
@@ -338,9 +339,11 @@ function DeptTableSection({
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
   const allSubjects = plan.grades.flatMap((g) => g.subjects);
-  const tableSubjects = table.subjectFilter.length > 0
+  const tableSubjectsRaw = table.subjectFilter.length > 0
     ? allSubjects.filter((s) => table.subjectFilter.includes(s.name))
     : allSubjects;
+  // З21-6: mandatory subjects always precede optional ones
+  const tableSubjects = sortSubjectsMandatoryFirst(tableSubjectsRaw);
   const uniqueSubjectNames = [...new Set(tableSubjects.map((s) => s.name))];
   const visibleClassNames = visibleClassesForTable(
     plan.classNames,
