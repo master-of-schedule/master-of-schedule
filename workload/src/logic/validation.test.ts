@@ -270,6 +270,19 @@ describe('validateWorkload', () => {
     expect(sanpinErrors).toHaveLength(0);
   });
 
+  it('З21-4: no warning when class hours are close to but not over СанПиН limit', () => {
+    // 5а СанПиН max = 29. Assign 28h — within 2h of limit, must NOT produce a warning.
+    const assignments: Assignment[] = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        makeAssignment({ subject: `Предмет${i}`, hoursPerWeek: 5 }),
+      ),
+      makeAssignment({ subject: 'Физкультура', hoursPerWeek: 3 }),
+    ]; // total = 28
+    const issues = validateWorkload(PLAN, [TEACHER], assignments, []);
+    expect(issues.filter((i) => i.message.includes('близко к лимиту'))).toHaveLength(0);
+    expect(issues.filter((i) => i.severity === 'error' && i.message.includes('СанПиН'))).toHaveLength(0);
+  });
+
   it('homeroom assignment does not contribute to SanPiN class total', () => {
     // 5а UP is exactly at the SanPiN limit (5+3+... = 29). Adding a homeroom assignment
     // must NOT push the class over the limit.
