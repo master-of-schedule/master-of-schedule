@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { parseUP } from '../logic/parseUP';
 import { createUPSnapshot } from '../logic/upSnapshot';
-import { applyGroupSplitToggle } from '../logic/planUtils';
+import { applyGroupSplitToggle, sortSubjectsMandatoryFirst } from '../logic/planUtils';
 import { downloadUPTemplate } from '../logic/upTemplate';
 import { downloadPlanXlsx } from '../logic/planExport';
 import { compareClassNames } from '../logic/classSort';
@@ -604,14 +604,11 @@ function GradeTable({
   }
 
   // З21-3: Always show mandatory subjects first, then optional — regardless of array order.
-  // This keeps the display consistent with the source Excel structure after any manual edits
-  // (part changes, manual additions) that may have reordered the underlying array.
-  const mandatorySubjects = subjects.filter((s) => s.part === 'mandatory');
-  const optionalSubjects  = subjects.filter((s) => s.part === 'optional');
-  const sortedSubjects    = [...mandatorySubjects, ...optionalSubjects];
+  const sortedSubjects = sortSubjectsMandatoryFirst(subjects);
   // Insert the section separator at the boundary only when both sections are non-empty.
-  const sectionSeparatorIdx = mandatorySubjects.length > 0 && optionalSubjects.length > 0
-    ? mandatorySubjects.length
+  const mandatoryCount = sortedSubjects.filter((s) => s.part === 'mandatory').length;
+  const sectionSeparatorIdx = mandatoryCount > 0 && mandatoryCount < sortedSubjects.length
+    ? mandatoryCount
     : -1;
 
   const colSpanAll = 4 + classNames.length + (readOnly ? 0 : 2);

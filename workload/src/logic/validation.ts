@@ -127,12 +127,6 @@ export function validateWorkload(
         detail: `Предметы: ${classSubjectBreakdown(cn, assignments)}`,
         target: cn,
       });
-    } else if (max !== null && hours > max - 2) {
-      issues.push({
-        severity: 'warning',
-        message: `Класс ${cn}: ${hours} ч/нед — близко к лимиту СанПиН (${max})`,
-        target: cn,
-      });
     }
   }
 
