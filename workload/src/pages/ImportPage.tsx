@@ -1,6 +1,4 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-
-const MAX_UNDO_HISTORY = 50;
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { parseUP } from '../logic/parseUP';
@@ -10,6 +8,7 @@ import { downloadUPTemplate } from '../logic/upTemplate';
 import { downloadPlanXlsx } from '../logic/planExport';
 import { compareClassNames } from '../logic/classSort';
 import { useToast } from '../hooks/useToast';
+import { useHistory } from '../hooks/useHistory';
 import type { CurriculumPlan, SubjectRow } from '../types';
 import styles from './ImportPage.module.css';
 
@@ -29,12 +28,11 @@ function applyStoredShortNames(plan: CurriculumPlan, shortNames: Record<string, 
   };
 }
 
-/** З12-2: Undo entry — always stores the plan; optionally stores assignments+homeroom (class deletion). */
-type UndoEntry = {
+/** З12-2: Undo snapshot — always stores the plan; optionally stores assignments+homeroom (class deletion). */
+type PlanSnapshot = {
   plan: CurriculumPlan;
   assignments?: import('../types').Assignment[];
   homeroom?: import('../types').HomeroomAssignment[];
-  description?: string;
 };
 
 export function ImportPage() {
@@ -62,54 +60,49 @@ export function ImportPage() {
 
   // З11-3: local undo/redo stack for UP edits (plan snapshots before mutations)
   // З12-2: extended to also snapshot assignments+homeroom for class deletion undo
-  const undoStack = useRef<UndoEntry[]>([]);
-  const redoStack = useRef<UndoEntry[]>([]);
+  const planHistory = useHistory<PlanSnapshot>();
 
   function pushUndo(includeAssignments = false, description?: string) {
     const current = draft ?? curriculumPlan;
     if (!current) return;
-    const entry: UndoEntry = { plan: current, description };
+    const snapshot: PlanSnapshot = { plan: current };
     if (includeAssignments) {
-      entry.assignments = [...assignments];
-      entry.homeroom = [...homeroomAssignments];
+      snapshot.assignments = [...assignments];
+      snapshot.homeroom = [...homeroomAssignments];
     }
-    undoStack.current = [...undoStack.current.slice(-(MAX_UNDO_HISTORY - 1)), entry];
-    redoStack.current = [];
+    planHistory.push(snapshot, description);
   }
 
   const handleUndoRedo = useCallback((e: KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.key !== 'z') return;
     e.preventDefault();
+    const current = draft ?? curriculumPlan;
+    const currentSnapshot: PlanSnapshot = current
+      ? { plan: current, assignments: [...assignments], homeroom: [...homeroomAssignments] }
+      : { plan: null as unknown as CurriculumPlan };
+
     if (e.shiftKey) {
       // Redo
-      if (redoStack.current.length === 0) return;
-      const next = redoStack.current[0];
-      redoStack.current = redoStack.current.slice(1);
-      const current = draft ?? curriculumPlan;
-      if (current) {
-        const entry: UndoEntry = { plan: current };
-        if (next.assignments) { entry.assignments = [...assignments]; entry.homeroom = [...homeroomAssignments]; }
-        undoStack.current = [...undoStack.current, entry];
+      const entry = planHistory.redo(currentSnapshot);
+      if (!entry) return;
+      if (draft !== null) setDraft(entry.snapshot.plan); else setCurriculumPlan(entry.snapshot.plan);
+      if (entry.snapshot.assignments) {
+        bulkSetAssignments(entry.snapshot.assignments);
+        bulkSetHomeroomAssignments(entry.snapshot.homeroom ?? []);
       }
-      if (draft !== null) setDraft(next.plan); else setCurriculumPlan(next.plan);
-      if (next.assignments) { bulkSetAssignments(next.assignments); bulkSetHomeroomAssignments(next.homeroom ?? []); }
-      notify(next.description ? `Возвращено: ${next.description}` : 'Изменение возвращено', 'info');
+      notify(entry.description ? `Возвращено: ${entry.description}` : 'Изменение возвращено', 'info');
     } else {
       // Undo
-      if (undoStack.current.length === 0) return;
-      const prev = undoStack.current[undoStack.current.length - 1];
-      undoStack.current = undoStack.current.slice(0, -1);
-      const current = draft ?? curriculumPlan;
-      if (current) {
-        const entry: UndoEntry = { plan: current };
-        if (prev.assignments) { entry.assignments = [...assignments]; entry.homeroom = [...homeroomAssignments]; }
-        redoStack.current = [entry, ...redoStack.current.slice(0, 49)];
+      const entry = planHistory.undo(currentSnapshot);
+      if (!entry) return;
+      if (draft !== null) setDraft(entry.snapshot.plan); else setCurriculumPlan(entry.snapshot.plan);
+      if (entry.snapshot.assignments) {
+        bulkSetAssignments(entry.snapshot.assignments);
+        bulkSetHomeroomAssignments(entry.snapshot.homeroom ?? []);
       }
-      if (draft !== null) setDraft(prev.plan); else setCurriculumPlan(prev.plan);
-      if (prev.assignments) { bulkSetAssignments(prev.assignments); bulkSetHomeroomAssignments(prev.homeroom ?? []); }
-      notify(prev.description ? `Отменено: ${prev.description}` : 'Изменение отменено', 'info');
+      notify(entry.description ? `Отменено: ${entry.description}` : 'Изменение отменено', 'info');
     }
-  }, [draft, curriculumPlan, assignments, homeroomAssignments, setCurriculumPlan, bulkSetAssignments, bulkSetHomeroomAssignments, notify]);
+  }, [draft, curriculumPlan, assignments, homeroomAssignments, setCurriculumPlan, bulkSetAssignments, bulkSetHomeroomAssignments, notify, planHistory]);
 
   // Only register Ctrl+Z when this tab is active — ImportPage is always mounted
   // so the undo stack (refs) survive tab switches, but the listener must not
@@ -610,8 +603,16 @@ function GradeTable({
     computedTotals[cn] = subjects.reduce((sum, s) => sum + (s.hoursPerClass[cn] ?? 0), 0);
   }
 
-  // З11-1: Detect where optional section starts for separator row
-  const firstOptionalIdx = subjects.findIndex((s) => s.part === 'optional');
+  // З21-3: Always show mandatory subjects first, then optional — regardless of array order.
+  // This keeps the display consistent with the source Excel structure after any manual edits
+  // (part changes, manual additions) that may have reordered the underlying array.
+  const mandatorySubjects = subjects.filter((s) => s.part === 'mandatory');
+  const optionalSubjects  = subjects.filter((s) => s.part === 'optional');
+  const sortedSubjects    = [...mandatorySubjects, ...optionalSubjects];
+  // Insert the section separator at the boundary only when both sections are non-empty.
+  const sectionSeparatorIdx = mandatorySubjects.length > 0 && optionalSubjects.length > 0
+    ? mandatorySubjects.length
+    : -1;
 
   const colSpanAll = 4 + classNames.length + (readOnly ? 0 : 2);
 
@@ -666,10 +667,10 @@ function GradeTable({
           </tr>
         </thead>
         <tbody>
-          {subjects.map((s, idx) => (
+          {sortedSubjects.map((s, idx) => (
             <Fragment key={`${s.name}::${s.part}`}>
-              {/* З11-1: Section separator before the first optional subject */}
-              {idx === firstOptionalIdx && firstOptionalIdx > 0 && (
+              {/* З21-3: Section separator between mandatory and optional sections */}
+              {idx === sectionSeparatorIdx && (
                 <tr className={styles.sectionSeparator}>
                   <td colSpan={colSpanAll} className={styles.sectionSeparatorCell}>
                     Школьная / вариативная часть
