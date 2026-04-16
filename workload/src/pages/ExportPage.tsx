@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useDownloadFolder, isFileSystemAccessSupported } from '../hooks/useDownloadFolder';
 import { useStore } from '../store';
@@ -35,6 +35,10 @@ export function ExportPage() {
   const exportFolder = useDownloadFolder('export');
   const deptFileFolder = useDownloadFolder('dept-file');
 
+  // З22-1: warnings banner expand/collapse
+  const AUTO_EXPAND_THRESHOLD = 5;
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
+
   // З15-1: official workload report variant
   const [variantDate, setVariantDate] = useState<string>(() => {
     return new Date().toISOString().slice(0, 10);
@@ -50,21 +54,33 @@ export function ExportPage() {
   // MU-2: dept import
   const deptInputRef = useRef<HTMLInputElement>(null);
 
-  const requirements = generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides, curriculumPlan ?? undefined);
-  const classReqs = requirements.filter((r) => r.type === 'class').sort((a, b) => {
-    const c = compareClassNames(a.classOrGroup, b.classOrGroup);
-    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
-  });
-  const groupReqs = requirements.filter((r) => r.type === 'group').sort((a, b) => {
-    const c = compareClassNames(a.className ?? '', b.className ?? '');
-    return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
-  });
+  const requirements = useMemo(
+    () => generateOutput(assignments, teachers, homeroomAssignments, curriculumPlan?.groupNameOverrides, curriculumPlan ?? undefined),
+    [assignments, teachers, homeroomAssignments, curriculumPlan],
+  );
+  const classReqs = useMemo(
+    () => requirements.filter((r) => r.type === 'class').sort((a, b) => {
+      const c = compareClassNames(a.classOrGroup, b.classOrGroup);
+      return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+    }),
+    [requirements],
+  );
+  const groupReqs = useMemo(
+    () => requirements.filter((r) => r.type === 'group').sort((a, b) => {
+      const c = compareClassNames(a.className ?? '', b.className ?? '');
+      return c !== 0 ? c : a.subject.localeCompare(b.subject, 'ru');
+    }),
+    [requirements],
+  );
 
-  const issues = curriculumPlan
-    ? validateWorkload(curriculumPlan, teachers, assignments, homeroomAssignments)
-    : [];
-  const errors = issues.filter((i) => i.severity === 'error');
-  const warnings = issues.filter((i) => i.severity === 'warning');
+  const issues = useMemo(
+    () => curriculumPlan
+      ? validateWorkload(curriculumPlan, teachers, assignments, homeroomAssignments)
+      : [],
+    [curriculumPlan, teachers, assignments, homeroomAssignments],
+  );
+  const errors = useMemo(() => issues.filter((i) => i.severity === 'error'), [issues]);
+  const warnings = useMemo(() => issues.filter((i) => i.severity === 'warning'), [issues]);
 
   async function handleUpImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -117,30 +133,28 @@ export function ExportPage() {
     return false;
   }
 
-  async function handleSendToPrincipal() {
-    if (!curriculumPlan || !isSingleGroup) return;
-    const group = deptGroups[0];
+  async function exportDeptSnapshot(groupId: string) {
+    if (!curriculumPlan) return;
+    const group = deptGroups.find((g) => g.id === groupId);
+    const groupName = group?.name ?? groupId;
     try {
-      const snap = createDeptSnapshot(group.id, { curriculumPlan, teachers, deptGroups, assignments });
+      const snap = createDeptSnapshot(groupId, { curriculumPlan, teachers, deptGroups, assignments });
       const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
-      await saveBlobToFolderOrDownload(blob, `нагрузка_${group.name}_для_завуча.json`, deptFileFolder);
-      notify('Файл скачан — отправьте его завучу', 'success');
+      await saveBlobToFolderOrDownload(blob, `нагрузка_${groupName}.json`, deptFileFolder);
+      notify(`Файл кафедры «${groupName}» скачан`, 'success');
     } catch (err) {
       notify(err instanceof Error ? err.message : String(err), 'error');
     }
   }
 
-  async function handleExportDept() {
-    if (!curriculumPlan || !selectedGroupId) return;
-    try {
-      const snap = createDeptSnapshot(selectedGroupId, { curriculumPlan, teachers, deptGroups, assignments });
-      const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
-      const group = deptGroups.find((g) => g.id === selectedGroupId);
-      await saveBlobToFolderOrDownload(blob, `нагрузка_${group?.name ?? selectedGroupId}.json`, deptFileFolder);
-      notify(`Файл кафедры «${group?.name ?? selectedGroupId}» скачан`, 'success');
-    } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), 'error');
-    }
+  function handleSendToPrincipal() {
+    if (!isSingleGroup) return;
+    return exportDeptSnapshot(deptGroups[0].id);
+  }
+
+  function handleExportDept() {
+    if (!selectedGroupId) return;
+    return exportDeptSnapshot(selectedGroupId);
   }
 
   async function handleImportDept(e: React.ChangeEvent<HTMLInputElement>) {
@@ -296,14 +310,43 @@ export function ExportPage() {
         <div className={styles.errorBanner}>
           <strong>Есть ошибки ({errors.length}):</strong>
           <ul>
-            {errors.map((e, i) => <li key={i}>{e.message}</li>)}
+            {errors.map((e, i) => (
+              <li key={i}>
+                {e.message}
+                {e.detail && <div className={styles.issueDetail}>{e.detail}</div>}
+              </li>
+            ))}
           </ul>
         </div>
       )}
 
-      {warnings.length > 0 && errors.length === 0 && (
-        <div className={styles.warnBanner}>
-          <strong>Предупреждения ({warnings.length})</strong> — экспорт возможен, но проверьте нагрузку.
+      {warnings.length > 0 && errors.length === 0 && (() => {
+        const expanded = warningsExpanded || warnings.length <= AUTO_EXPAND_THRESHOLD;
+        return (
+          <div className={styles.warnBanner}>
+            <button
+              className={styles.warnBannerToggle}
+              onClick={() => setWarningsExpanded((v) => !v)}
+              aria-expanded={expanded}
+            >
+              <strong>Предупреждения ({warnings.length})</strong>
+              {' '}— экспорт возможен, но проверьте нагрузку.
+              {warnings.length > AUTO_EXPAND_THRESHOLD && (
+                <span className={styles.warnToggleArrow}>{expanded ? '▲' : '▼'}</span>
+              )}
+            </button>
+            {expanded && (
+              <ul className={styles.warnList}>
+                {warnings.map((w, i) => <li key={i}>{w.message}</li>)}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
+
+      {issues.length === 0 && curriculumPlan !== null && assignments.length > 0 && (
+        <div className={styles.successBanner}>
+          ✓ Всё в порядке — нагрузка полностью соответствует учебному плану.
         </div>
       )}
 
