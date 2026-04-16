@@ -9,7 +9,7 @@
   ![Версия РН](https://img.shields.io/badge/РН-1.19.0-teal)
   ![Лицензия](https://img.shields.io/badge/лицензия-MIT-blue)
   ![Платформа](https://img.shields.io/badge/платформа-web%20%7C%20macOS%20%7C%20Windows-lightgrey)
-  ![Сборка](https://img.shields.io/github/actions/workflow/status/Vanderhoof/timetable/release.yml?label=сборка)
+  ![Сборка](https://img.shields.io/github/actions/workflow/status/master-of-schedule/master-of-schedule/release.yml?label=сборка)
   ![Скачиваний](https://img.shields.io/github/downloads/master-of-schedule/master-of-schedule/total?label=скачиваний&color=teal)
   
 **[master-of-schedule.github.io](https://master-of-schedule.github.io)**
