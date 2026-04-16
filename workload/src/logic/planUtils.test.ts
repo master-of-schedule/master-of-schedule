@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyGroupSplitToggle, getExpectedGroupSlots, removeClassFromPlan } from './planUtils';
+import { applyGroupSplitToggle, getExpectedGroupSlots, removeClassFromPlan, sortSubjectsMandatoryFirst } from './planUtils';
 import type { CurriculumPlan } from '../types';
 
 function makePlan(): CurriculumPlan {
@@ -163,5 +163,54 @@ describe('getExpectedGroupSlots', () => {
   it('returns 1 for class not in plan', () => {
     const plan = makeSplitPlan();
     expect(getExpectedGroupSlots(plan, '9-б', 'Математика')).toBe(1);
+  });
+});
+
+describe('sortSubjectsMandatoryFirst (З21-3/З21-6)', () => {
+  function makeSubject(name: string, part: 'mandatory' | 'optional') {
+    return { name, shortName: name, part, groupSplit: false, hoursPerClass: {} };
+  }
+
+  it('mandatory subjects appear before optional', () => {
+    const subjects = [
+      makeSubject('Элективный курс', 'optional'),
+      makeSubject('Математика', 'mandatory'),
+      makeSubject('Физкультура', 'mandatory'),
+    ];
+    const result = sortSubjectsMandatoryFirst(subjects);
+    expect(result[0].name).toBe('Математика');
+    expect(result[1].name).toBe('Физкультура');
+    expect(result[2].name).toBe('Элективный курс');
+  });
+
+  it('preserves relative order within each group', () => {
+    const subjects = [
+      makeSubject('Б', 'mandatory'),
+      makeSubject('А', 'mandatory'),
+      makeSubject('Д', 'optional'),
+      makeSubject('В', 'optional'),
+    ];
+    const result = sortSubjectsMandatoryFirst(subjects);
+    expect(result.map((s) => s.name)).toEqual(['Б', 'А', 'Д', 'В']);
+  });
+
+  it('returns all subjects when all are mandatory', () => {
+    const subjects = [makeSubject('А', 'mandatory'), makeSubject('Б', 'mandatory')];
+    const result = sortSubjectsMandatoryFirst(subjects);
+    expect(result).toHaveLength(2);
+    expect(result.every((s) => s.part === 'mandatory')).toBe(true);
+  });
+
+  it('returns all subjects when all are optional', () => {
+    const subjects = [makeSubject('А', 'optional'), makeSubject('Б', 'optional')];
+    const result = sortSubjectsMandatoryFirst(subjects);
+    expect(result).toHaveLength(2);
+    expect(result.every((s) => s.part === 'optional')).toBe(true);
+  });
+
+  it('does not mutate the original array', () => {
+    const subjects = [makeSubject('optional1', 'optional'), makeSubject('mandatory1', 'mandatory')];
+    sortSubjectsMandatoryFirst(subjects);
+    expect(subjects[0].part).toBe('optional');
   });
 });
