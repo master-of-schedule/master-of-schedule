@@ -35,6 +35,10 @@ export function ExportPage() {
   const exportFolder = useDownloadFolder('export');
   const deptFileFolder = useDownloadFolder('dept-file');
 
+  // З22-1: warnings banner expand/collapse
+  const AUTO_EXPAND_THRESHOLD = 5;
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
+
   // З15-1: official workload report variant
   const [variantDate, setVariantDate] = useState<string>(() => {
     return new Date().toISOString().slice(0, 10);
@@ -306,14 +310,43 @@ export function ExportPage() {
         <div className={styles.errorBanner}>
           <strong>Есть ошибки ({errors.length}):</strong>
           <ul>
-            {errors.map((e, i) => <li key={i}>{e.message}</li>)}
+            {errors.map((e, i) => (
+              <li key={i}>
+                {e.message}
+                {e.detail && <div className={styles.issueDetail}>{e.detail}</div>}
+              </li>
+            ))}
           </ul>
         </div>
       )}
 
-      {warnings.length > 0 && errors.length === 0 && (
-        <div className={styles.warnBanner}>
-          <strong>Предупреждения ({warnings.length})</strong> — экспорт возможен, но проверьте нагрузку.
+      {warnings.length > 0 && errors.length === 0 && (() => {
+        const expanded = warningsExpanded || warnings.length <= AUTO_EXPAND_THRESHOLD;
+        return (
+          <div className={styles.warnBanner}>
+            <button
+              className={styles.warnBannerToggle}
+              onClick={() => setWarningsExpanded((v) => !v)}
+              aria-expanded={expanded}
+            >
+              <strong>Предупреждения ({warnings.length})</strong>
+              {' '}— экспорт возможен, но проверьте нагрузку.
+              {warnings.length > AUTO_EXPAND_THRESHOLD && (
+                <span className={styles.warnToggleArrow}>{expanded ? '▲' : '▼'}</span>
+              )}
+            </button>
+            {expanded && (
+              <ul className={styles.warnList}>
+                {warnings.map((w, i) => <li key={i}>{w.message}</li>)}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
+
+      {issues.length === 0 && curriculumPlan !== null && assignments.length > 0 && (
+        <div className={styles.successBanner}>
+          ✓ Всё в порядке — нагрузка полностью соответствует учебному плану.
         </div>
       )}
 
