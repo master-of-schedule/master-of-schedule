@@ -357,21 +357,13 @@ export function ExportPage() {
 
       {vacancySummary.length > 0 && (
         <div className={styles.vacancyBanner}>
-          <div className={styles.vacancyBannerTitle}>
-            Вакансии: нужны учителя
-          </div>
+          <div className={styles.vacancyBannerTitle}>Вакансии: нужны учителя</div>
           {vacancySummary.map((group) => (
             <div key={group.groupName} className={styles.vacancyGroup}>
-              <div className={styles.vacancyGroupName}>{group.groupName}</div>
-              {group.tables.map((table) => (
-                <div key={table.tableName}>
-                  <div className={styles.vacancyTableName}>{table.tableName}</div>
-                  {table.items.map((item) => (
-                    <div key={`${item.teacherName}::${item.subject}`} className={styles.vacancyItem}>
-                      {item.subject}: {item.classNames.join(', ')}
-                      {item.teacherName !== 'Вакансия' && <> ({item.teacherName})</>}
-                    </div>
-                  ))}
+              <div className={styles.vacancyGroupName}>{group.groupName}:</div>
+              {group.teachers.map((t) => (
+                <div key={t.teacherName} className={styles.vacancyItem}>
+                  {t.teacherName} — {t.totalHours} ч/нед
                 </div>
               ))}
             </div>
