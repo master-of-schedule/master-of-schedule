@@ -358,10 +358,10 @@ export function ExportPage() {
       {vacancySummary.length > 0 && (
         <div className={styles.vacancyBanner}>
           <div className={styles.vacancyBannerTitle}>Вакансии: нужны учителя</div>
-          {vacancySummary.map((group) => (
-            <div key={group.groupName} className={styles.vacancyGroup}>
-              <div className={styles.vacancyGroupName}>{group.groupName}:</div>
-              {group.teachers.map((t) => (
+          {vacancySummary.map((table) => (
+            <div key={table.tableName} className={styles.vacancyGroup}>
+              <div className={styles.vacancyGroupName}>{table.tableName}:</div>
+              {table.teachers.map((t) => (
                 <div key={t.teacherName} className={styles.vacancyItem}>
                   {t.teacherName} — {t.totalHours} ч/нед
                 </div>
