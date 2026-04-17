@@ -152,16 +152,15 @@ function subjectOrderIndex(subject: string): number {
 
 /**
  * Auto-computes school year from a date string (YYYY-MM-DD).
- * Aug–Dec YYYY → "YYYY/(YYYY+1)", Jan–Jul YYYY → "(YYYY-1)/YYYY".
+ * Workload is always prepared for the NEXT school year:
+ * calendar year YYYY → "YYYY-(YYYY+1)".
  */
 export function schoolYearFromDate(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '';
   const year = d.getFullYear();
-  const month = d.getMonth() + 1; // 1-based
-  const y1 = month >= 8 ? year : year - 1;
-  return `${y1}-${y1 + 1}`;
+  return `${year}-${year + 1}`;
 }
 
 // ─── Dept ordering ────────────────────────────────────────────────────────────
