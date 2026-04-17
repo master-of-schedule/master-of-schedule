@@ -63,20 +63,19 @@ const TEACHERS = [
 // ─── schoolYearFromDate ────────────────────────────────────────────────────────
 
 describe('schoolYearFromDate', () => {
-  it('August date → current/next year', () => {
-    expect(schoolYearFromDate('2025-08-18')).toBe('2025-2026');
+  it('calendar year becomes the start of the school year', () => {
+    // Workload is always planned for the NEXT year: 2026 → 2026-2027
+    expect(schoolYearFromDate('2026-04-17')).toBe('2026-2027');
   });
 
-  it('September date → current/next year', () => {
+  it('any month in 2026 → 2026-2027', () => {
+    expect(schoolYearFromDate('2026-01-01')).toBe('2026-2027');
+    expect(schoolYearFromDate('2026-08-18')).toBe('2026-2027');
+    expect(schoolYearFromDate('2026-12-31')).toBe('2026-2027');
+  });
+
+  it('2025 → 2025-2026', () => {
     expect(schoolYearFromDate('2025-09-01')).toBe('2025-2026');
-  });
-
-  it('March date → prev/current year', () => {
-    expect(schoolYearFromDate('2026-03-22')).toBe('2025-2026');
-  });
-
-  it('July date → prev/current year', () => {
-    expect(schoolYearFromDate('2026-07-15')).toBe('2025-2026');
   });
 
   it('returns empty string for empty input', () => {
