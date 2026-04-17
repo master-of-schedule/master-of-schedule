@@ -1,28 +1,24 @@
 /**
- * З21-5: Vacancy teacher location summary.
+ * З21-5: Vacancy teacher summary.
  *
  * Collects all assignments belonging to teachers whose name contains "вакансия"
- * (case-insensitive) and returns them grouped by DeptGroup → DeptTable.
+ * (case-insensitive) and returns them grouped by DeptGroup with total hours per
+ * vacancy teacher. Gives the principal a compact view of how many hours need
+ * filling per department.
  */
 
 import type { RNTeacher, Assignment, DeptGroup } from '../types';
+import { computeTeacherTotalHours } from './teacherHours';
 
-export interface VacancyItem {
-  subject: string;
-  /** Sorted class names covered by this vacancy teacher for this subject. */
-  classNames: string[];
-  /** Teacher name, e.g. "Вакансия (математики)" */
+export interface VacancyTeacherEntry {
   teacherName: string;
-}
-
-export interface VacancyTableEntry {
-  tableName: string;
-  items: VacancyItem[];
+  /** Total weekly hours for this vacancy position (bothGroups counted double). */
+  totalHours: number;
 }
 
 export interface VacancyGroupEntry {
   groupName: string;
-  tables: VacancyTableEntry[];
+  teachers: VacancyTeacherEntry[];
 }
 
 /** Returns true when the teacher name indicates a vacancy position. */
@@ -31,8 +27,9 @@ export function isVacancyTeacher(name: string): boolean {
 }
 
 /**
- * Builds a summary of where vacancy teachers are assigned, grouped by
- * DeptGroup → DeptTable. Groups and tables with no vacancy assignments are omitted.
+ * Builds a compact summary grouped by DeptGroup.
+ * Each entry lists the vacancy teachers in that group and their total weekly hours.
+ * Groups with no vacancy assignments are omitted.
  */
 export function buildVacancySummary(
   teachers: RNTeacher[],
@@ -52,46 +49,29 @@ export function buildVacancySummary(
   const result: VacancyGroupEntry[] = [];
 
   for (const group of deptGroups) {
-    const tableEntries: VacancyTableEntry[] = [];
-
+    // Collect all vacancy teacher IDs that appear in any table of this group
+    const groupVacancyIds = new Set<string>();
     for (const table of group.tables) {
-      const tableVacancyTeacherIds = table.teacherIds.filter((id) => vacancyTeacherIds.has(id));
-      if (tableVacancyTeacherIds.length === 0) continue;
-
-      // Assignments from vacancy teachers in this table
-      const tableAssignments = vacancyAssignments.filter((a) =>
-        tableVacancyTeacherIds.includes(a.teacherId),
-      );
-      if (tableAssignments.length === 0) continue;
-
-      // Group by (teacherId, subject) → collect classNames
-      const key = (a: Assignment) => `${a.teacherId}::${a.subject}`;
-      const grouped = new Map<string, { teacherId: string; subject: string; classNames: string[] }>();
-      for (const a of tableAssignments) {
-        const k = key(a);
-        const entry = grouped.get(k);
-        if (entry) {
-          entry.classNames.push(a.className);
-        } else {
-          grouped.set(k, { teacherId: a.teacherId, subject: a.subject, classNames: [a.className] });
-        }
+      for (const tid of table.teacherIds) {
+        if (vacancyTeacherIds.has(tid)) groupVacancyIds.add(tid);
       }
-
-      const items: VacancyItem[] = [...grouped.values()].map(({ teacherId, subject, classNames }) => ({
-        subject,
-        classNames: [...classNames].sort(),
-        teacherName: teacherById.get(teacherId)?.name ?? teacherId,
-      }));
-
-      // Sort items by subject name
-      items.sort((a, b) => a.subject.localeCompare(b.subject, 'ru'));
-
-      tableEntries.push({ tableName: table.name, items });
     }
+    if (groupVacancyIds.size === 0) continue;
 
-    if (tableEntries.length > 0) {
-      result.push({ groupName: group.name, tables: tableEntries });
+    const teachers_: VacancyTeacherEntry[] = [];
+    for (const tid of groupVacancyIds) {
+      const hours = computeTeacherTotalHours(tid, vacancyAssignments);
+      if (hours === 0) continue;
+      teachers_.push({
+        teacherName: teacherById.get(tid)?.name ?? tid,
+        totalHours: hours,
+      });
     }
+    if (teachers_.length === 0) continue;
+
+    // Sort by teacher name
+    teachers_.sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ru'));
+    result.push({ groupName: group.name, teachers: teachers_ });
   }
 
   return result;
