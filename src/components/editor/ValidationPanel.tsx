@@ -68,10 +68,10 @@ export function ValidationPanel() {
     [allConflicts, acknowledgedConflictKeys]
   );
 
-  // Find gaps
+  // Find gaps — partner classes are always excluded (no gaps counted for partner school)
   const excludeSet = useMemo(
-    () => new Set(gapExcludedClasses),
-    [gapExcludedClasses]
+    () => new Set([...gapExcludedClasses, ...partnerClassNames]),
+    [gapExcludedClasses, partnerClassNames]
   );
   const gaps = useMemo(
     () => findGaps(schedule, teachers, excludeSet, Object.values(groups)),
