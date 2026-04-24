@@ -122,6 +122,16 @@ const SUBJECT_ORDER_PREFIXES: string[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * З23-1: Actual paid hours for an assignment.
+ * When a single teacher takes both groups of a groupSplit subject
+ * (`bothGroups=true`), the real hours are doubled — matches how
+ * computeTeacherTotalHours, validation, and vacancySummary count them.
+ */
+function assignmentHours(a: Assignment): number {
+  return a.hoursPerWeek * (a.bothGroups ? 2 : 1);
+}
+
 function matchesPrefix(actual: string, prefix: string): boolean {
   return actual.toLowerCase().startsWith(prefix.toLowerCase());
 }
@@ -274,9 +284,10 @@ export function buildOfficialReport(
         const classNames = [...new Set(teacherAssignments.map((a) => a.className))];
 
         // RF-W8: pre-build index to avoid O(n²) find() inside the class loop
+        // Z23-1: store doubled hours when bothGroups=true
         const hoursByClassSubject = new Map<string, number>();
         for (const a of teacherAssignments) {
-          hoursByClassSubject.set(`${a.className}::${a.subject}`, a.hoursPerWeek);
+          hoursByClassSubject.set(`${a.className}::${a.subject}`, assignmentHours(a));
         }
 
         // Build compound entries per class: hoursPerSubject[i] = hours for actualSubjects[i]
@@ -291,7 +302,7 @@ export function buildOfficialReport(
           else if (grade >= 10) entries1011.push(entry);
         }
 
-        const teacherTotal = teacherAssignments.reduce((s, a) => s + a.hoursPerWeek, 0);
+        const teacherTotal = teacherAssignments.reduce((s, a) => s + assignmentHours(a), 0);
         totalHours += teacherTotal;
         const t59 = entries59.flatMap((e) => e.hoursPerSubject).reduce((s, h) => s + h, 0);
         const t1011 = entries1011.flatMap((e) => e.hoursPerSubject).reduce((s, h) => s + h, 0);
@@ -311,14 +322,16 @@ export function buildOfficialReport(
 
     // Per-subject breakdown for the yellow cell
     // RF-W8: single pass per subject instead of three separate filter() passes
+    // Z23-1: count bothGroups assignments as doubled
     const subjectBreakdown: SubjectBreakdown[] = actualSubjects.map((s) => {
       let t = 0, t5 = 0, t10 = 0;
       for (const a of allCompoundAssignments) {
         if (a.subject !== s) continue;
-        t += a.hoursPerWeek;
+        const h = assignmentHours(a);
+        t += h;
         const grade = gradeFromClassName(a.className);
-        if (grade <= 9) t5 += a.hoursPerWeek;
-        else if (grade >= 10) t10 += a.hoursPerWeek;
+        if (grade <= 9) t5 += h;
+        else if (grade >= 10) t10 += h;
       }
       return { name: s, total: t, hours5to9: t5, hours10to11: t10 };
     });
@@ -356,10 +369,11 @@ export function buildOfficialReport(
           if (!teacher) return null;
 
           const ta = sa.filter((a) => a.teacherId === tid);
-          const entries = ta.map((a) => ({ className: a.className, hours: a.hoursPerWeek }));
-          const teacherTotal = ta.reduce((s, a) => s + a.hoursPerWeek, 0);
-          const t59 = ta.filter((a) => gradeFromClassName(a.className) <= 9).reduce((s, a) => s + a.hoursPerWeek, 0);
-          const t1011 = ta.filter((a) => gradeFromClassName(a.className) >= 10).reduce((s, a) => s + a.hoursPerWeek, 0);
+          // Z23-1: pass doubled hours into the cell formatter and totals when bothGroups=true
+          const entries = ta.map((a) => ({ className: a.className, hours: assignmentHours(a) }));
+          const teacherTotal = ta.reduce((s, a) => s + assignmentHours(a), 0);
+          const t59 = ta.filter((a) => gradeFromClassName(a.className) <= 9).reduce((s, a) => s + assignmentHours(a), 0);
+          const t1011 = ta.filter((a) => gradeFromClassName(a.className) >= 10).reduce((s, a) => s + assignmentHours(a), 0);
 
           totalHours += teacherTotal;
           hours5to9 += t59;
@@ -484,12 +498,13 @@ export function buildOfficialReport(
 
   const electives: ElectiveCourse[] = electiveSubjects.map((name) => {
     const sa = electiveAssignments.filter((a) => a.subject === name);
-    const totalHours = sa.reduce((s, a) => s + a.hoursPerWeek, 0);
+    // Z23-1: bothGroups is unusual on electives but counted consistently if set
+    const totalHours = sa.reduce((s, a) => s + assignmentHours(a), 0);
     const rows: ElectiveRow[] = sa
       .map((a) => {
         const teacher = teacherMap.get(a.teacherId);
         if (!teacher) return null;
-        return { className: a.className, hours: a.hoursPerWeek, teacherName: teacher.name };
+        return { className: a.className, hours: assignmentHours(a), teacherName: teacher.name };
       })
       .filter((r): r is ElectiveRow => r !== null)
       .sort((a, b) => a.className.localeCompare(b.className, 'ru'));
@@ -509,20 +524,22 @@ export function buildOfficialReport(
     const grade = gradeFromClassName(a.className);
     const part = getSubjectPart(a.subject, grade);
     const split = isGroupSplit(a.subject, grade);
+    // Z23-1: bothGroups teacher contributes 2× real hours to summary totals
+    const h = assignmentHours(a);
 
     if (grade >= 5 && grade <= 9) {
       if (part === 'mandatory') {
-        if (split) mandatory59Split += a.hoursPerWeek;
-        else mandatory59NoSplit += a.hoursPerWeek;
+        if (split) mandatory59Split += h;
+        else mandatory59NoSplit += h;
       } else {
-        optional59 += a.hoursPerWeek;
+        optional59 += h;
       }
     } else if (grade >= 10) {
       if (part === 'mandatory') {
-        if (split) mandatory1011Split += a.hoursPerWeek;
-        else mandatory1011NoSplit += a.hoursPerWeek;
+        if (split) mandatory1011Split += h;
+        else mandatory1011NoSplit += h;
       } else {
-        optional1011 += a.hoursPerWeek;
+        optional1011 += h;
       }
     }
   }

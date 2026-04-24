@@ -13,8 +13,9 @@ function makeAssignment(
   className: string,
   subject: string,
   hoursPerWeek: number,
+  bothGroups = false,
 ): Assignment {
-  return { teacherId, className, subject, hoursPerWeek };
+  return { teacherId, className, subject, hoursPerWeek, bothGroups };
 }
 
 const BASIC_PLAN: CurriculumPlan = {
@@ -373,5 +374,122 @@ describe('buildOfficialReport — dept ordering', () => {
     const names = report.subjectGroups.slice(0, 2).map((g) => g.displayName);
     expect(names).toContain('Физика');
     expect(names).toContain('Химия');
+  });
+});
+
+// ─── Z23-1: bothGroups handling ───────────────────────────────────────────────
+// When one teacher takes both groups of a groupSplit subject, hours must be
+// counted 2× everywhere — yellow column total, 5-9/10-11 breakdown, teacher
+// row total, class cell display, and summary totals. Previously undercounted.
+
+describe('buildOfficialReport — bothGroups (Z23-1)', () => {
+  it('simple subject: bothGroups=true doubles yellow total, 5-9, and teacher row', () => {
+    const assignments: Assignment[] = [
+      makeAssignment('t1', '7г', 'Физическая культура', 2, true),
+    ];
+    const report = buildOfficialReport(BASIC_PLAN, assignments, TEACHERS, [], '2025-08-18', '');
+    const pe = report.subjectGroups.find((g) => g.displayName === 'Физическая культура')!;
+    expect(pe.totalHours).toBe(4);
+    expect(pe.hours5to9).toBe(4);
+    expect(pe.hours10to11).toBe(0);
+    expect(pe.teachers).toHaveLength(1);
+    expect(pe.teachers[0].totalHours).toBe(4);
+    expect(pe.teachers[0].cells5to9).toBe('7-г(4)');
+  });
+
+  it('matches math expected by stakeholder: one-teacher-both-groups equals two-teachers-one-group-each', () => {
+    // Stakeholder: English (two teachers, one group each) already counts correctly.
+    // Informatics (one teacher, both groups) should match that total.
+    const oneTeacherBothGroups: Assignment[] = [
+      makeAssignment('t1', '7г', 'Физическая культура', 2, true),
+    ];
+    const twoTeachersOneGroupEach: Assignment[] = [
+      makeAssignment('t1', '7г', 'Физическая культура', 2),
+      makeAssignment('t2', '7г', 'Физическая культура', 2),
+    ];
+    const r1 = buildOfficialReport(BASIC_PLAN, oneTeacherBothGroups, TEACHERS, [], '2025-08-18', '');
+    const r2 = buildOfficialReport(BASIC_PLAN, twoTeachersOneGroupEach, TEACHERS, [], '2025-08-18', '');
+    const pe1 = r1.subjectGroups.find((g) => g.displayName === 'Физическая культура')!;
+    const pe2 = r2.subjectGroups.find((g) => g.displayName === 'Физическая культура')!;
+    expect(pe1.totalHours).toBe(pe2.totalHours);
+    expect(pe1.hours5to9).toBe(pe2.hours5to9);
+    // Teacher-row totals should each equal 4h (same for single bothGroups teacher
+    // and for each of the two one-group teachers who together total 4h)
+    expect(pe1.teachers[0].totalHours).toBe(4);
+    expect(pe2.teachers[0].totalHours + pe2.teachers[1].totalHours).toBe(4);
+  });
+
+  it('bothGroups mixed with regular assignment: no double-counting of the non-bothGroups class', () => {
+    const assignments: Assignment[] = [
+      makeAssignment('t1', '7г', 'Физическая культура', 2, true), // 4h paid
+      makeAssignment('t1', '5а', 'Физика', 2),                     // 2h paid (not split)
+    ];
+    const report = buildOfficialReport(BASIC_PLAN, assignments, TEACHERS, [], '2025-08-18', '');
+    const pe = report.subjectGroups.find((g) => g.displayName === 'Физическая культура')!;
+    const fiz = report.subjectGroups.find((g) => g.displayName === 'Физика')!;
+    expect(pe.teachers[0].totalHours).toBe(4);
+    expect(fiz.teachers[0].totalHours).toBe(2);
+  });
+
+  it('summary: bothGroups doubles mandatory59Split, not mandatory59NoSplit', () => {
+    const assignments: Assignment[] = [
+      makeAssignment('t1', '7г', 'Физическая культура', 2, true), // groupSplit mandatory, 2h × 2
+    ];
+    const report = buildOfficialReport(BASIC_PLAN, assignments, TEACHERS, [], '2025-08-18', '');
+    expect(report.summary.mandatory59Split).toBe(4);
+    expect(report.summary.mandatory59NoSplit).toBe(0);
+  });
+
+  it('summary grandTotal of one-teacher-both-groups equals that of two-teachers-one-group-each', () => {
+    const r1 = buildOfficialReport(
+      BASIC_PLAN,
+      [makeAssignment('t1', '7г', 'Физическая культура', 2, true)],
+      TEACHERS, [], '2025-08-18', '',
+    );
+    const r2 = buildOfficialReport(
+      BASIC_PLAN,
+      [
+        makeAssignment('t1', '7г', 'Физическая культура', 2),
+        makeAssignment('t2', '7г', 'Физическая культура', 2),
+      ],
+      TEACHERS, [], '2025-08-18', '',
+    );
+    expect(r1.summary.grandTotal).toBe(r2.summary.grandTotal);
+  });
+
+  it('compound subject: bothGroups doubles hours in subjectBreakdown and cell', () => {
+    // Hypothetical: a teacher takes both groups on a compound subject.
+    // Rus+Lit is not usually split, but if flagged, must count consistently.
+    const assignments: Assignment[] = [
+      makeAssignment('t1', '5а', 'Русский язык', 4, true),
+      makeAssignment('t1', '5а', 'Литература', 2, true),
+    ];
+    const report = buildOfficialReport(BASIC_PLAN, assignments, TEACHERS, [], '2025-08-18', '');
+    const group = report.subjectGroups.find((g) => g.subjects.includes('Русский язык'))!;
+    expect(group.totalHours).toBe(12); // 4×2 + 2×2
+    expect(group.teachers[0].totalHours).toBe(12);
+    expect(group.teachers[0].cells5to9).toBe('5-а(8/4)');
+    const rus = group.subjectBreakdown.find((b) => b.name === 'Русский язык')!;
+    const lit = group.subjectBreakdown.find((b) => b.name === 'Литература')!;
+    expect(rus.total).toBe(8);
+    expect(lit.total).toBe(4);
+  });
+
+  it('bothGroups=false behaves exactly like an absent flag', () => {
+    const withFlag = buildOfficialReport(
+      BASIC_PLAN,
+      [makeAssignment('t1', '5а', 'Физика', 2, false)],
+      TEACHERS, [], '2025-08-18', '',
+    );
+    // makeAssignment without the 5th arg also sets bothGroups=false per its default
+    const withoutFlag = buildOfficialReport(
+      BASIC_PLAN,
+      [makeAssignment('t1', '5а', 'Физика', 2)],
+      TEACHERS, [], '2025-08-18', '',
+    );
+    const g1 = withFlag.subjectGroups.find((g) => g.displayName === 'Физика')!;
+    const g2 = withoutFlag.subjectGroups.find((g) => g.displayName === 'Физика')!;
+    expect(g1.totalHours).toBe(g2.totalHours);
+    expect(g1.teachers[0].cells5to9).toBe(g2.teachers[0].cells5to9);
   });
 });
