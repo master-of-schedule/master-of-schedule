@@ -14,9 +14,9 @@ export function gradeFromClassName(cn: string): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
-/** Extracts the letter suffix from a class name. "5а" → "а", "10б" → "б", "5мк" → "мк". */
+/** Extracts the letter suffix from a class name. "5а" → "а", "10б" → "б", "5мк" → "мк", "5-а" → "а". */
 function suffixFromClassName(cn: string): string {
-  return cn.replace(/^\d{1,2}/, '');
+  return cn.replace(/^\d{1,2}/, '').replace(/^[-–—\s]+/, '');
 }
 
 /** Formats a class name for display: "5а" → "5-а", "10б" → "10-б". */
