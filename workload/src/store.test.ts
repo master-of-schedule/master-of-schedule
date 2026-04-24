@@ -157,6 +157,45 @@ describe('teacher actions', () => {
   });
 });
 
+describe('mergeDuplicateTeachers (З23-3)', () => {
+  it('removes the duplicate and transfers its assignments', () => {
+    useStore.getState().addTeacher({ id: 'keep', name: 'Мартынова Елена Анатольевна', initials: 'ЕА', subjects: [] });
+    useStore.getState().addTeacher({ id: 'rm', name: 'Мартынова Елена Анаольевна', initials: 'ЕА', subjects: [] });
+    useStore.getState().setAssignment({ teacherId: 'rm', className: '5а', subject: 'Информатика', hoursPerWeek: 1 });
+
+    useStore.getState().mergeDuplicateTeachers('keep', 'rm');
+
+    const s = useStore.getState();
+    expect(s.teachers.map((t) => t.id)).toContain('keep');
+    expect(s.teachers.map((t) => t.id)).not.toContain('rm');
+    expect(s.assignments[0].teacherId).toBe('keep');
+  });
+
+  it('does not clear unrelated state (curriculumPlan, subjectShortNames)', () => {
+    useStore.getState().setCurriculumPlan(PLAN);
+    useStore.getState().setSubjectShortName('Математика', 'Мат!');
+    useStore.getState().addTeacher({ id: 'keep', name: 'Иванов И.И.', initials: 'ИИ', subjects: [] });
+    useStore.getState().addTeacher({ id: 'rm', name: 'Иванов И.И.', initials: 'ИИ', subjects: [] });
+
+    useStore.getState().mergeDuplicateTeachers('keep', 'rm');
+
+    expect(useStore.getState().curriculumPlan).not.toBeNull();
+    expect(useStore.getState().subjectShortNames['Математика']).toBe('Мат!');
+  });
+
+  it('re-points dept-table teacherIds from removed to kept', () => {
+    useStore.getState().addTeacher({ id: 'keep', name: 'A', initials: 'A', subjects: [] });
+    useStore.getState().addTeacher({ id: 'rm', name: 'A', initials: 'A', subjects: [] });
+    useStore.getState().updateDeptTable('filo', 'filo-t1', { teacherIds: ['rm'] });
+
+    useStore.getState().mergeDuplicateTeachers('keep', 'rm');
+
+    const filo = useStore.getState().deptGroups.find((g) => g.id === 'filo')!;
+    expect(filo.tables.find((t) => t.id === 'filo-t1')!.teacherIds).toContain('keep');
+    expect(filo.tables.find((t) => t.id === 'filo-t1')!.teacherIds).not.toContain('rm');
+  });
+});
+
 describe('deptGroup actions', () => {
   it('addDeptGroup adds to list', () => {
     const initialCount = useStore.getState().deptGroups.length;
