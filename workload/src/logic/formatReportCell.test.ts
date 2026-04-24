@@ -83,6 +83,34 @@ describe('formatSimpleClasses', () => {
     expect(formatSimpleClasses(entries, '5-9')).toBe('5-мк(4)');
   });
 
+  // З23-2: class names already in "5-а" form must not render as "5--а"
+  it('handles class names with existing dash: single class', () => {
+    const entries = [{ className: '5-а', hours: 3 }];
+    expect(formatSimpleClasses(entries, '5-9')).toBe('5-а(3)');
+  });
+
+  it('handles class names with existing dash: compact notation', () => {
+    const entries = [
+      { className: '5-а', hours: 2 },
+      { className: '5-б', hours: 2 },
+      { className: '5-в', hours: 2 },
+    ];
+    expect(formatSimpleClasses(entries, '5-9')).toBe('5-а,б,в(6)');
+  });
+
+  it('handles class names with existing dash: 10-11 range', () => {
+    const entries = [
+      { className: '10-а', hours: 3 },
+      { className: '11-б', hours: 3 },
+    ];
+    expect(formatSimpleClasses(entries, '10-11')).toBe('10-а(3), 11-б(3)');
+  });
+
+  it('handles class names with existing dash: мк suffix', () => {
+    const entries = [{ className: '5-мк', hours: 4 }];
+    expect(formatSimpleClasses(entries, '5-9')).toBe('5-мк(4)');
+  });
+
   it('Физкультура pattern: 7 classes across 3 grades', () => {
     const entries = [
       { className: '5а', hours: 2 }, { className: '5б', hours: 2 },
@@ -133,5 +161,14 @@ describe('formatCompoundClasses', () => {
       { className: '11в', hoursPerSubject: [2, 3] },
     ];
     expect(formatCompoundClasses(entries, '10-11')).toBe('10-в(2/3), 11-в(2/3)');
+  });
+
+  // З23-2: class names already in "7-г" form must not render as "7--г"
+  it('handles class names with existing dash', () => {
+    const entries = [
+      { className: '7-г', hoursPerSubject: [3, 2, 1] },
+      { className: '5-мк', hoursPerSubject: [4, 2] },
+    ];
+    expect(formatCompoundClasses(entries, '5-9')).toBe('5-мк(4/2), 7-г(3/2/1)');
   });
 });
