@@ -7,6 +7,7 @@ import { persist } from 'zustand/middleware';
 import { migrateInitials } from './logic/groupNames';
 import type { SnapshotConflicts } from './logic/deptSnapshot';
 import { applyDeptSnapshotState } from './logic/deptSnapshot';
+import { mergeTeachers } from './logic/mergeTeachers';
 import { removeClassFromPlan } from './logic/planUtils';
 import type {
   CurriculumPlan,
@@ -41,6 +42,12 @@ interface RNState {
   addTeacher: (teacher: RNTeacher) => void;
   updateTeacher: (id: string, updates: Partial<RNTeacher>) => void;
   deleteTeacher: (id: string) => void;
+  /**
+   * З23-3: Merge `removeId` into `keepId`. Transfers assignments, homeroom,
+   * dept-table membership, subjects, and defaultRoom. Caller should use the
+   * pure `mergeTeachers()` first to preview conflicts before invoking this.
+   */
+  mergeDuplicateTeachers: (keepId: string, removeId: string) => void;
 
   // ── DeptGroup actions ──────────────────────────────────────────────────────
   addDeptGroup: (group: DeptGroup) => void;
@@ -332,6 +339,25 @@ export const useStore = create<RNState>()(
             })),
           })),
         })),
+      mergeDuplicateTeachers: (keepId, removeId) =>
+        set((s) => {
+          const result = mergeTeachers(
+            {
+              teachers: s.teachers,
+              assignments: s.assignments,
+              homeroomAssignments: s.homeroomAssignments,
+              deptGroups: s.deptGroups,
+            },
+            keepId,
+            removeId,
+          );
+          return {
+            teachers: result.teachers,
+            assignments: result.assignments,
+            homeroomAssignments: result.homeroomAssignments,
+            deptGroups: result.deptGroups,
+          };
+        }),
 
       // ── DeptGroup actions ────────────────────────────────────────────────
       addDeptGroup: (group) =>
