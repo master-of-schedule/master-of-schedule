@@ -10,6 +10,7 @@ import { useScheduleStore, useUIStore, useDataStore, usePartnerStore } from '@/s
 import { useShallow } from 'zustand/react/shallow';
 import { getCellStatus, getSlotLessons } from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
+import { getActiveGridStatusLesson } from './scheduleGridStatus';
 import styles from './ScheduleGrid.module.css';
 
 interface ScheduleGridProps {
@@ -123,16 +124,15 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     [highlightedMovableCell, highlightedMovableTeacher, schedule, className]
   );
 
-  // Get cell status based on selected lesson or copied lesson
   const getCellStatusForLesson = useCallback(
     (day: Day, lessonNum: LessonNumber): CellStatusInfo => {
-      const activeLesson = selectedLesson ?? copiedLesson?.requirement ?? null;
+      const activeLesson = getActiveGridStatusLesson(selectedLesson, copiedLesson, movingLesson);
       if (!activeLesson) {
         return { status: 'available' };
       }
       return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups, partnerClassNames);
     },
-    [schedule, teachers, selectedLesson, copiedLesson, className, partnerBusySet, groups, partnerClassNames]
+    [schedule, teachers, selectedLesson, copiedLesson, movingLesson, className, partnerBusySet, groups, partnerClassNames]
   );
 
   // Handle cell click
