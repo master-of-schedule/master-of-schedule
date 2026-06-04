@@ -9,7 +9,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons, findRequirementForScheduledLesson } from '@/logic';
-import { ClassSelector, groupClassesByGrade } from './ClassSelector';
+import { ClassSelector } from './ClassSelector';
+import { pickFirstEditableClass } from './classSelection';
 import { ScheduleGrid } from './ScheduleGrid';
 import { UnscheduledPanel } from './UnscheduledPanel';
 import { ProtocolPanel } from './ProtocolPanel';
@@ -23,7 +24,7 @@ import { ContextMenu, ContextMenuItem, ContextMenuDivider } from '@/components/c
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { usePickerState } from '@/hooks/usePickerState';
 import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import styles from './EditorPage.module.css';
@@ -181,9 +182,7 @@ export function EditorPage() {
   // Set initial class if none selected — pick the first non-partner, non-excluded class
   useEffect(() => {
     if (!currentClass && classes.length > 0) {
-      const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
-      const sorted = groupClassesByGrade(ownClassNames.length > 0 ? ownClassNames : classes.map(c => c.name), gapExcludedClasses);
-      const firstClass = sorted[0]?.[1][0] ?? classes[0].name;
+      const firstClass = pickFirstEditableClass(classes, gapExcludedClasses) ?? classes[0].name;
       setCurrentClass(firstClass);
     }
   }, [currentClass, classes, gapExcludedClasses, setCurrentClass]);
@@ -370,7 +369,7 @@ export function EditorPage() {
       if (!selectedLesson) return;
       roomPicker.open({ day, lessonNum });
     },
-    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, requirements, temporaryLessons, assignLesson, setCopiedLesson, roomPicker, moveTargetPicker]
+    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, requirements, temporaryLessons, assignLesson, roomPicker, moveTargetPicker]
   );
 
   // Handle quick assign (double-click) - auto-select first available room

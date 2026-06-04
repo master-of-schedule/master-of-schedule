@@ -8,10 +8,11 @@ import { DAYS, LESSON_NUMBERS } from '@/types';
 import { useDataStore } from '@/stores';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
-import { FormField, formStyles } from '@/components/common/FormField';
+import { FormField } from '@/components/common/FormField';
+import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import { DatalistInput } from '@/components/common/DatalistInput';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { closestMatch } from '@/utils/editDistance';
 import { useFormSave } from '@/hooks/useFormSave';
 import styles from './TeacherEditModal.module.css';
@@ -78,8 +79,9 @@ export function TeacherEditModal({ teacher, onClose }: TeacherEditModalProps) {
         : [...dayBans, lesson].sort((a, b) => a - b);
 
       if (newDayBans.length === 0) {
-        const { [day]: _, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[day];
+        return next;
       }
       return { ...prev, [day]: newDayBans };
     });
@@ -96,8 +98,9 @@ export function TeacherEditModal({ teacher, onClose }: TeacherEditModalProps) {
   // Clear day bans
   const clearDay = useCallback((day: Day) => {
     setBans((prev) => {
-      const { [day]: _, ...rest } = prev;
-      return rest;
+      const next = { ...prev };
+      delete next[day];
+      return next;
     });
   }, []);
 

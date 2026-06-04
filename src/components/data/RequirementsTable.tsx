@@ -8,7 +8,7 @@ import { useDataStore } from '@/stores';
 import { useDataTable } from '@/hooks/useDataTable';
 import { Button } from '@/components/common/Button';
 import { TableActions } from '@/components/common/TableActions';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { RequirementEditModal } from './RequirementEditModal';
 import styles from './DataTable.module.css';
 
@@ -57,7 +57,7 @@ export function RequirementsTable() {
     }
 
     return result;
-  }, [sortedRequirements, filterClass, search]);
+  }, [sortedRequirements, filterClass, filterType, search]);
 
   const handleCopyTable = useCallback(() => {
     const header = ['Класс/Группа', 'Предмет', 'Учитель', 'Часов в неделю'].join('\t');

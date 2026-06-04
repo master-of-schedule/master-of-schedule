@@ -14,10 +14,10 @@ import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { ImportConfirmModal } from '@/components/common/ImportConfirmModal';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { VersionColumn } from './VersionColumn';
 import { NewYearWizard } from './NewYearWizard';
-import { pickFirstEditableClass } from '@/components/editor/ClassSelector';
+import { pickFirstEditableClass } from '@/components/editor/classSelection';
 import { useBackupList } from '@/hooks/useBackupList';
 import { useSaveAsModal } from '@/hooks/useSaveAsModal';
 import { useCreateWeeklyModal } from '@/hooks/useCreateWeeklyModal';
@@ -191,7 +191,6 @@ export function StartPage() {
   const {
     importModalOpen,
     importSummary,
-    pendingImportJson: _pendingImportJson,
     handleImportJsonStart,
     handleImportJsonConfirm,
     closeImportModal,
@@ -200,7 +199,6 @@ export function StartPage() {
   // ── Save As modal ──────────────────────────────────────────────────────────
   const {
     saveAsModalOpen,
-    saveAsSourceId: _saveAsSourceId,
     saveAsName, setSaveAsName,
     saveAsType, setSaveAsType,
     saveAsMondayDate, setSaveAsMondayDate,

@@ -19,7 +19,7 @@ import { downloadJson, exportToJson, saveJsonStringToFolder } from '@/db';
 import { formatDayFullWithDate } from '@/utils/dateFormat';
 import { Button } from '@/components/common/Button';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { extractGroupIndex, formatRoom, escapeHtml } from '@/utils/formatLesson';
 import styles from './ExportPage.module.css';
 
@@ -355,7 +355,7 @@ export function ExportPage() {
 
     html += '</table>';
     return html;
-  }, [activeColumns, displayDays, getDayName, getCellContent, formatCellText, changedCells, activeView, baseTeacherSchedule]);
+  }, [activeColumns, displayDays, getDayName, getCellContent, formatCellText, changedCells, activeView, teacherChangedCells, baseTeacherSchedule]);
 
   // Copy functions
   const copyAll = useCallback(async () => {
@@ -394,7 +394,7 @@ export function ExportPage() {
     } catch {
       showToast('Ошибка копирования', 'error');
     }
-  }, [selection, generateTSV, generateHTML, showToast]);
+  }, [selection, generateTSV, generateHTML, showToast, clearSelection]);
 
   // Build canvas list for Telegram export (shared between folder and blob download paths)
   const buildTelegramCanvases = useCallback((): Array<[HTMLCanvasElement, string]> => {
@@ -539,7 +539,7 @@ export function ExportPage() {
   }, [
     selectedDay, baseTemplateSchedule, fsFolderSupported, folderHandle, folderHandles,
     pickFolder, ensurePermission, saveCanvases, versionType, mondayDate, versionName,
-    budgetReplacementEntries, unionReplacementEntries, schedule,
+    budgetReplacementEntries, unionReplacementEntries, schedule, partnerClassNames,
   ]);
 
   // Download замены image (budget or union)
@@ -579,7 +579,7 @@ export function ExportPage() {
     setActiveView(view);
     clearSelection();
     setSelectedDay(null);
-  }, [clearSelection]);
+  }, [setActiveView, clearSelection, setSelectedDay]);
 
   // Export teacher availability for partner unit
   const handleExportAvailability = useCallback(() => {

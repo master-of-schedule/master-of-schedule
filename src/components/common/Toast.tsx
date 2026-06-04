@@ -2,10 +2,9 @@
  * Toast notification system
  */
 
-import { useEffect, useState, useCallback, createContext, useContext, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { ToastContext, type ToastType } from './toastContext';
 import styles from './Toast.module.css';
-
-type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 const DEFAULT_DURATIONS: Record<ToastType, number> = {
   success: 5000,
@@ -22,20 +21,6 @@ interface Toast {
   message: string;
   type: ToastType;
   duration: number; // ms; 0 = persistent (manual close only)
-}
-
-interface ToastContextValue {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return context;
 }
 
 interface ToastProviderProps {

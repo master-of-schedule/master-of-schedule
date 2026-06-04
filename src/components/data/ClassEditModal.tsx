@@ -6,9 +6,10 @@ import { useState, useCallback } from 'react';
 import type { SchoolClass } from '@/types';
 import { useDataStore } from '@/stores';
 import { Modal } from '@/components/common/Modal';
-import { FormField, formStyles } from '@/components/common/FormField';
+import { FormField } from '@/components/common/FormField';
+import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { useFormSave } from '@/hooks/useFormSave';
 
 interface ClassEditModalProps {
@@ -57,7 +58,7 @@ export function ClassEditModal({ schoolClass, onClose }: ClassEditModalProps) {
         }
       }
     );
-  }, [isNew, name, studentCount, schoolClass, addClass, updateClass, save, showToast]);
+  }, [isNew, name, studentCount, isPartner, schoolClass, addClass, updateClass, save, showToast]);
 
   return (
     <Modal

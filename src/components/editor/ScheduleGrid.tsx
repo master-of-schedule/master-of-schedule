@@ -123,53 +123,6 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     [highlightedMovableCell, highlightedMovableTeacher, schedule, className]
   );
 
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input field
-      const activeElement = document.activeElement;
-      const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
-      if (isInputFocused) return;
-
-      // Only handle if grid is focused or a cell is focused
-      if (!gridRef.current?.contains(document.activeElement) && !focusedCell) {
-        return;
-      }
-
-      const maxDayIdx = effectiveDays.length - 1;
-      const maxLessonIdx = effectiveLessons.length - 1;
-      switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          moveFocus('up', maxDayIdx, maxLessonIdx);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          moveFocus('down', maxDayIdx, maxLessonIdx);
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          moveFocus('left', maxDayIdx, maxLessonIdx);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          moveFocus('right', maxDayIdx, maxLessonIdx);
-          break;
-        case 'Enter':
-          if (focusedCell) {
-            e.preventDefault();
-            handleCellClick(focusedCell.day, focusedCell.lessonNum as LessonNumber);
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedCell, moveFocus, effectiveDays.length, effectiveLessons.length]);
-
-
-
   // Get cell status based on selected lesson or copied lesson
   const getCellStatusForLesson = useCallback(
     (day: Day, lessonNum: LessonNumber): CellStatusInfo => {
@@ -207,6 +160,49 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     },
     [selectedLesson, copiedLesson, movingLesson, getCellStatusForLesson, className, selectCell, onAssignLesson, setFocusedCell, clearHighlightedMovableCell, clearHighlightedMovableTeacher]
   );
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+      if (isInputFocused) return;
+
+      if (!gridRef.current?.contains(document.activeElement) && !focusedCell) {
+        return;
+      }
+
+      const maxDayIdx = effectiveDays.length - 1;
+      const maxLessonIdx = effectiveLessons.length - 1;
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          moveFocus('up', maxDayIdx, maxLessonIdx);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          moveFocus('down', maxDayIdx, maxLessonIdx);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          moveFocus('left', maxDayIdx, maxLessonIdx);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          moveFocus('right', maxDayIdx, maxLessonIdx);
+          break;
+        case 'Enter':
+          if (focusedCell) {
+            e.preventDefault();
+            handleCellClick(focusedCell.day, focusedCell.lessonNum as LessonNumber);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedCell, moveFocus, effectiveDays.length, effectiveLessons.length, handleCellClick]);
 
   // Handle context menu — also select the cell so the user can see which cell was right-clicked
   const handleContextMenu = useCallback(
