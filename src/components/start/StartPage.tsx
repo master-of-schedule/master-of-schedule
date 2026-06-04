@@ -17,7 +17,7 @@ import { HintBar } from '@/components/common/HintBar';
 import { useToast } from '@/components/common/Toast';
 import { VersionColumn } from './VersionColumn';
 import { NewYearWizard } from './NewYearWizard';
-import { groupClassesByGrade } from '@/components/editor/ClassSelector';
+import { pickFirstEditableClass } from '@/components/editor/ClassSelector';
 import { useBackupList } from '@/hooks/useBackupList';
 import { useSaveAsModal } from '@/hooks/useSaveAsModal';
 import { useCreateWeeklyModal } from '@/hooks/useCreateWeeklyModal';
@@ -116,11 +116,8 @@ export function StartPage() {
     readOnlyVersions: s.readOnlyVersions,
   })));
 
-  /** Returns the first class in the visual order (non-excluded grades first). */
   const pickFirstClass = useCallback((): string | undefined => {
-    if (classes.length === 0) return undefined;
-    const sorted = groupClassesByGrade(classes.map(c => c.name), gapExcludedClasses);
-    return sorted[0]?.[1][0] ?? classes[0].name;
+    return pickFirstEditableClass(classes, gapExcludedClasses);
   }, [classes, gapExcludedClasses]);
 
   const { setActiveTab, setCurrentClass } = useUIStore(useShallow((s) => ({

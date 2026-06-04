@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupClassesByGrade } from './ClassSelector';
+import { groupClassesByGrade, pickFirstEditableClass } from './ClassSelector';
 
 describe('groupClassesByGrade', () => {
   const allClasses = ['1а', '1б', '2а', '5а', '9б', '10а', '10б', '11в'];
@@ -52,5 +52,31 @@ describe('groupClassesByGrade', () => {
     const firstClass = result[0]?.[1][0];
     expect(firstClass).toBe('5а');
     expect(firstClass).not.toBe('1а');
+  });
+
+  it('sorts classes inside one grade in natural school order', () => {
+    const result = groupClassesByGrade(['8-Мк', '8-г', '8-в', '8-а', '8-д'], []);
+    expect(result[0][1]).toEqual(['8-а', '8-в', '8-г', '8-д', '8-Мк']);
+  });
+});
+
+describe('pickFirstEditableClass', () => {
+  it('skips partner classes when opening the editor', () => {
+    const classes = [
+      { id: 'c1', name: '2-а', isPartner: true },
+      { id: 'c2', name: '3-а', isPartner: true },
+      { id: 'c3', name: '5-а' },
+    ];
+
+    expect(pickFirstEditableClass(classes, [])).toBe('5-а');
+  });
+
+  it('falls back to partner classes if there are no own classes', () => {
+    const classes = [
+      { id: 'c1', name: '2-а', isPartner: true },
+      { id: 'c2', name: '3-а', isPartner: true },
+    ];
+
+    expect(pickFirstEditableClass(classes, [])).toBe('2-а');
   });
 });

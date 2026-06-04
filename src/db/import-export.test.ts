@@ -125,6 +125,25 @@ describe('parseExcelWorkbook', () => {
     expect(result.lessonRequirements[0].countPerWeek).toBe(5);
   });
 
+  it('auto-creates classes referenced only by class lesson requirements', () => {
+    const workbook = createWorkbook({
+      'Классы': [
+        ['Класс', 'Число детей'],
+        ['8-а', 28],
+        ['8-в', 26],
+        ['8-Мк', 20],
+      ],
+      'Классные занятия': [
+        ['Класс', 'Предмет', 'Учитель', 'Занятий в неделю'],
+        ['8-г', 'Математика', 'Иванова М.А.', 5],
+      ],
+    });
+
+    const result = parseExcelWorkbook(workbook);
+
+    expect(result.classes.map(c => c.name)).toContain('8-г');
+  });
+
   it('should parse group lessons sheet', () => {
     const workbook = createWorkbook({
       'Групповые занятия': [

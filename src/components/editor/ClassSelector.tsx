@@ -3,8 +3,10 @@
  */
 
 import { useMemo } from 'react';
+import type { SchoolClass } from '@/types';
 import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
 import { getTotalUnscheduledCount, mergeWithTemporaryLessons } from '@/logic';
+import { compareClassNames } from '@/utils/formatLesson';
 import styles from './ClassSelector.module.css';
 
 /** Groups class names by grade, placing fully gap-excluded grade groups at the bottom. */
@@ -19,6 +21,7 @@ export function groupClassesByGrade(
     const grade = name.match(/^\d+/)?.[0] ?? 'Другие';
     const existing = groups.get(grade) ?? [];
     existing.push(name);
+    existing.sort(compareClassNames);
     groups.set(grade, existing);
   }
 
@@ -36,6 +39,17 @@ export function groupClassesByGrade(
   const allExcluded = entries.filter(([, names]) => names.every(n => excludedSet.has(n)));
 
   return [...normal.sort(sortByGrade), ...allExcluded.sort(sortByGrade)];
+}
+
+export function pickFirstEditableClass(
+  classes: SchoolClass[],
+  gapExcluded: string[]
+): string | undefined {
+  if (classes.length === 0) return undefined;
+  const ownClasses = classes.filter(c => !c.isPartner);
+  const candidates = ownClasses.length > 0 ? ownClasses : classes;
+  const sorted = groupClassesByGrade(candidates.map(c => c.name), gapExcluded);
+  return sorted[0]?.[1][0] ?? candidates[0]?.name;
 }
 
 export function ClassSelector() {
