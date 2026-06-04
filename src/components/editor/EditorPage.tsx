@@ -337,7 +337,10 @@ export function EditorPage() {
 
         // Check room availability
         if (lesson.room) {
-          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum);
+          const targetStudentCount = req.type === 'group'
+            ? undefined
+            : classes.find(c => c.name === currentClass)?.studentCount;
+          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum, classes, targetStudentCount, currentClass);
           if (!roomFree) {
             let occupant = '';
             for (const [cn, classSchedule] of Object.entries(schedule)) {
@@ -369,7 +372,7 @@ export function EditorPage() {
       if (!selectedLesson) return;
       roomPicker.open({ day, lessonNum });
     },
-    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, requirements, temporaryLessons, assignLesson, roomPicker, moveTargetPicker]
+    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, classes, requirements, temporaryLessons, assignLesson, roomPicker, moveTargetPicker]
   );
 
   // Handle quick assign (double-click) - auto-select first available room
@@ -377,7 +380,7 @@ export function EditorPage() {
     (day: Day, lessonNum: LessonNumber) => {
       if (!selectedLesson || !currentClass) return;
 
-      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum);
+      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum, classes, currentClassStudentCount, currentClass);
       if (availableRooms.length === 0) {
         // No rooms available, open picker to show message
         roomPicker.open({ day, lessonNum });
@@ -397,7 +400,7 @@ export function EditorPage() {
 
       selectLesson(null);
     },
-    [selectedLesson, currentClass, schedule, rooms, assignLesson, selectLesson, roomPicker]
+    [selectedLesson, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, roomPicker]
   );
 
   // Handle force-assign (Shift+click on banned/busy cell in weekly mode)
@@ -838,6 +841,7 @@ export function EditorPage() {
           preferredSubject={selectedLesson?.subject}
           preferredRoom={selectedLesson ? teachers[selectedLesson.teacher]?.defaultRoom : undefined}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
@@ -852,6 +856,7 @@ export function EditorPage() {
           preferredSubject={changeRoomPicker.data.subject}
           preferredRoom={teachers[changeRoomPicker.data.teacher]?.defaultRoom}
           studentCount={changeRoomPicker.data.isGroup ? undefined : currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
@@ -866,6 +871,7 @@ export function EditorPage() {
           preferredSubject={movingLesson.requirement.subject}
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 

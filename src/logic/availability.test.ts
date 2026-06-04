@@ -964,6 +964,67 @@ describe('getRoomStudentCount — no double-counting for same-class groups', () 
     const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, 25);
     expect(available.map(r => r.shortName)).not.toContain('-Зал-');
   });
+
+  it('counts same-class groups as one class for multiClass room limit', () => {
+    const schedule: Schedule = {
+      '5а': {
+        'Пн': {
+          1: {
+            lessons: [
+              { id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Иванов А.А.', room: '-Зал-' },
+            ],
+          },
+        },
+      },
+      '6б': {
+        'Пн': {
+          1: {
+            lessons: [
+              { id: 'l2', requirementId: 'r2', subject: 'Физра', teacher: 'Петров Б.Б.', room: '-Зал-', group: '6б(1)' },
+            ],
+          },
+        },
+      },
+    };
+    const classes: SchoolClass[] = [
+      { id: 'c1', name: '5а', studentCount: 25 },
+      { id: 'c2', name: '6б', studentCount: 24 },
+    ];
+    const rooms: Record<string, Room> = {
+      '-Зал-': { id: 'r1', fullName: 'Зал', shortName: '-Зал-', capacity: 70, multiClass: 2 },
+    };
+
+    const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, undefined, '6б');
+    expect(available.map(r => r.shortName)).toContain('-Зал-');
+    expect(isRoomAvailable(schedule, rooms, '-Зал-', 'Пн', 1, classes, undefined, '6б')).toBe(true);
+  });
+
+  it('still rejects a third distinct class in a two-class room', () => {
+    const schedule: Schedule = {
+      '5а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Иванов А.А.', room: '-Зал-' }] },
+        },
+      },
+      '6б': {
+        'Пн': {
+          1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физра', teacher: 'Петров Б.Б.', room: '-Зал-', group: '6б(1)' }] },
+        },
+      },
+    };
+    const classes: SchoolClass[] = [
+      { id: 'c1', name: '5а', studentCount: 25 },
+      { id: 'c2', name: '6б', studentCount: 24 },
+      { id: 'c3', name: '7в', studentCount: 23 },
+    ];
+    const rooms: Record<string, Room> = {
+      '-Зал-': { id: 'r1', fullName: 'Зал', shortName: '-Зал-', capacity: 90, multiClass: 2 },
+    };
+
+    const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, 23, '7в');
+    expect(available.map(r => r.shortName)).not.toContain('-Зал-');
+    expect(isRoomAvailable(schedule, rooms, '-Зал-', 'Пн', 1, classes, 23, '7в')).toBe(false);
+  });
 });
 
 describe('getSubstituteTeachers', () => {
