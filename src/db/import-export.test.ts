@@ -2,9 +2,14 @@
  * Tests for import/export functionality
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseExcelWorkbook, parseExportData, getExportSummary, CURRENT_SCHEMA_VERSION, type ExportData } from './import-export';
+import { parseExcelWorkbook, parseExportData, importFromJson, getExportSummary, CURRENT_SCHEMA_VERSION, type ExportData } from './import-export';
+import { db } from './database';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // Helper to create a minimal valid export data object
 function createExportData(overrides: Partial<ExportData> = {}): ExportData {
@@ -351,6 +356,12 @@ describe('parseExportData', () => {
     expect(() => parseExportData(json)).toThrow('более новой версии');
   });
 
+  it('should compare schema versions numerically when rejecting newer files', () => {
+    const data = createExportData({ version: '3.10' });
+    const json = JSON.stringify(data);
+    expect(() => parseExportData(json)).toThrow('более новой версии');
+  });
+
   it('should throw on unknown old version with no migration', () => {
     const data = createExportData({ version: '1.0' });
     const json = JSON.stringify(data);
@@ -439,6 +450,51 @@ describe('parseExportData', () => {
     expect(result.version).toBe('3.8');
     // acknowledgedConflictKeys is optional — absent in old data is fine
     expect(result.scheduleVersions[0].acknowledgedConflictKeys).toBeUndefined();
+  });
+});
+
+describe('importFromJson', () => {
+  it('imports the complete JSON file inside one transaction', async () => {
+    const transaction = vi.spyOn(db, 'transaction').mockResolvedValue(undefined);
+    const data = createExportData({
+      teachers: [{ id: 't1', name: 'А', bans: {}, subjects: [] }],
+      rooms: [{ id: 'r1', fullName: 'Кабинет 1', shortName: '1' }],
+      classes: [{ id: 'c1', name: '5а' }],
+      groups: [{ id: 'g1', name: '5а(д)', className: '5а', index: '1' }],
+      lessonRequirements: [{
+        id: 'lr1',
+        type: 'class',
+        classOrGroup: '5а',
+        subject: 'Математика',
+        teacher: 'А',
+        countPerWeek: 1,
+      }],
+      scheduleVersions: [{
+        id: 'v1',
+        name: 'Шаблон',
+        type: 'template',
+        createdAt: new Date(),
+        schedule: {},
+        substitutions: [],
+        isActiveTemplate: true,
+      }],
+    });
+
+    await importFromJson(JSON.stringify(data));
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    const [mode, tables] = transaction.mock.calls[0];
+    expect(mode).toBe('rw');
+    expect(tables).toEqual([
+      db.teachers,
+      db.rooms,
+      db.classes,
+      db.groups,
+      db.lessonRequirements,
+      db.versions,
+      db.substitutions,
+      db.settings,
+    ]);
   });
 });
 

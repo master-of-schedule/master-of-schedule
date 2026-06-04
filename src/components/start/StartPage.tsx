@@ -125,7 +125,20 @@ export function StartPage() {
     setCurrentClass: s.setCurrentClass,
   })));
 
-  const { newSchedule, loadSchedule, isDirty, jsonIsDirty, versionId, versionName, schedule, markSaved, markJsonSaved } = useScheduleStore(useShallow((s) => ({
+  const {
+    newSchedule,
+    loadSchedule,
+    isDirty,
+    jsonIsDirty,
+    versionId,
+    versionName,
+    schedule,
+    temporaryLessons,
+    lessonStatuses,
+    acknowledgedConflictKeys,
+    markSaved,
+    markJsonSaved,
+  } = useScheduleStore(useShallow((s) => ({
     newSchedule: s.newSchedule,
     loadSchedule: s.loadSchedule,
     isDirty: s.isDirty,
@@ -133,6 +146,9 @@ export function StartPage() {
     versionId: s.versionId,
     versionName: s.versionName,
     schedule: s.schedule,
+    temporaryLessons: s.temporaryLessons,
+    lessonStatuses: s.lessonStatuses,
+    acknowledgedConflictKeys: s.acknowledgedConflictKeys,
     markSaved: s.markSaved,
     markJsonSaved: s.markJsonSaved,
   })));
@@ -216,30 +232,6 @@ export function StartPage() {
     loadBackups();
   }, [loadVersions, loadBackups]);
 
-  // Handle "Save and proceed" in unsaved changes modal
-  const handleSaveAndProceed = useCallback(async () => {
-    if (!versionId) {
-      // Can't save if no version exists, just proceed without saving
-      handleProceedWithoutSaving();
-      return;
-    }
-
-    setIsSavingBeforeLoad(true);
-    try {
-      await updateVersionSchedule(versionId, schedule);
-      await updateVersionMetadata(versionId, { name: versionName });
-      markSaved(versionId, versionName);
-
-      // Now proceed with the pending action
-      await handleProceedWithoutSaving();
-    } catch (err) {
-      console.error('Failed to save before loading:', err);
-      alert('Ошибка сохранения');
-    } finally {
-      setIsSavingBeforeLoad(false);
-    }
-  }, [versionId, schedule, versionName, markSaved]);
-
   // Handle "Proceed without saving" in unsaved changes modal
   const handleProceedWithoutSaving = useCallback(async () => {
     const { pendingVersionId, pendingAction, pendingType } = unsavedChanges;
@@ -271,6 +263,37 @@ export function StartPage() {
       setActiveTab('editor');
     }
   }, [unsavedChanges, closeUnsavedModal, loadSchedule, pickFirstClass, setCurrentClass, setActiveTab, newSchedule, openCreateWeekly]);
+
+  // Handle "Save and proceed" in unsaved changes modal
+  const handleSaveAndProceed = useCallback(async () => {
+    if (!versionId) {
+      handleProceedWithoutSaving();
+      return;
+    }
+
+    setIsSavingBeforeLoad(true);
+    try {
+      await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses, acknowledgedConflictKeys);
+      await updateVersionMetadata(versionId, { name: versionName });
+      markSaved(versionId, versionName);
+
+      await handleProceedWithoutSaving();
+    } catch (err) {
+      console.error('Failed to save before loading:', err);
+      alert('Ошибка сохранения');
+    } finally {
+      setIsSavingBeforeLoad(false);
+    }
+  }, [
+    versionId,
+    schedule,
+    temporaryLessons,
+    lessonStatuses,
+    acknowledgedConflictKeys,
+    versionName,
+    markSaved,
+    handleProceedWithoutSaving,
+  ]);
 
   // Handle Excel import (with backup)
   const handleImportExcel = useCallback(async () => {
@@ -397,7 +420,7 @@ export function StartPage() {
       setCurrentClass(firstClass);
     }
     setActiveTab('editor');
-  }, [isReadOnlyYear, readOnlyVersions, pickFirstClass, loadSchedule, setCurrentClass, setActiveTab, isDirty]);
+  }, [isReadOnlyYear, readOnlyVersions, pickFirstClass, loadSchedule, setCurrentClass, setActiveTab, isDirty, versionId]);
 
   // Delete version
   const handleDeleteVersion = useCallback(async (versionId: string, e: React.MouseEvent) => {

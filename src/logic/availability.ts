@@ -15,6 +15,7 @@ import type {
 import { forEachSlotAt } from './traversal';
 import { isTeacherFree } from './validation';
 import { getUnscheduledLessons } from './counting';
+import { findRequirementForScheduledLesson } from './lessonRequirementMatching';
 
 /**
  * Count how many times each room is used at a specific slot.
@@ -266,13 +267,7 @@ export function getAvailableLessonsForSlot(
             // Mark as seen so it won't appear in unscheduled too
             seenKeys.add(key);
 
-            // Find the matching requirement
-            const req = requirements.find(r =>
-              r.id === lesson.requirementId ||
-              (r.subject === lesson.subject &&
-               r.teacher === lesson.teacher &&
-               (r.type === 'class' || r.classOrGroup === lesson.group))
-            );
+            const req = findRequirementForScheduledLesson(requirements, lesson, className);
 
             if (req) {
               result.movable.push({

@@ -529,6 +529,65 @@ describe('getAvailableLessonsForSlot', () => {
     expect(result.movable[0].fromLessonNum).toBe(1);
   });
 
+  it('matches movable grouped lessons by group when requirementId is stale', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: {
+            lessons: [{
+              id: 'l1',
+              requirementId: 'old-req',
+              subject: 'Английский',
+              teacher: 'Иванова Т.С.',
+              room: '101',
+              group: '10а(д)',
+            }],
+          },
+          3: { lessons: [] },
+        },
+      },
+    };
+    const teachers: Record<string, Teacher> = {
+      'Иванова Т.С.': {
+        id: 't1',
+        name: 'Иванова Т.С.',
+        subjects: ['Английский'],
+        bans: {},
+      },
+    };
+    const requirements: LessonRequirement[] = [
+      {
+        id: 'class-req',
+        type: 'class',
+        classOrGroup: '10а',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 1,
+      },
+      {
+        id: 'group-req',
+        type: 'group',
+        classOrGroup: '10а(д)',
+        className: '10а',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 1,
+      },
+    ];
+
+    const result = getAvailableLessonsForSlot(
+      requirements,
+      schedule,
+      teachers,
+      '10а',
+      'Пн',
+      3
+    );
+
+    expect(result.movable).toHaveLength(1);
+    expect(result.movable[0].lesson.id).toBe('group-req');
+  });
+
   it('returns empty result when no lessons available', () => {
     const schedule: Schedule = {
       '10а': {

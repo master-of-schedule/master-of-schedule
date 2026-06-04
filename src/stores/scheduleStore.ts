@@ -384,6 +384,8 @@ export const useScheduleStore = create<ScheduleState>()(
       if (useDataStore.getState().isReadOnlyYear) return;
       set((state) => {
         state.substitutions.push(substitution);
+        state.isDirty = true;
+        state.jsonIsDirty = true;
       });
     },
 
@@ -394,6 +396,8 @@ export const useScheduleStore = create<ScheduleState>()(
         const index = state.substitutions.findIndex(s => s.id === id);
         if (index !== -1) {
           state.substitutions.splice(index, 1);
+          state.isDirty = true;
+          state.jsonIsDirty = true;
         }
       });
     },
@@ -416,6 +420,7 @@ export const useScheduleStore = create<ScheduleState>()(
         if (index !== -1) {
           state.temporaryLessons.splice(index, 1);
           state.isDirty = true;
+          state.jsonIsDirty = true;
         }
       });
     },

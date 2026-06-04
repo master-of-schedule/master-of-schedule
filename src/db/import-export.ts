@@ -52,6 +52,23 @@ export interface ExportSummary {
   versionCount: number;
 }
 
+function compareSchemaVersions(a: string, b: string): number {
+  const left = a.split('.').map(part => Number.parseInt(part, 10));
+  const right = b.split('.').map(part => Number.parseInt(part, 10));
+  const length = Math.max(left.length, right.length);
+
+  for (let index = 0; index < length; index++) {
+    const leftPart = left[index] ?? 0;
+    const rightPart = right[index] ?? 0;
+    if (Number.isNaN(leftPart) || Number.isNaN(rightPart)) {
+      return a.localeCompare(b, undefined, { numeric: true });
+    }
+    if (leftPart !== rightPart) return leftPart - rightPart;
+  }
+
+  return 0;
+}
+
 /**
  * Migration functions: key is the version to migrate FROM.
  * Each function transforms data to the next version.
@@ -126,7 +143,7 @@ export function parseExportData(jsonString: string): ExportData {
   }
 
   // Reject files from newer versions
-  if (data.version > CURRENT_SCHEMA_VERSION) {
+  if (compareSchemaVersions(data.version, CURRENT_SCHEMA_VERSION) > 0) {
     throw new Error(
       `Этот файл создан в более новой версии приложения (${data.version}). ` +
       `Обновите приложение для открытия этого файла.`
@@ -203,37 +220,59 @@ export async function exportToJson(): Promise<string> {
 export async function importFromJson(jsonString: string): Promise<void> {
   const data = parseExportData(jsonString);
 
-  await replaceAllData({
-    teachers: data.teachers,
-    rooms: data.rooms,
-    classes: data.classes,
-    groups: data.groups,
-    lessonRequirements: data.lessonRequirements,
-  });
+  await db.transaction('rw', [
+    db.teachers,
+    db.rooms,
+    db.classes,
+    db.groups,
+    db.lessonRequirements,
+    db.versions,
+    db.substitutions,
+    db.settings,
+  ], async () => {
+    if (data.teachers?.length) {
+      await db.teachers.clear();
+      await db.teachers.bulkAdd(data.teachers);
+    }
+    if (data.rooms?.length) {
+      await db.rooms.clear();
+      await db.rooms.bulkAdd(data.rooms);
+    }
+    if (data.classes?.length) {
+      await db.classes.clear();
+      await db.classes.bulkAdd(data.classes);
+    }
+    if (data.groups?.length) {
+      await db.groups.clear();
+      await db.groups.bulkAdd(data.groups);
+    }
+    if (data.lessonRequirements?.length) {
+      await db.lessonRequirements.clear();
+      await db.lessonRequirements.bulkAdd(data.lessonRequirements);
+    }
 
-  // Clear existing versions and import new ones
-  await db.versions.clear();
-  await db.substitutions.clear();
+    await db.versions.clear();
+    await db.substitutions.clear();
 
-  for (const version of data.scheduleVersions ?? []) {
-    await db.versions.add({
-      ...version,
-      createdAt: new Date(version.createdAt),
-      mondayDate: version.mondayDate ? new Date(version.mondayDate) : undefined,
+    for (const version of data.scheduleVersions ?? []) {
+      await db.versions.add({
+        ...version,
+        createdAt: new Date(version.createdAt),
+        mondayDate: version.mondayDate ? new Date(version.mondayDate) : undefined,
+      });
+    }
+
+    const activeTemplate = (data.scheduleVersions ?? []).find(v => v.isActiveTemplate);
+    const currentSettings = await db.settings.get('default');
+    await db.settings.put({
+      ...currentSettings,
+      id: 'default',
+      daysPerWeek: currentSettings?.daysPerWeek ?? 5,
+      lessonsPerDay: currentSettings?.lessonsPerDay ?? 8,
+      activeTemplateId: activeTemplate?.id ?? null,
+      gapExcludedClasses: data.settings?.gapExcludedClasses ?? currentSettings?.gapExcludedClasses,
+      customSubjects: data.settings?.customSubjects ?? currentSettings?.customSubjects,
     });
-  }
-
-  // Restore settings (use put to ensure settings exist)
-  const activeTemplate = (data.scheduleVersions ?? []).find(v => v.isActiveTemplate);
-  const currentSettings = await db.settings.get('default');
-  await db.settings.put({
-    ...currentSettings,
-    id: 'default',
-    daysPerWeek: currentSettings?.daysPerWeek ?? 5,
-    lessonsPerDay: currentSettings?.lessonsPerDay ?? 8,
-    activeTemplateId: activeTemplate?.id ?? null,
-    gapExcludedClasses: data.settings?.gapExcludedClasses ?? currentSettings?.gapExcludedClasses,
-    customSubjects: data.settings?.customSubjects ?? currentSettings?.customSubjects,
   });
 }
 
