@@ -8,7 +8,7 @@ import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/s
 import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
-import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons } from '@/logic';
+import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons, findRequirementForScheduledLesson } from '@/logic';
 import { ClassSelector, groupClassesByGrade } from './ClassSelector';
 import { ScheduleGrid } from './ScheduleGrid';
 import { UnscheduledPanel } from './UnscheduledPanel';
@@ -469,14 +469,8 @@ export function EditorPage() {
     const lesson = lessons[contextMenu.lessonIndex];
     if (!lesson) return;
 
-    // Find the matching requirement
     const mergedReqs = mergeWithTemporaryLessons(requirements, temporaryLessons);
-    const req = mergedReqs.find(r =>
-      r.id === lesson.requirementId ||
-      (r.subject === lesson.subject &&
-       r.teacher === lesson.teacher &&
-       (r.type === 'class' || r.classOrGroup === lesson.group))
-    );
+    const req = findRequirementForScheduledLesson(mergedReqs, lesson, cellClass);
     if (!req) return;
 
     setCopiedLesson({
@@ -500,14 +494,8 @@ export function EditorPage() {
     const lesson = lessons[contextMenu.lessonIndex];
     if (!lesson) return;
 
-    // Find the matching requirement
     const mergedReqs = mergeWithTemporaryLessons(requirements, temporaryLessons);
-    const req = mergedReqs.find(r =>
-      r.id === lesson.requirementId ||
-      (r.subject === lesson.subject &&
-       r.teacher === lesson.teacher &&
-       (r.type === 'class' || r.classOrGroup === lesson.group))
-    );
+    const req = findRequirementForScheduledLesson(mergedReqs, lesson, cellClass);
     if (!req) return;
 
     setMovingLesson({

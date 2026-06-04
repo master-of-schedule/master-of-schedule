@@ -5,6 +5,7 @@
 
 // ScheduledLesson factory
 export { createScheduledLesson } from './createScheduledLesson';
+export { findRequirementForScheduledLesson } from './lessonRequirementMatching';
 
 // Schedule manipulation
 export {
@@ -105,4 +106,3 @@ export {
   computeMatchedTeachers,
   buildPartnerBusySet,
 } from './partner';
-
