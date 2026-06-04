@@ -19,6 +19,7 @@ import { db, getSettings } from './database';
 import { replaceAllData, getAllData } from './data';
 import { getAllVersions, getVersion } from './versions';
 import { inferRoomShortName } from '@/utils/roomUtils';
+import { getRequirementClassName } from '@/utils/classNames';
 
 // ============ JSON Export/Import ============
 
@@ -605,14 +606,15 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
     }
   }
 
-  // Auto-add classes referenced by group lessons but missing from Классы sheet
+  // Auto-add classes referenced by lesson requirements but missing from Классы sheet
   const classNames = new Set(classes.map(c => c.name));
   for (const req of lessonRequirements) {
-    if (req.type === 'group' && req.className && !classNames.has(req.className)) {
-      classNames.add(req.className);
+    const className = getRequirementClassName(req);
+    if (className && !classNames.has(className)) {
+      classNames.add(className);
       classes.push({
         id: `class-${classes.length + 1}`,
-        name: req.className,
+        name: className,
       });
     }
   }
