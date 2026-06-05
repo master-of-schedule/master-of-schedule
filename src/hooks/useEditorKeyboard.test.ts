@@ -31,13 +31,11 @@ function makeSchedule(className = '5а'): Schedule {
 describe('useEditorKeyboard', () => {
   const removeLessons = vi.fn();
   const clearSelectedCells = vi.fn();
-  const setSelectedLesson = vi.fn();
-  const setCopiedLesson = vi.fn();
+  const cancelInteraction = vi.fn();
   const undo = vi.fn();
   const redo = vi.fn();
   const closeContextMenu = vi.fn();
-  const clearMovingLesson = vi.fn();
-  const closeMoveTargetPicker = vi.fn();
+  const closeEditorDialog = vi.fn();
 
   const onUndoEmpty = vi.fn();
   const onRedoEmpty = vi.fn();
@@ -47,8 +45,7 @@ describe('useEditorKeyboard', () => {
     schedule: {} as Schedule,
     removeLessons,
     clearSelectedCells,
-    setSelectedLesson,
-    setCopiedLesson,
+    cancelInteraction,
     undo,
     redo,
     canUndo: true,
@@ -56,8 +53,7 @@ describe('useEditorKeyboard', () => {
     onUndoEmpty,
     onRedoEmpty,
     closeContextMenu,
-    clearMovingLesson,
-    closeMoveTargetPicker,
+    closeEditorDialog,
   };
 
   beforeEach(() => {
@@ -94,15 +90,13 @@ describe('useEditorKeyboard', () => {
     expect(redo).toHaveBeenCalledOnce();
   });
 
-  it('Escape clears selection, lesson, copied lesson, moving lesson, context menu', () => {
+  it('Escape clears selection and cancels editor interaction and dialogs', () => {
     renderHook(() => useEditorKeyboard(baseParams));
     fireKey('Escape');
-    expect(setSelectedLesson).toHaveBeenCalledWith(null);
+    expect(cancelInteraction).toHaveBeenCalledOnce();
     expect(clearSelectedCells).toHaveBeenCalledOnce();
-    expect(setCopiedLesson).toHaveBeenCalledWith(null);
-    expect(clearMovingLesson).toHaveBeenCalledOnce();
     expect(closeContextMenu).toHaveBeenCalledOnce();
-    expect(closeMoveTargetPicker).toHaveBeenCalledOnce();
+    expect(closeEditorDialog).toHaveBeenCalledOnce();
   });
 
   it('Delete with no selectedCells does nothing', () => {
@@ -171,7 +165,7 @@ describe('useEditorKeyboard', () => {
 
     renderHook(() => useEditorKeyboard(baseParams));
     fireKey('Escape');
-    expect(setSelectedLesson).not.toHaveBeenCalled();
+    expect(cancelInteraction).not.toHaveBeenCalled();
 
     document.body.removeChild(input);
   });

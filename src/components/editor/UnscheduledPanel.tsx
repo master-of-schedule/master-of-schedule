@@ -5,7 +5,12 @@
 import { useMemo, useCallback, useState } from 'react';
 import type { LessonRequirement, UnscheduledLesson } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
-import { getUnscheduledLessons, mergeWithTemporaryLessons, computeMergedTemps } from '@/logic';
+import {
+  computeMergedTemps,
+  getAssigningLesson,
+  getUnscheduledLessons,
+  mergeWithTemporaryLessons,
+} from '@/logic';
 import { extractGroupIndex } from '@/utils/formatLesson';
 import { ContextMenu, ContextMenuItem } from '@/components/common/ContextMenu';
 import { AddTemporaryLessonModal } from './AddTemporaryLessonModal';
@@ -31,7 +36,8 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
   const setLessonStatus = useScheduleStore((state) => state.setLessonStatus);
   const clearLessonStatus = useScheduleStore((state) => state.clearLessonStatus);
-  const selectedLesson = useUIStore((state) => state.selectedLesson);
+  const interaction = useUIStore((state) => state.interaction);
+  const selectedLesson = getAssigningLesson(interaction);
   const selectLesson = useUIStore((state) => state.selectLesson);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

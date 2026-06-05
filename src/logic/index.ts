@@ -6,6 +6,26 @@
 // ScheduledLesson factory
 export { createScheduledLesson } from './createScheduledLesson';
 export { findRequirementForScheduledLesson } from './lessonRequirementMatching';
+export {
+  reduceEditorInteraction,
+  reduceEditorDialog,
+  getAssigningLesson,
+  getCopiedLesson,
+  getMovingLesson,
+  getInteractionRequirement,
+} from './editorFlow';
+export type {
+  CopiedLessonData,
+  MovingLessonData,
+  EditorInteraction,
+  EditorInteractionEvent,
+  RoomDialogData,
+  ReplacementDialogData,
+  ChangeRoomDialogData,
+  MoveRoomDialogData,
+  EditorDialog,
+  EditorDialogEvent,
+} from './editorFlow';
 
 // Schedule manipulation
 export {
