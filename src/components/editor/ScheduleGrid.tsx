@@ -8,9 +8,15 @@ import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber, CellStatusInfo } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore, usePartnerStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
-import { getCellStatus, getSlotLessons } from '@/logic';
+import {
+  getAssigningLesson,
+  getCellStatus,
+  getCopiedLesson,
+  getInteractionRequirement,
+  getMovingLesson,
+  getSlotLessons,
+} from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
-import { getActiveGridStatusLesson } from './scheduleGridStatus';
 import styles from './ScheduleGrid.module.css';
 
 interface ScheduleGridProps {
@@ -38,13 +44,12 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
   })));
 
   const {
-    selectedLesson, selectedCells, searchResults, focusedCell,
+    interaction, selectedCells, searchResults, focusedCell,
     highlightedMovableCell, highlightedMovableTeacher, absentDay, absentLessons,
-    openContextMenu, selectCell, toggleCellSelection, setFocusedCell, moveFocus,
+    openContextMenu, selectCell, selectContextCell, toggleCellSelection, setFocusedCell, moveFocus,
     clearCellSelection, clearHighlightedMovableCell, clearHighlightedMovableTeacher,
-    copiedLesson, movingLesson,
   } = useUIStore(useShallow((s) => ({
-    selectedLesson: s.selectedLesson,
+    interaction: s.interaction,
     selectedCells: s.selectedCells,
     searchResults: s.searchResults,
     focusedCell: s.focusedCell,
@@ -54,15 +59,17 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     absentLessons: s.absentLessons,
     openContextMenu: s.openContextMenu,
     selectCell: s.selectCell,
+    selectContextCell: s.selectContextCell,
     toggleCellSelection: s.toggleCellSelection,
     setFocusedCell: s.setFocusedCell,
     moveFocus: s.moveFocus,
     clearCellSelection: s.clearCellSelection,
     clearHighlightedMovableCell: s.clearHighlightedMovableCell,
     clearHighlightedMovableTeacher: s.clearHighlightedMovableTeacher,
-    copiedLesson: s.copiedLesson,
-    movingLesson: s.movingLesson,
   })));
+  const selectedLesson = getAssigningLesson(interaction);
+  const copiedLesson = getCopiedLesson(interaction);
+  const movingLesson = getMovingLesson(interaction);
 
   const { partnerBusySet, isPartnerBusy } = usePartnerStore(useShallow((s) => ({
     partnerBusySet: s.partnerBusySet,
@@ -126,13 +133,13 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
 
   const getCellStatusForLesson = useCallback(
     (day: Day, lessonNum: LessonNumber): CellStatusInfo => {
-      const activeLesson = getActiveGridStatusLesson(selectedLesson, copiedLesson, movingLesson);
+      const activeLesson = getInteractionRequirement(interaction);
       if (!activeLesson) {
         return { status: 'available' };
       }
       return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups, partnerClassNames);
     },
-    [schedule, teachers, selectedLesson, copiedLesson, movingLesson, className, partnerBusySet, groups, partnerClassNames]
+    [schedule, teachers, interaction, className, partnerBusySet, groups, partnerClassNames]
   );
 
   // Handle cell click
@@ -208,10 +215,10 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, day: Day, lessonNum: LessonNumber, lessonIndex: number | null) => {
       e.preventDefault();
-      selectCell({ className, day, lessonNum });
+      selectContextCell({ className, day, lessonNum });
       openContextMenu(e.clientX, e.clientY, { className, day, lessonNum }, lessonIndex);
     },
-    [className, selectCell, openContextMenu]
+    [className, selectContextCell, openContextMenu]
   );
 
   // Handle Ctrl+click for multi-select

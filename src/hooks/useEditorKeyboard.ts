@@ -4,15 +4,14 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import type { CellRef, LessonRef, LessonRequirement, Schedule } from '@/types';
+import type { CellRef, LessonRef, Schedule } from '@/types';
 
 export interface UseEditorKeyboardParams {
   selectedCells: CellRef[];
   schedule: Schedule;
   removeLessons: (refs: LessonRef[]) => void;
   clearSelectedCells: () => void;
-  setSelectedLesson: (lesson: LessonRequirement | null) => void;
-  setCopiedLesson: (lesson: null) => void;
+  cancelInteraction: () => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -21,8 +20,7 @@ export interface UseEditorKeyboardParams {
   onRedoEmpty?: () => void;
   // Additional Escape handlers
   closeContextMenu: () => void;
-  clearMovingLesson: () => void;
-  closeMoveTargetPicker: () => void;
+  closeEditorDialog: () => void;
 }
 
 export interface UseEditorKeyboardReturn {
@@ -36,8 +34,7 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
     schedule,
     removeLessons,
     clearSelectedCells,
-    setSelectedLesson,
-    setCopiedLesson,
+    cancelInteraction,
     undo,
     redo,
     canUndo,
@@ -45,8 +42,7 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
     onUndoEmpty,
     onRedoEmpty,
     closeContextMenu,
-    clearMovingLesson,
-    closeMoveTargetPicker,
+    closeEditorDialog,
   } = params;
 
   const handleDeleteSelected = useCallback(() => {
@@ -96,12 +92,10 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
 
       // Escape: clear selection and cancel all flows
       if (e.key === 'Escape') {
-        setSelectedLesson(null);
+        cancelInteraction();
         closeContextMenu();
         clearSelectedCells();
-        setCopiedLesson(null);
-        clearMovingLesson();
-        closeMoveTargetPicker();
+        closeEditorDialog();
       }
       // Delete: remove all selected cells
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -121,12 +115,10 @@ export function useEditorKeyboard(params: UseEditorKeyboardParams): UseEditorKey
     canRedo,
     onUndoEmpty,
     onRedoEmpty,
-    setSelectedLesson,
+    cancelInteraction,
     closeContextMenu,
     clearSelectedCells,
-    setCopiedLesson,
-    clearMovingLesson,
-    closeMoveTargetPicker,
+    closeEditorDialog,
     selectedCells,
     handleDeleteSelected,
   ]);
