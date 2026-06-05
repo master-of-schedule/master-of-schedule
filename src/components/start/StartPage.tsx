@@ -7,7 +7,14 @@ import { useState, useCallback, useEffect } from 'react';
 import type { VersionListItem, VersionType } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
-import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile, downloadExcelTemplate } from '@/db/import-export';
+import {
+  pickExcelFile,
+  importFromExcel,
+  importLessonListsFromExcel,
+  exportToJson,
+  saveJsonFile,
+  downloadExcelTemplate,
+} from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { getVersionsByType, getVersion, deleteVersion, setActiveTemplate, getActiveTemplate, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { Button } from '@/components/common/Button';
@@ -318,6 +325,29 @@ export function StartPage() {
     }
   }, [reloadData, loadVersions, loadBackups, hasData, showToast]);
 
+  const handleImportLessonLists = useCallback(async () => {
+    setImportError(null);
+    const file = await pickExcelFile();
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      if (hasData) {
+        await createBackup('Загрузка списков занятий');
+      }
+      await importLessonListsFromExcel(file);
+      await reloadData();
+      await loadBackups();
+      showToast('Списки занятий загружены', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка импорта';
+      setImportError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  }, [reloadData, loadBackups, hasData, showToast]);
+
   // Handle JSON export
   const handleExportJson = useCallback(async () => {
     try {
@@ -492,6 +522,15 @@ export function StartPage() {
             title="Импорт учителей, кабинетов, классов и занятий из Excel"
           >
             {isImporting ? 'Загрузка...' : 'Загрузить Excel'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={handleImportLessonLists}
+            disabled={isImporting}
+            title="Обновить только классные и групповые занятия из файла РН"
+          >
+            Загрузить занятия
           </Button>
           <Button
             variant="ghost"

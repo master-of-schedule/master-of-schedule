@@ -93,6 +93,7 @@ export {
   saveJsonStringToFolder,
   parseExcelFile,
   importFromExcel,
+  importLessonListsFromExcel,
   pickJsonFile,
   pickExcelFile,
 } from './import-export';

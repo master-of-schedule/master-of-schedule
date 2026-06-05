@@ -20,6 +20,7 @@ import { replaceAllData, getAllData } from './data';
 import { getAllVersions, getVersion } from './versions';
 import { inferRoomShortName } from '@/utils/roomUtils';
 import { getRequirementClassName } from '@/utils/classNames';
+import { generateId } from '@/utils/generateId';
 
 // ============ JSON Export/Import ============
 
@@ -460,6 +461,7 @@ interface LessonRow {
   'Предмет'?: unknown;
   'Учитель'?: unknown;
   'Занятий в неделю'?: unknown;
+  'Кол-во в неделю'?: unknown;
   'Часов в неделю'?: unknown; // alias used by "Данные → Копировать"
   'Количество'?: unknown;
 }
@@ -580,14 +582,23 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
   }
 
   // Parse Class Lessons sheet (Классные занятия / Список занятий)
-  const classLessonsSheet = workbook.Sheets['Классные занятия'] ?? workbook.Sheets['Список занятий'];
+  const classLessonsSheet =
+    workbook.Sheets['Классные занятия'] ??
+    workbook.Sheets['Список занятий'] ??
+    workbook.Sheets['Занятия (классы)'];
   if (classLessonsSheet) {
     const data = XLSX.utils.sheet_to_json<LessonRow>(classLessonsSheet);
     for (const row of data) {
       const className = String(row['Класс'] ?? row['Класс/Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
       const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
-      const count = Number(row['Занятий в неделю'] ?? row['Часов в неделю'] ?? row['Количество'] ?? 0);
+      const count = Number(
+        row['Занятий в неделю'] ??
+        row['Кол-во в неделю'] ??
+        row['Часов в неделю'] ??
+        row['Количество'] ??
+        0
+      );
 
       if (!className || !subject || !teacher || count <= 0) continue;
 
@@ -603,14 +614,21 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
   }
 
   // Parse Group Lessons sheet (Групповые занятия)
-  const groupLessonsSheet = workbook.Sheets['Групповые занятия'];
+  const groupLessonsSheet =
+    workbook.Sheets['Групповые занятия'] ??
+    workbook.Sheets['Занятия (группы)'];
   if (groupLessonsSheet) {
     const data = XLSX.utils.sheet_to_json<GroupLessonRow>(groupLessonsSheet);
     for (const row of data) {
       const groupName = String(row['Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
       const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
-      const count = Number(row['Занятий в неделю'] ?? row['Количество'] ?? 0);
+      const count = Number(
+        row['Занятий в неделю'] ??
+        row['Кол-во в неделю'] ??
+        row['Количество'] ??
+        0
+      );
       const parallelGroup = String(row['Параллельная группа'] ?? '').trim();
       const className = String(row['Класс'] ?? '').trim();
 
@@ -697,12 +715,121 @@ export async function parseExcelFile(file: File): Promise<{
   return parseExcelWorkbook(workbook);
 }
 
+interface LessonImportData {
+  teachers: Teacher[];
+  classes: SchoolClass[];
+  groups: Group[];
+  lessonRequirements: LessonRequirement[];
+}
+
+function requirementKey(requirement: LessonRequirement): string {
+  return [
+    requirement.type,
+    requirement.classOrGroup,
+    requirement.subject,
+    requirement.teacher,
+    requirement.parallelGroup ?? '',
+    requirement.className ?? '',
+  ].join('\u0000');
+}
+
+export function mergeLessonImportData(
+  current: LessonImportData,
+  imported: LessonImportData
+): LessonImportData {
+  const importedSubjectsByTeacher = new Map<string, Set<string>>();
+  for (const requirement of imported.lessonRequirements) {
+    if (!importedSubjectsByTeacher.has(requirement.teacher)) {
+      importedSubjectsByTeacher.set(requirement.teacher, new Set());
+    }
+    importedSubjectsByTeacher.get(requirement.teacher)!.add(requirement.subject);
+  }
+
+  const teachers = current.teachers.map(teacher => ({
+    ...teacher,
+    subjects: Array.from(new Set([
+      ...teacher.subjects,
+      ...(importedSubjectsByTeacher.get(teacher.name) ?? []),
+    ])),
+  }));
+  const teacherNames = new Set(teachers.map(teacher => teacher.name));
+  for (const [name, subjects] of importedSubjectsByTeacher) {
+    if (teacherNames.has(name)) continue;
+    teachers.push({
+      id: generateId('teacher'),
+      name,
+      bans: {},
+      subjects: Array.from(subjects),
+    });
+  }
+
+  const classes = [...current.classes];
+  const classNames = new Set(classes.map(schoolClass => schoolClass.name));
+  for (const schoolClass of imported.classes) {
+    if (classNames.has(schoolClass.name)) continue;
+    classNames.add(schoolClass.name);
+    classes.push({
+      id: generateId('class'),
+      name: schoolClass.name,
+    });
+  }
+
+  const currentGroupsByName = new Map(current.groups.map(group => [group.name, group]));
+  const groups = imported.groups.map(group => ({
+    ...group,
+    id: currentGroupsByName.get(group.name)?.id ?? generateId('group'),
+  }));
+
+  const currentRequirementsByKey = new Map<string, LessonRequirement[]>();
+  for (const requirement of current.lessonRequirements) {
+    const key = requirementKey(requirement);
+    const matches = currentRequirementsByKey.get(key) ?? [];
+    matches.push(requirement);
+    currentRequirementsByKey.set(key, matches);
+  }
+  const lessonRequirements = imported.lessonRequirements.map(requirement => {
+    const matches = currentRequirementsByKey.get(requirementKey(requirement));
+    const existing = matches?.shift();
+    return {
+      ...requirement,
+      id: existing?.id ?? generateId('req'),
+    };
+  });
+
+  return { teachers, classes, groups, lessonRequirements };
+}
+
 /**
  * Import data from Excel file
  */
 export async function importFromExcel(file: File): Promise<void> {
   const data = await parseExcelFile(file);
   await replaceAllData(data);
+}
+
+export async function importLessonListsFromExcel(file: File): Promise<void> {
+  const imported = await parseExcelFile(file);
+  if (imported.lessonRequirements.length === 0) {
+    throw new Error('В файле не найдены списки занятий.');
+  }
+
+  const current = await getAllData();
+  const merged = mergeLessonImportData(current, imported);
+
+  await db.transaction(
+    'rw',
+    [db.teachers, db.classes, db.groups, db.lessonRequirements],
+    async () => {
+      await db.teachers.clear();
+      await db.teachers.bulkAdd(merged.teachers);
+      await db.classes.clear();
+      await db.classes.bulkAdd(merged.classes);
+      await db.groups.clear();
+      await db.groups.bulkAdd(merged.groups);
+      await db.lessonRequirements.clear();
+      await db.lessonRequirements.bulkAdd(merged.lessonRequirements);
+    }
+  );
 }
 
 // ============ File Picker Helpers ============
