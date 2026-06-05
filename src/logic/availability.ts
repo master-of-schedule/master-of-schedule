@@ -15,24 +15,22 @@ import type {
 import { forEachSlotAt } from './traversal';
 import { isTeacherFree } from './validation';
 import { getUnscheduledLessons } from './counting';
+import { findRequirementForScheduledLesson } from './lessonRequirementMatching';
 
-/**
- * Count how many times each room is used at a specific slot.
- */
-function getRoomUsageAtSlot(
+function getRoomClassesAtSlot(
   schedule: Schedule,
   day: Day,
   lessonNum: LessonNumber
-): Map<string, number> {
-  const usage = new Map<string, number>();
-  forEachSlotAt(schedule, day, lessonNum, (_className, lessons) => {
+): Map<string, Set<string>> {
+  const roomClasses = new Map<string, Set<string>>();
+  forEachSlotAt(schedule, day, lessonNum, (className, lessons) => {
     for (const lesson of lessons) {
-      if (lesson.room) {
-        usage.set(lesson.room, (usage.get(lesson.room) ?? 0) + 1);
-      }
+      if (!lesson.room) continue;
+      if (!roomClasses.has(lesson.room)) roomClasses.set(lesson.room, new Set());
+      roomClasses.get(lesson.room)!.add(className);
     }
   });
-  return usage;
+  return roomClasses;
 }
 
 /**
@@ -100,9 +98,9 @@ export function getAvailableRooms(
   lessonNum: LessonNumber,
   classes?: SchoolClass[],
   studentCount?: number,
+  targetClassName?: string,
 ): Room[] {
-  // Count how many times each room is used in this slot
-  const roomUsageCount = getRoomUsageAtSlot(schedule, day, lessonNum);
+  const roomClasses = getRoomClassesAtSlot(schedule, day, lessonNum);
 
   // Optionally compute student counts for capacity check
   const studentCounts = classes && studentCount != null
@@ -112,11 +110,13 @@ export function getAvailableRooms(
   const available: Room[] = [];
 
   for (const room of Object.values(rooms)) {
-    const currentUsage = roomUsageCount.get(room.shortName) ?? 0;
+    const currentClasses = roomClasses.get(room.shortName) ?? new Set<string>();
+    const currentUsage = currentClasses.size;
     const maxUsage = room.multiClass ?? 1;
+    const targetAlreadyCounted = targetClassName ? currentClasses.has(targetClassName) : false;
 
     // Room is available if it hasn't reached its multi-class limit
-    if (currentUsage < maxUsage) {
+    if (currentUsage < maxUsage || targetAlreadyCounted) {
       // Check student capacity if both classes and studentCount provided
       if (studentCounts && studentCount != null && room.capacity) {
         const existingStudents = studentCounts.get(room.shortName) ?? 0;
@@ -143,14 +143,17 @@ export function isRoomAvailable(
   lessonNum: LessonNumber,
   classes?: SchoolClass[],
   studentCount?: number,
+  targetClassName?: string,
 ): boolean {
   const room = Object.values(rooms).find(r => r.shortName === roomShortName);
   if (!room) return false;
 
-  const roomUsageCount = getRoomUsageAtSlot(schedule, day, lessonNum);
-  const currentUsage = roomUsageCount.get(roomShortName) ?? 0;
+  const roomClasses = getRoomClassesAtSlot(schedule, day, lessonNum);
+  const currentClasses = roomClasses.get(roomShortName) ?? new Set<string>();
+  const currentUsage = currentClasses.size;
   const maxUsage = room.multiClass ?? 1;
-  if (currentUsage >= maxUsage) return false;
+  const targetAlreadyCounted = targetClassName ? currentClasses.has(targetClassName) : false;
+  if (currentUsage >= maxUsage && !targetAlreadyCounted) return false;
 
   // Check student capacity if both classes and studentCount provided
   if (classes && studentCount != null && room.capacity) {
@@ -266,13 +269,7 @@ export function getAvailableLessonsForSlot(
             // Mark as seen so it won't appear in unscheduled too
             seenKeys.add(key);
 
-            // Find the matching requirement
-            const req = requirements.find(r =>
-              r.id === lesson.requirementId ||
-              (r.subject === lesson.subject &&
-               r.teacher === lesson.teacher &&
-               (r.type === 'class' || r.classOrGroup === lesson.group))
-            );
+            const req = findRequirementForScheduledLesson(requirements, lesson, className);
 
             if (req) {
               result.movable.push({

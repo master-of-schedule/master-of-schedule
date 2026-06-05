@@ -15,14 +15,20 @@ import type {
   SearchResult,
 } from '@/types';
 import { DAYS, LESSON_NUMBERS } from '@/types';
+import {
+  reduceEditorInteraction,
+  type CopiedLessonData,
+  type EditorInteraction,
+  type MovingLessonData,
+} from '@/logic/editorFlow';
 
 interface UIState {
   // Navigation
   activeTab: AppTab;
   currentClass: string | null;
 
-  // Selection
-  selectedLesson: LessonRequirement | null;
+  // Editor interaction
+  interaction: EditorInteraction;
   selectedCells: CellRef[];
 
   // Context menu
@@ -61,36 +67,20 @@ interface UIState {
   // Highlighted movable teacher (all their lessons in the grid get highlighted)
   highlightedMovableTeacher: string | null;
 
-  // Copied lesson for grid paste (move semantics: sourceRef tracks where it was copied from)
-  copiedLesson: {
-    requirement: LessonRequirement;
-    room: string;
-    sourceRef: { className: string; day: Day; lessonNum: LessonNumber; lessonIndex: number };
-  } | null;
-
-  // Moving lesson: user chose "Переместить" from context menu, awaiting target cell click
-  movingLesson: {
-    sourceRef: { className: string; day: Day; lessonNum: LessonNumber; lessonIndex: number };
-    requirement: LessonRequirement;
-    room: string;
-    teacher: string;
-    originalTeacher?: string;
-    isSubstitution?: boolean;
-  } | null;
-
   // Export page persistent state (survives tab switches within session)
   exportView: 'classes' | 'teachers' | 'rooms';
   exportSelectedDay: Day | null;
 
   // Actions - Navigation
   setActiveTab: (tab: AppTab) => void;
-  /** Switch active class. Clears selectedLesson, selectedCells, showReplacementPanel, movingLesson, copiedLesson. */
+  /** Switch active class and cancel the current editor interaction. */
   setCurrentClass: (className: string | null) => void;
 
   // Actions - Selection
-  /** Select a lesson from the unscheduled panel. Clears selectedCells, movingLesson, copiedLesson. */
+  /** Select a lesson from the unscheduled panel, replacing any copy or move interaction. */
   selectLesson: (lesson: LessonRequirement | null) => void;
   selectCell: (cellRef: CellRef) => void;
+  selectContextCell: (cellRef: CellRef) => void;
   toggleCellSelection: (cellRef: CellRef) => void;
   clearCellSelection: () => void;
   clearAllSelection: () => void;
@@ -136,22 +126,11 @@ interface UIState {
   clearHighlightedMovableTeacher: () => void;
 
   // Actions - Copied lesson
-  setCopiedLesson: (lesson: {
-    requirement: LessonRequirement;
-    room: string;
-    sourceRef: { className: string; day: Day; lessonNum: LessonNumber; lessonIndex: number };
-  } | null) => void;
+  setCopiedLesson: (lesson: CopiedLessonData | null) => void;
 
   // Actions - Moving lesson
-  setMovingLesson: (data: {
-    sourceRef: { className: string; day: Day; lessonNum: LessonNumber; lessonIndex: number };
-    requirement: LessonRequirement;
-    room: string;
-    teacher: string;
-    originalTeacher?: string;
-    isSubstitution?: boolean;
-  } | null) => void;
-  clearMovingLesson: () => void;
+  setMovingLesson: (data: MovingLessonData | null) => void;
+  cancelInteraction: () => void;
 
   // Actions - Export
   setExportView: (view: 'classes' | 'teachers' | 'rooms') => void;
@@ -162,7 +141,7 @@ export const useUIStore = create<UIState>((set) => ({
   // Initial state
   activeTab: 'start',
   currentClass: null,
-  selectedLesson: null,
+  interaction: { type: 'idle' },
   selectedCells: [],
   contextMenu: {
     isOpen: false,
@@ -187,8 +166,6 @@ export const useUIStore = create<UIState>((set) => ({
   focusedCell: null,
   highlightedMovableCell: null,
   highlightedMovableTeacher: null,
-  copiedLesson: null,
-  movingLesson: null,
   exportView: 'classes',
   exportSelectedDay: null,
 
@@ -197,24 +174,27 @@ export const useUIStore = create<UIState>((set) => ({
 
   setCurrentClass: (className) => set({
     currentClass: className,
-    selectedLesson: null,
+    interaction: { type: 'idle' },
     selectedCells: [],
     showReplacementPanel: false,
-    movingLesson: null,
-    copiedLesson: null,
   }),
 
   // Selection
-  selectLesson: (lesson) => set({
-    selectedLesson: lesson,
+  selectLesson: (lesson) => set((state) => ({
+    interaction: reduceEditorInteraction(
+      state.interaction,
+      lesson ? { type: 'SELECT_LESSON', lesson } : { type: 'CANCEL' }
+    ),
     selectedCells: [],
-    copiedLesson: null,
-    movingLesson: null,
-  }),
+  })),
 
   selectCell: (cellRef) => set({
     selectedCells: [cellRef],
-    selectedLesson: null,
+    interaction: { type: 'idle' },
+  }),
+
+  selectContextCell: (cellRef) => set({
+    selectedCells: [cellRef],
   }),
 
   toggleCellSelection: (cellRef) => set((state) => {
@@ -236,19 +216,17 @@ export const useUIStore = create<UIState>((set) => ({
 
     return {
       selectedCells: [...state.selectedCells, cellRef],
-      selectedLesson: null,
+      interaction: { type: 'idle' },
     };
   }),
 
   clearCellSelection: () => set({ selectedCells: [] }),
 
   clearAllSelection: () => set({
-    selectedLesson: null,
+    interaction: { type: 'idle' },
     selectedCells: [],
     showReplacementPanel: false,
     replacementForCell: null,
-    copiedLesson: null,
-    movingLesson: null,
   }),
 
   // Context menu
@@ -407,25 +385,29 @@ export const useUIStore = create<UIState>((set) => ({
   clearHighlightedMovableTeacher: () => set({ highlightedMovableTeacher: null }),
 
   // Copied lesson
-  setCopiedLesson: (lesson) => set({
-    copiedLesson: lesson,
-    movingLesson: null,
-    selectedLesson: null,
+  setCopiedLesson: (lesson) => set((state) => ({
+    interaction: reduceEditorInteraction(
+      state.interaction,
+      lesson ? { type: 'START_COPY', lesson } : { type: 'CANCEL' }
+    ),
     selectedCells: [],
     showReplacementPanel: false,
     replacementForCell: null,
-  }),
+  })),
 
   // Moving lesson
-  setMovingLesson: (data) => set({
-    movingLesson: data,
-    copiedLesson: null,
-    selectedLesson: null,
+  setMovingLesson: (data) => set((state) => ({
+    interaction: reduceEditorInteraction(
+      state.interaction,
+      data ? { type: 'START_MOVE', lesson: data } : { type: 'CANCEL' }
+    ),
     selectedCells: [],
     showReplacementPanel: false,
     replacementForCell: null,
-  }),
-  clearMovingLesson: () => set({ movingLesson: null }),
+  })),
+  cancelInteraction: () => set((state) => ({
+    interaction: reduceEditorInteraction(state.interaction, { type: 'CANCEL' }),
+  })),
 
   // Export
   setExportView: (view) => set({ exportView: view }),
@@ -434,7 +416,7 @@ export const useUIStore = create<UIState>((set) => ({
 
 // Selectors for common checks
 export const useIsLessonSelected = () =>
-  useUIStore((state) => state.selectedLesson !== null);
+  useUIStore((state) => state.interaction.type === 'assigning');
 
 export const useIsCellSelected = (cellRef: CellRef) =>
   useUIStore((state) =>
@@ -447,7 +429,7 @@ export const useIsCellSelected = (cellRef: CellRef) =>
 
 export const useHasSelection = () =>
   useUIStore((state) =>
-    state.selectedLesson !== null || state.selectedCells.length > 0
+    state.interaction.type !== 'idle' || state.selectedCells.length > 0
   );
 
 /** Build the key used in absentMarkedCells set */

@@ -6,10 +6,11 @@ import { useState, useCallback, useMemo } from 'react';
 import type { LessonRequirement } from '@/types';
 import { useDataStore } from '@/stores';
 import { Modal } from '@/components/common/Modal';
-import { FormField, formStyles } from '@/components/common/FormField';
+import { FormField } from '@/components/common/FormField';
+import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import { DatalistInput } from '@/components/common/DatalistInput';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { useFormSave } from '@/hooks/useFormSave';
 
 interface RequirementEditModalProps {

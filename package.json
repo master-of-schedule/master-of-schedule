@@ -1,12 +1,12 @@
 {
   "name": "timetable-editor",
   "private": true,
-  "version": "3.33.1",
+  "version": "3.34.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint src",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",

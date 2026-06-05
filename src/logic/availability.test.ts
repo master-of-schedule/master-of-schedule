@@ -529,6 +529,65 @@ describe('getAvailableLessonsForSlot', () => {
     expect(result.movable[0].fromLessonNum).toBe(1);
   });
 
+  it('matches movable grouped lessons by group when requirementId is stale', () => {
+    const schedule: Schedule = {
+      '10а': {
+        'Пн': {
+          1: {
+            lessons: [{
+              id: 'l1',
+              requirementId: 'old-req',
+              subject: 'Английский',
+              teacher: 'Иванова Т.С.',
+              room: '101',
+              group: '10а(д)',
+            }],
+          },
+          3: { lessons: [] },
+        },
+      },
+    };
+    const teachers: Record<string, Teacher> = {
+      'Иванова Т.С.': {
+        id: 't1',
+        name: 'Иванова Т.С.',
+        subjects: ['Английский'],
+        bans: {},
+      },
+    };
+    const requirements: LessonRequirement[] = [
+      {
+        id: 'class-req',
+        type: 'class',
+        classOrGroup: '10а',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 1,
+      },
+      {
+        id: 'group-req',
+        type: 'group',
+        classOrGroup: '10а(д)',
+        className: '10а',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 1,
+      },
+    ];
+
+    const result = getAvailableLessonsForSlot(
+      requirements,
+      schedule,
+      teachers,
+      '10а',
+      'Пн',
+      3
+    );
+
+    expect(result.movable).toHaveLength(1);
+    expect(result.movable[0].lesson.id).toBe('group-req');
+  });
+
   it('returns empty result when no lessons available', () => {
     const schedule: Schedule = {
       '10а': {
@@ -904,6 +963,67 @@ describe('getRoomStudentCount — no double-counting for same-class groups', () 
 
     const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, 25);
     expect(available.map(r => r.shortName)).not.toContain('-Зал-');
+  });
+
+  it('counts same-class groups as one class for multiClass room limit', () => {
+    const schedule: Schedule = {
+      '5а': {
+        'Пн': {
+          1: {
+            lessons: [
+              { id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Иванов А.А.', room: '-Зал-' },
+            ],
+          },
+        },
+      },
+      '6б': {
+        'Пн': {
+          1: {
+            lessons: [
+              { id: 'l2', requirementId: 'r2', subject: 'Физра', teacher: 'Петров Б.Б.', room: '-Зал-', group: '6б(1)' },
+            ],
+          },
+        },
+      },
+    };
+    const classes: SchoolClass[] = [
+      { id: 'c1', name: '5а', studentCount: 25 },
+      { id: 'c2', name: '6б', studentCount: 24 },
+    ];
+    const rooms: Record<string, Room> = {
+      '-Зал-': { id: 'r1', fullName: 'Зал', shortName: '-Зал-', capacity: 70, multiClass: 2 },
+    };
+
+    const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, undefined, '6б');
+    expect(available.map(r => r.shortName)).toContain('-Зал-');
+    expect(isRoomAvailable(schedule, rooms, '-Зал-', 'Пн', 1, classes, undefined, '6б')).toBe(true);
+  });
+
+  it('still rejects a third distinct class in a two-class room', () => {
+    const schedule: Schedule = {
+      '5а': {
+        'Пн': {
+          1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Иванов А.А.', room: '-Зал-' }] },
+        },
+      },
+      '6б': {
+        'Пн': {
+          1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физра', teacher: 'Петров Б.Б.', room: '-Зал-', group: '6б(1)' }] },
+        },
+      },
+    };
+    const classes: SchoolClass[] = [
+      { id: 'c1', name: '5а', studentCount: 25 },
+      { id: 'c2', name: '6б', studentCount: 24 },
+      { id: 'c3', name: '7в', studentCount: 23 },
+    ];
+    const rooms: Record<string, Room> = {
+      '-Зал-': { id: 'r1', fullName: 'Зал', shortName: '-Зал-', capacity: 90, multiClass: 2 },
+    };
+
+    const available = getAvailableRooms(schedule, rooms, 'Пн', 1, classes, 23, '7в');
+    expect(available.map(r => r.shortName)).not.toContain('-Зал-');
+    expect(isRoomAvailable(schedule, rooms, '-Зал-', 'Пн', 1, classes, 23, '7в')).toBe(false);
   });
 });
 

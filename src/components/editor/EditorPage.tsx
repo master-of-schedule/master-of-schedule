@@ -3,13 +3,25 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import type { Day, LessonNumber, Room, ScheduledLesson, CellRef, LessonRequirement, Teacher } from '@/types';
+import type { Day, LessonNumber, Room, ScheduledLesson, LessonRequirement, Teacher } from '@/types';
 import { useUIStore, useDataStore, useScheduleStore, usePartnerStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
-import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons, findRequirementForScheduledLesson } from '@/logic';
-import { ClassSelector, groupClassesByGrade } from './ClassSelector';
+import {
+  createScheduledLesson,
+  findRequirementForScheduledLesson,
+  getAssigningLesson,
+  getAvailableRooms,
+  getCopiedLesson,
+  getMovingLesson,
+  getSlotLessons,
+  getUnscheduledLessons,
+  isRoomAvailable,
+  mergeWithTemporaryLessons,
+} from '@/logic';
+import { ClassSelector } from './ClassSelector';
+import { pickFirstEditableClass } from './classSelection';
 import { ScheduleGrid } from './ScheduleGrid';
 import { UnscheduledPanel } from './UnscheduledPanel';
 import { ProtocolPanel } from './ProtocolPanel';
@@ -23,33 +35,33 @@ import { ContextMenu, ContextMenuItem, ContextMenuDivider } from '@/components/c
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
-import { usePickerState } from '@/hooks/usePickerState';
+import { useToast } from '@/components/common/toastContext';
+import { useEditorDialogState } from '@/hooks/useEditorDialogState';
 import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import styles from './EditorPage.module.css';
 
 export function EditorPage() {
   const {
-    currentClass, setCurrentClass, selectedLesson, selectLesson,
+    currentClass, setCurrentClass, interaction, selectLesson,
     contextMenu, closeContextMenu, selectedCells, clearCellSelection,
-    copiedLesson, setCopiedLesson, movingLesson, setMovingLesson,
-    clearMovingLesson, absentTeacher,
+    setCopiedLesson, setMovingLesson, cancelInteraction, absentTeacher,
   } = useUIStore(useShallow((s) => ({
     currentClass: s.currentClass,
     setCurrentClass: s.setCurrentClass,
-    selectedLesson: s.selectedLesson,
+    interaction: s.interaction,
     selectLesson: s.selectLesson,
     contextMenu: s.contextMenu,
     closeContextMenu: s.closeContextMenu,
     selectedCells: s.selectedCells,
     clearCellSelection: s.clearCellSelection,
-    copiedLesson: s.copiedLesson,
     setCopiedLesson: s.setCopiedLesson,
-    movingLesson: s.movingLesson,
     setMovingLesson: s.setMovingLesson,
-    clearMovingLesson: s.clearMovingLesson,
+    cancelInteraction: s.cancelInteraction,
     absentTeacher: s.absentTeacher,
   })));
+  const selectedLesson = getAssigningLesson(interaction);
+  const copiedLesson = getCopiedLesson(interaction);
+  const movingLesson = getMovingLesson(interaction);
 
   const { classes, gapExcludedClasses, requirements, teachers, rooms } = useDataStore(useShallow((s) => ({
     classes: s.classes,
@@ -123,40 +135,19 @@ export function EditorPage() {
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
   }, [movingLesson, absentTeacher, copiedLesson, selectedCells.length, selectedLesson, versionType]);
 
-  // Room picker state - supports both single cell and bulk assignment
-  const roomPicker = usePickerState<{
-    day: Day;
-    lessonNum: LessonNumber;
-    bulkCells?: CellRef[]; // If set, assign to all these cells
-  }>();
-
-  // Replacement picker state
-  const replacementPicker = usePickerState<{
-    day: Day;
-    lessonNum: LessonNumber;
-    lessonIndex: number;
-    currentLesson?: {
-      subject: string;
-      teacher: string;
-      group?: string;
-    };
-  }>();
-
-  // Change room picker state
-  const changeRoomPicker = usePickerState<{
-    day: Day;
-    lessonNum: LessonNumber;
-    lessonIndex: number;
-    subject: string;
-    teacher: string;
-    isGroup: boolean;
-  }>();
-
-  // Move target room picker state
-  const moveTargetPicker = usePickerState<{
-    day: Day;
-    lessonNum: LessonNumber;
-  }>();
+  const editorDialog = useEditorDialogState();
+  const roomDialogData = editorDialog.dialog.type === 'room'
+    ? editorDialog.dialog.data
+    : null;
+  const replacementDialogData = editorDialog.dialog.type === 'replacement'
+    ? editorDialog.dialog.data
+    : null;
+  const changeRoomDialogData = editorDialog.dialog.type === 'changeRoom'
+    ? editorDialog.dialog.data
+    : null;
+  const moveRoomDialogData = editorDialog.dialog.type === 'moveRoom'
+    ? editorDialog.dialog.data
+    : null;
 
   // Partner modal state (Z35-4 / Z39-3: open AddTemporaryLessonModal from ReplacementPanel partner section)
   const [partnerModal, setPartnerModal] = useState<{
@@ -181,9 +172,7 @@ export function EditorPage() {
   // Set initial class if none selected — pick the first non-partner, non-excluded class
   useEffect(() => {
     if (!currentClass && classes.length > 0) {
-      const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
-      const sorted = groupClassesByGrade(ownClassNames.length > 0 ? ownClassNames : classes.map(c => c.name), gapExcludedClasses);
-      const firstClass = sorted[0]?.[1][0] ?? classes[0].name;
+      const firstClass = pickFirstEditableClass(classes, gapExcludedClasses) ?? classes[0].name;
       setCurrentClass(firstClass);
     }
   }, [currentClass, classes, gapExcludedClasses, setCurrentClass]);
@@ -194,8 +183,7 @@ export function EditorPage() {
     schedule,
     removeLessons,
     clearSelectedCells: clearCellSelection,
-    setSelectedLesson: selectLesson,
-    setCopiedLesson,
+    cancelInteraction,
     undo,
     redo,
     canUndo: historyIndex > 0,
@@ -203,18 +191,17 @@ export function EditorPage() {
     onUndoEmpty: () => showToast('Нечего отменять', 'info'),
     onRedoEmpty: () => showToast('Нечего повторить', 'info'),
     closeContextMenu,
-    clearMovingLesson,
-    closeMoveTargetPicker: moveTargetPicker.close,
+    closeEditorDialog: editorDialog.close,
   });
 
   // Handle room selection for lesson assignment (single or bulk)
   const handleRoomSelect = useCallback(
     (room: Room) => {
-      if (!selectedLesson || !roomPicker.data) return;
+      if (!selectedLesson || !roomDialogData) return;
 
       // Bulk assignment mode
-      if (roomPicker.data.bulkCells && roomPicker.data.bulkCells.length > 0) {
-        for (const cell of roomPicker.data.bulkCells) {
+      if (roomDialogData.bulkCells && roomDialogData.bulkCells.length > 0) {
+        for (const cell of roomDialogData.bulkCells) {
           const lesson = createScheduledLesson(selectedLesson, room.shortName);
           assignLesson({
             className: cell.className,
@@ -238,16 +225,16 @@ export function EditorPage() {
 
         assignLesson({
           className: currentClass,
-          day: roomPicker.data.day,
-          lessonNum: roomPicker.data.lessonNum,
+          day: roomDialogData.day,
+          lessonNum: roomDialogData.lessonNum,
           lesson,
         });
       }
 
-      roomPicker.close();
+      editorDialog.close();
       selectLesson(null);
     },
-    [selectedLesson, roomPicker, currentClass, assignLesson, selectLesson, clearCellSelection]
+    [selectedLesson, roomDialogData, currentClass, assignLesson, editorDialog, selectLesson, clearCellSelection]
   );
 
   // Clear partner file and restore saved partner class schedules
@@ -311,7 +298,7 @@ export function EditorPage() {
     (day: Day, lessonNum: LessonNumber) => {
       // Move mode: user clicked target cell, open room picker
       if (movingLesson && currentClass) {
-        moveTargetPicker.open({ day, lessonNum });
+        editorDialog.openMoveRoom({ day, lessonNum });
         return;
       }
 
@@ -338,7 +325,10 @@ export function EditorPage() {
 
         // Check room availability
         if (lesson.room) {
-          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum);
+          const targetStudentCount = req.type === 'group'
+            ? undefined
+            : classes.find(c => c.name === currentClass)?.studentCount;
+          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum, classes, targetStudentCount, currentClass);
           if (!roomFree) {
             let occupant = '';
             for (const [cn, classSchedule] of Object.entries(schedule)) {
@@ -368,9 +358,9 @@ export function EditorPage() {
 
       // Normal flow: open room picker for selected lesson
       if (!selectedLesson) return;
-      roomPicker.open({ day, lessonNum });
+      editorDialog.openRoom({ day, lessonNum });
     },
-    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, requirements, temporaryLessons, assignLesson, setCopiedLesson, roomPicker, moveTargetPicker]
+    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, classes, requirements, temporaryLessons, assignLesson, editorDialog]
   );
 
   // Handle quick assign (double-click) - auto-select first available room
@@ -378,10 +368,10 @@ export function EditorPage() {
     (day: Day, lessonNum: LessonNumber) => {
       if (!selectedLesson || !currentClass) return;
 
-      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum);
+      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum, classes, currentClassStudentCount, currentClass);
       if (availableRooms.length === 0) {
         // No rooms available, open picker to show message
-        roomPicker.open({ day, lessonNum });
+        editorDialog.openRoom({ day, lessonNum });
         return;
       }
 
@@ -398,7 +388,7 @@ export function EditorPage() {
 
       selectLesson(null);
     },
-    [selectedLesson, currentClass, schedule, rooms, assignLesson, selectLesson, roomPicker]
+    [selectedLesson, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, editorDialog]
   );
 
   // Handle force-assign (Shift+click on banned/busy cell in weekly mode)
@@ -429,7 +419,7 @@ export function EditorPage() {
     const lessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
     const currentLessonData = lessons[contextMenu.lessonIndex];
 
-    replacementPicker.open({
+    editorDialog.openReplacement({
       day,
       lessonNum,
       lessonIndex: contextMenu.lessonIndex,
@@ -440,7 +430,7 @@ export function EditorPage() {
       } : undefined,
     });
     closeContextMenu();
-  }, [contextMenu, schedule, closeContextMenu, replacementPicker]);
+  }, [contextMenu, schedule, closeContextMenu, editorDialog]);
 
   // Open change room picker
   const handleOpenChangeRoom = useCallback(() => {
@@ -450,7 +440,7 @@ export function EditorPage() {
     const lesson = lessons[contextMenu.lessonIndex];
     if (!lesson) return;
 
-    changeRoomPicker.open({
+    editorDialog.openChangeRoom({
       day,
       lessonNum,
       lessonIndex: contextMenu.lessonIndex,
@@ -459,7 +449,7 @@ export function EditorPage() {
       isGroup: !!lesson.group,
     });
     closeContextMenu();
-  }, [contextMenu, schedule, closeContextMenu, changeRoomPicker]);
+  }, [contextMenu, schedule, closeContextMenu, editorDialog]);
 
   // Handle copy lesson from context menu
   const handleCopyLesson = useCallback(() => {
@@ -512,23 +502,23 @@ export function EditorPage() {
   // Handle room selection for change room
   const handleChangeRoomSelect = useCallback(
     (room: Room) => {
-      if (!changeRoomPicker.data || !currentClass) return;
+      if (!changeRoomDialogData || !currentClass) return;
       changeRoom({
         className: currentClass,
-        day: changeRoomPicker.data.day,
-        lessonNum: changeRoomPicker.data.lessonNum,
-        lessonIndex: changeRoomPicker.data.lessonIndex,
+        day: changeRoomDialogData.day,
+        lessonNum: changeRoomDialogData.lessonNum,
+        lessonIndex: changeRoomDialogData.lessonIndex,
         newRoom: room.shortName,
       });
-      changeRoomPicker.close();
+      editorDialog.close();
     },
-    [changeRoomPicker, currentClass, changeRoom]
+    [changeRoomDialogData, currentClass, changeRoom, editorDialog]
   );
 
   // Handle room selection for move operation
   const handleMoveRoomSelect = useCallback(
     (room: Room) => {
-      if (!movingLesson || !moveTargetPicker.data || !currentClass) return;
+      if (!movingLesson || !moveRoomDialogData || !currentClass) return;
 
       // Remove from source
       removeLesson(movingLesson.sourceRef);
@@ -540,67 +530,65 @@ export function EditorPage() {
       });
       assignLesson({
         className: currentClass,
-        day: moveTargetPicker.data.day,
-        lessonNum: moveTargetPicker.data.lessonNum,
+        day: moveRoomDialogData.day,
+        lessonNum: moveRoomDialogData.lessonNum,
         lesson,
       });
 
-      moveTargetPicker.close();
-      clearMovingLesson();
+      editorDialog.close();
+      cancelInteraction();
     },
-    [movingLesson, moveTargetPicker, currentClass, removeLesson, assignLesson, clearMovingLesson]
+    [movingLesson, moveRoomDialogData, currentClass, removeLesson, assignLesson, editorDialog, cancelInteraction]
   );
 
   // Handle replacement selection - removes old lesson, opens room picker for new
   const handleReplacementSelect = useCallback(
     (lesson: LessonRequirement) => {
-      if (!replacementPicker.data || !currentClass) return;
+      if (!replacementDialogData || !currentClass) return;
 
       // Remove the old lesson first
       removeLesson({
         className: currentClass,
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
-        lessonIndex: replacementPicker.data.lessonIndex,
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
+        lessonIndex: replacementDialogData.lessonIndex,
       });
 
       // Select the new lesson and open room picker
       selectLesson(lesson);
-      roomPicker.open({
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
+      editorDialog.openRoom({
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
       });
-
-      replacementPicker.close();
     },
-    [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
+    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
   );
 
   // Handle substitute teacher selection from replacement panel
   const handleSubstituteSelect = useCallback(
     (teacher: Teacher) => {
-      if (!replacementPicker.data || !currentClass) return;
+      if (!replacementDialogData || !currentClass) return;
 
       // Remember this is a substitution
       substitutionRef.current = {
-        originalTeacher: replacementPicker.data.currentLesson?.teacher ?? '',
+        originalTeacher: replacementDialogData.currentLesson?.teacher ?? '',
       };
 
       // Remove old lesson
       removeLesson({
         className: currentClass,
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
-        lessonIndex: replacementPicker.data.lessonIndex,
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
+        lessonIndex: replacementDialogData.lessonIndex,
       });
 
       // Create synthetic requirement for the substitute teacher
-      const group = replacementPicker.data.currentLesson?.group;
+      const group = replacementDialogData.currentLesson?.group;
       const syntheticReq: LessonRequirement = {
         id: `substitute-${teacher.name}`,
         type: group ? 'group' : 'class',
         classOrGroup: group ?? currentClass,
-        subject: replacementPicker.data.currentLesson?.subject ?? '',
+        subject: replacementDialogData.currentLesson?.subject ?? '',
         teacher: teacher.name,
         countPerWeek: 1,
         ...(group ? { className: currentClass } : {}),
@@ -608,64 +596,62 @@ export function EditorPage() {
 
       // Select and open room picker (same flow as handleReplacementSelect)
       selectLesson(syntheticReq);
-      roomPicker.open({
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
+      editorDialog.openRoom({
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
       });
-      replacementPicker.close();
     },
-    [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
+    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
   );
 
   // Handle union (профсоюз) substitute teacher selection — same flow but marks isUnionSubstitution
   const handleUnionSubstituteSelect = useCallback(
     (teacher: Teacher) => {
-      if (!replacementPicker.data || !currentClass) return;
+      if (!replacementDialogData || !currentClass) return;
 
       substitutionRef.current = {
-        originalTeacher: replacementPicker.data.currentLesson?.teacher ?? '',
+        originalTeacher: replacementDialogData.currentLesson?.teacher ?? '',
         isUnionSubstitution: true,
       };
 
       removeLesson({
         className: currentClass,
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
-        lessonIndex: replacementPicker.data.lessonIndex,
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
+        lessonIndex: replacementDialogData.lessonIndex,
       });
 
-      const group = replacementPicker.data.currentLesson?.group;
+      const group = replacementDialogData.currentLesson?.group;
       const syntheticReq: LessonRequirement = {
         id: `union-substitute-${teacher.name}`,
         type: group ? 'group' : 'class',
         classOrGroup: group ?? currentClass,
-        subject: replacementPicker.data.currentLesson?.subject ?? '',
+        subject: replacementDialogData.currentLesson?.subject ?? '',
         teacher: teacher.name,
         countPerWeek: 1,
         ...(group ? { className: currentClass } : {}),
       };
 
       selectLesson(syntheticReq);
-      roomPicker.open({
-        day: replacementPicker.data.day,
-        lessonNum: replacementPicker.data.lessonNum,
+      editorDialog.openRoom({
+        day: replacementDialogData.day,
+        lessonNum: replacementDialogData.lessonNum,
       });
-      replacementPicker.close();
     },
-    [replacementPicker, currentClass, removeLesson, selectLesson, roomPicker]
+    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
   );
 
   // Handle partner select (Z35-4 / Z39-3): open AddTemporaryLessonModal with pre-filled teacher + subject
   const handlePartnerSelect = useCallback((teacher: string, subject: string) => {
-    if (!replacementPicker.data) return;
+    if (!replacementDialogData) return;
     setPartnerModal({
       teacher,
       subject,
-      sourceDay: replacementPicker.data.day,
-      sourceLessonNum: replacementPicker.data.lessonNum,
+      sourceDay: replacementDialogData.day,
+      sourceLessonNum: replacementDialogData.lessonNum,
     });
-    replacementPicker.close();
-  }, [replacementPicker]);
+    editorDialog.close();
+  }, [replacementDialogData, editorDialog]);
 
   // Handle partner merge saved (Z39-3): remove original group lessons + auto-open room picker
   const handlePartnerMergeSaved = useCallback((lesson: LessonRequirement) => {
@@ -683,20 +669,20 @@ export function EditorPage() {
 
     // Select the new merged lesson and open room picker at the same slot
     selectLesson(lesson);
-    roomPicker.open({ day: sourceDay, lessonNum: sourceLessonNum });
-  }, [partnerModal, currentClass, schedule, removeLessons, selectLesson, roomPicker]);
+    editorDialog.openRoom({ day: sourceDay, lessonNum: sourceLessonNum });
+  }, [partnerModal, currentClass, schedule, removeLessons, selectLesson, editorDialog]);
 
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
     if (!selectedLesson || selectedCells.length === 0) return;
     // Use first cell's day/lessonNum for room picker display, but assign to all cells
     const firstCell = selectedCells[0];
-    roomPicker.open({
+    editorDialog.openRoom({
       day: firstCell.day,
       lessonNum: firstCell.lessonNum,
       bulkCells: selectedCells,
     });
-  }, [selectedLesson, selectedCells, roomPicker]);
+  }, [selectedLesson, selectedCells, editorDialog]);
 
   // Check if bulk assign is available
   const canBulkAssign = selectedLesson && selectedCells.length > 0;
@@ -774,18 +760,18 @@ export function EditorPage() {
         {currentClass && <UnscheduledPanel className={currentClass} />}
         {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <AbsentPanel />}
         {(versionType === 'weekly' || versionType === 'technical' || versionType === 'template') && <RoomPanel />}
-        {replacementPicker.isOpen && currentClass && replacementPicker.data && (
+        {replacementDialogData && currentClass && (
           <ReplacementPanel
             className={currentClass}
-            day={replacementPicker.data.day}
-            lessonNum={replacementPicker.data.lessonNum}
-            lessonIndex={replacementPicker.data.lessonIndex}
-            currentLesson={replacementPicker.data.currentLesson}
+            day={replacementDialogData.day}
+            lessonNum={replacementDialogData.lessonNum}
+            lessonIndex={replacementDialogData.lessonIndex}
+            currentLesson={replacementDialogData.currentLesson}
             onSelect={handleReplacementSelect}
             onSubstituteSelect={handleSubstituteSelect}
             onUnionSubstituteSelect={handleUnionSubstituteSelect}
             onPartnerSelect={handlePartnerSelect}
-            onClose={replacementPicker.close}
+            onClose={editorDialog.close}
           />
         )}
       </div>
@@ -829,44 +815,50 @@ export function EditorPage() {
       </ContextMenu>
 
       {/* Room Picker Modal */}
-      {roomPicker.isOpen && roomPicker.data && (
+      {roomDialogData && (
         <RoomPicker
           isOpen={true}
-          onClose={roomPicker.close}
+          onClose={editorDialog.close}
           onSelect={handleRoomSelect}
-          day={roomPicker.data.day}
-          lessonNum={roomPicker.data.lessonNum}
+          day={roomDialogData.day}
+          lessonNum={roomDialogData.lessonNum}
           preferredSubject={selectedLesson?.subject}
           preferredRoom={selectedLesson ? teachers[selectedLesson.teacher]?.defaultRoom : undefined}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
       {/* Change Room Picker Modal */}
-      {changeRoomPicker.isOpen && changeRoomPicker.data && (
+      {changeRoomDialogData && (
         <RoomPicker
           isOpen={true}
-          onClose={changeRoomPicker.close}
+          onClose={editorDialog.close}
           onSelect={handleChangeRoomSelect}
-          day={changeRoomPicker.data.day}
-          lessonNum={changeRoomPicker.data.lessonNum}
-          preferredSubject={changeRoomPicker.data.subject}
-          preferredRoom={teachers[changeRoomPicker.data.teacher]?.defaultRoom}
-          studentCount={changeRoomPicker.data.isGroup ? undefined : currentClassStudentCount}
+          day={changeRoomDialogData.day}
+          lessonNum={changeRoomDialogData.lessonNum}
+          preferredSubject={changeRoomDialogData.subject}
+          preferredRoom={teachers[changeRoomDialogData.teacher]?.defaultRoom}
+          studentCount={changeRoomDialogData.isGroup ? undefined : currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
       {/* Move Target Room Picker Modal */}
-      {moveTargetPicker.isOpen && moveTargetPicker.data && movingLesson && (
+      {moveRoomDialogData && movingLesson && (
         <RoomPicker
           isOpen={true}
-          onClose={() => { moveTargetPicker.close(); clearMovingLesson(); }}
+          onClose={() => {
+            editorDialog.close();
+            cancelInteraction();
+          }}
           onSelect={handleMoveRoomSelect}
-          day={moveTargetPicker.data.day}
-          lessonNum={moveTargetPicker.data.lessonNum}
+          day={moveRoomDialogData.day}
+          lessonNum={moveRoomDialogData.lessonNum}
           preferredSubject={movingLesson.requirement.subject}
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 

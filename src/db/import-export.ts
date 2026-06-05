@@ -20,6 +20,7 @@ import { replaceAllData, getAllData } from './data';
 import { getAllVersions, getVersion } from './versions';
 import { inferRoomShortName } from '@/utils/roomUtils';
 import { getRequirementClassName } from '@/utils/classNames';
+import { generateId } from '@/utils/generateId';
 
 // ============ JSON Export/Import ============
 
@@ -50,6 +51,23 @@ export interface ExportSummary {
   groupCount: number;
   requirementCount: number;
   versionCount: number;
+}
+
+function compareSchemaVersions(a: string, b: string): number {
+  const left = a.split('.').map(part => Number.parseInt(part, 10));
+  const right = b.split('.').map(part => Number.parseInt(part, 10));
+  const length = Math.max(left.length, right.length);
+
+  for (let index = 0; index < length; index++) {
+    const leftPart = left[index] ?? 0;
+    const rightPart = right[index] ?? 0;
+    if (Number.isNaN(leftPart) || Number.isNaN(rightPart)) {
+      return a.localeCompare(b, undefined, { numeric: true });
+    }
+    if (leftPart !== rightPart) return leftPart - rightPart;
+  }
+
+  return 0;
 }
 
 /**
@@ -126,7 +144,7 @@ export function parseExportData(jsonString: string): ExportData {
   }
 
   // Reject files from newer versions
-  if (data.version > CURRENT_SCHEMA_VERSION) {
+  if (compareSchemaVersions(data.version, CURRENT_SCHEMA_VERSION) > 0) {
     throw new Error(
       `Этот файл создан в более новой версии приложения (${data.version}). ` +
       `Обновите приложение для открытия этого файла.`
@@ -203,37 +221,59 @@ export async function exportToJson(): Promise<string> {
 export async function importFromJson(jsonString: string): Promise<void> {
   const data = parseExportData(jsonString);
 
-  await replaceAllData({
-    teachers: data.teachers,
-    rooms: data.rooms,
-    classes: data.classes,
-    groups: data.groups,
-    lessonRequirements: data.lessonRequirements,
-  });
+  await db.transaction('rw', [
+    db.teachers,
+    db.rooms,
+    db.classes,
+    db.groups,
+    db.lessonRequirements,
+    db.versions,
+    db.substitutions,
+    db.settings,
+  ], async () => {
+    if (data.teachers?.length) {
+      await db.teachers.clear();
+      await db.teachers.bulkAdd(data.teachers);
+    }
+    if (data.rooms?.length) {
+      await db.rooms.clear();
+      await db.rooms.bulkAdd(data.rooms);
+    }
+    if (data.classes?.length) {
+      await db.classes.clear();
+      await db.classes.bulkAdd(data.classes);
+    }
+    if (data.groups?.length) {
+      await db.groups.clear();
+      await db.groups.bulkAdd(data.groups);
+    }
+    if (data.lessonRequirements?.length) {
+      await db.lessonRequirements.clear();
+      await db.lessonRequirements.bulkAdd(data.lessonRequirements);
+    }
 
-  // Clear existing versions and import new ones
-  await db.versions.clear();
-  await db.substitutions.clear();
+    await db.versions.clear();
+    await db.substitutions.clear();
 
-  for (const version of data.scheduleVersions ?? []) {
-    await db.versions.add({
-      ...version,
-      createdAt: new Date(version.createdAt),
-      mondayDate: version.mondayDate ? new Date(version.mondayDate) : undefined,
+    for (const version of data.scheduleVersions ?? []) {
+      await db.versions.add({
+        ...version,
+        createdAt: new Date(version.createdAt),
+        mondayDate: version.mondayDate ? new Date(version.mondayDate) : undefined,
+      });
+    }
+
+    const activeTemplate = (data.scheduleVersions ?? []).find(v => v.isActiveTemplate);
+    const currentSettings = await db.settings.get('default');
+    await db.settings.put({
+      ...currentSettings,
+      id: 'default',
+      daysPerWeek: currentSettings?.daysPerWeek ?? 5,
+      lessonsPerDay: currentSettings?.lessonsPerDay ?? 8,
+      activeTemplateId: activeTemplate?.id ?? null,
+      gapExcludedClasses: data.settings?.gapExcludedClasses ?? currentSettings?.gapExcludedClasses,
+      customSubjects: data.settings?.customSubjects ?? currentSettings?.customSubjects,
     });
-  }
-
-  // Restore settings (use put to ensure settings exist)
-  const activeTemplate = (data.scheduleVersions ?? []).find(v => v.isActiveTemplate);
-  const currentSettings = await db.settings.get('default');
-  await db.settings.put({
-    ...currentSettings,
-    id: 'default',
-    daysPerWeek: currentSettings?.daysPerWeek ?? 5,
-    lessonsPerDay: currentSettings?.lessonsPerDay ?? 8,
-    activeTemplateId: activeTemplate?.id ?? null,
-    gapExcludedClasses: data.settings?.gapExcludedClasses ?? currentSettings?.gapExcludedClasses,
-    customSubjects: data.settings?.customSubjects ?? currentSettings?.customSubjects,
   });
 }
 
@@ -421,6 +461,7 @@ interface LessonRow {
   'Предмет'?: unknown;
   'Учитель'?: unknown;
   'Занятий в неделю'?: unknown;
+  'Кол-во в неделю'?: unknown;
   'Часов в неделю'?: unknown; // alias used by "Данные → Копировать"
   'Количество'?: unknown;
 }
@@ -541,14 +582,23 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
   }
 
   // Parse Class Lessons sheet (Классные занятия / Список занятий)
-  const classLessonsSheet = workbook.Sheets['Классные занятия'] ?? workbook.Sheets['Список занятий'];
+  const classLessonsSheet =
+    workbook.Sheets['Классные занятия'] ??
+    workbook.Sheets['Список занятий'] ??
+    workbook.Sheets['Занятия (классы)'];
   if (classLessonsSheet) {
     const data = XLSX.utils.sheet_to_json<LessonRow>(classLessonsSheet);
     for (const row of data) {
       const className = String(row['Класс'] ?? row['Класс/Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
       const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
-      const count = Number(row['Занятий в неделю'] ?? row['Часов в неделю'] ?? row['Количество'] ?? 0);
+      const count = Number(
+        row['Занятий в неделю'] ??
+        row['Кол-во в неделю'] ??
+        row['Часов в неделю'] ??
+        row['Количество'] ??
+        0
+      );
 
       if (!className || !subject || !teacher || count <= 0) continue;
 
@@ -564,14 +614,21 @@ export function parseExcelWorkbook(workbook: XLSX.WorkBook): {
   }
 
   // Parse Group Lessons sheet (Групповые занятия)
-  const groupLessonsSheet = workbook.Sheets['Групповые занятия'];
+  const groupLessonsSheet =
+    workbook.Sheets['Групповые занятия'] ??
+    workbook.Sheets['Занятия (группы)'];
   if (groupLessonsSheet) {
     const data = XLSX.utils.sheet_to_json<GroupLessonRow>(groupLessonsSheet);
     for (const row of data) {
       const groupName = String(row['Группа'] ?? '').trim();
       const subject = String(row['Предмет'] ?? '').trim();
       const teacher = String(row['Учитель'] ?? '').trim().normalize('NFC');
-      const count = Number(row['Занятий в неделю'] ?? row['Количество'] ?? 0);
+      const count = Number(
+        row['Занятий в неделю'] ??
+        row['Кол-во в неделю'] ??
+        row['Количество'] ??
+        0
+      );
       const parallelGroup = String(row['Параллельная группа'] ?? '').trim();
       const className = String(row['Класс'] ?? '').trim();
 
@@ -658,12 +715,121 @@ export async function parseExcelFile(file: File): Promise<{
   return parseExcelWorkbook(workbook);
 }
 
+interface LessonImportData {
+  teachers: Teacher[];
+  classes: SchoolClass[];
+  groups: Group[];
+  lessonRequirements: LessonRequirement[];
+}
+
+function requirementKey(requirement: LessonRequirement): string {
+  return [
+    requirement.type,
+    requirement.classOrGroup,
+    requirement.subject,
+    requirement.teacher,
+    requirement.parallelGroup ?? '',
+    requirement.className ?? '',
+  ].join('\u0000');
+}
+
+export function mergeLessonImportData(
+  current: LessonImportData,
+  imported: LessonImportData
+): LessonImportData {
+  const importedSubjectsByTeacher = new Map<string, Set<string>>();
+  for (const requirement of imported.lessonRequirements) {
+    if (!importedSubjectsByTeacher.has(requirement.teacher)) {
+      importedSubjectsByTeacher.set(requirement.teacher, new Set());
+    }
+    importedSubjectsByTeacher.get(requirement.teacher)!.add(requirement.subject);
+  }
+
+  const teachers = current.teachers.map(teacher => ({
+    ...teacher,
+    subjects: Array.from(new Set([
+      ...teacher.subjects,
+      ...(importedSubjectsByTeacher.get(teacher.name) ?? []),
+    ])),
+  }));
+  const teacherNames = new Set(teachers.map(teacher => teacher.name));
+  for (const [name, subjects] of importedSubjectsByTeacher) {
+    if (teacherNames.has(name)) continue;
+    teachers.push({
+      id: generateId('teacher'),
+      name,
+      bans: {},
+      subjects: Array.from(subjects),
+    });
+  }
+
+  const classes = [...current.classes];
+  const classNames = new Set(classes.map(schoolClass => schoolClass.name));
+  for (const schoolClass of imported.classes) {
+    if (classNames.has(schoolClass.name)) continue;
+    classNames.add(schoolClass.name);
+    classes.push({
+      id: generateId('class'),
+      name: schoolClass.name,
+    });
+  }
+
+  const currentGroupsByName = new Map(current.groups.map(group => [group.name, group]));
+  const groups = imported.groups.map(group => ({
+    ...group,
+    id: currentGroupsByName.get(group.name)?.id ?? generateId('group'),
+  }));
+
+  const currentRequirementsByKey = new Map<string, LessonRequirement[]>();
+  for (const requirement of current.lessonRequirements) {
+    const key = requirementKey(requirement);
+    const matches = currentRequirementsByKey.get(key) ?? [];
+    matches.push(requirement);
+    currentRequirementsByKey.set(key, matches);
+  }
+  const lessonRequirements = imported.lessonRequirements.map(requirement => {
+    const matches = currentRequirementsByKey.get(requirementKey(requirement));
+    const existing = matches?.shift();
+    return {
+      ...requirement,
+      id: existing?.id ?? generateId('req'),
+    };
+  });
+
+  return { teachers, classes, groups, lessonRequirements };
+}
+
 /**
  * Import data from Excel file
  */
 export async function importFromExcel(file: File): Promise<void> {
   const data = await parseExcelFile(file);
   await replaceAllData(data);
+}
+
+export async function importLessonListsFromExcel(file: File): Promise<void> {
+  const imported = await parseExcelFile(file);
+  if (imported.lessonRequirements.length === 0) {
+    throw new Error('В файле не найдены списки занятий.');
+  }
+
+  const current = await getAllData();
+  const merged = mergeLessonImportData(current, imported);
+
+  await db.transaction(
+    'rw',
+    [db.teachers, db.classes, db.groups, db.lessonRequirements],
+    async () => {
+      await db.teachers.clear();
+      await db.teachers.bulkAdd(merged.teachers);
+      await db.classes.clear();
+      await db.classes.bulkAdd(merged.classes);
+      await db.groups.clear();
+      await db.groups.bulkAdd(merged.groups);
+      await db.lessonRequirements.clear();
+      await db.lessonRequirements.bulkAdd(merged.lessonRequirements);
+    }
+  );
 }
 
 // ============ File Picker Helpers ============

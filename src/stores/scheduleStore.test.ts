@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useScheduleStore } from './scheduleStore';
-import type { ScheduledLesson, Day, LessonNumber } from '@/types';
+import type { ScheduledLesson, Day, LessonNumber, LessonRequirement } from '@/types';
 
 const mockIsReadOnly = { value: false };
 
@@ -289,21 +289,51 @@ describe('substitutions', () => {
   it('addSubstitution appends to list', () => {
     const sub = { id: 's1', date: new Date('2026-01-01'), day: DAY, classOrGroup: '5а', originalTeacher: 'А', replacingTeacher: 'Б', subject: 'Физика', lessonNum: 1 as LessonNumber, room: '101' };
     useScheduleStore.getState().addSubstitution(sub);
-    expect(useScheduleStore.getState().substitutions).toHaveLength(1);
-    expect(useScheduleStore.getState().substitutions[0].id).toBe('s1');
+    const state = useScheduleStore.getState();
+    expect(state.substitutions).toHaveLength(1);
+    expect(state.substitutions[0].id).toBe('s1');
+    expect(state.isDirty).toBe(true);
+    expect(state.jsonIsDirty).toBe(true);
   });
 
   it('removeSubstitution removes by id', () => {
     const sub = { id: 's1', date: new Date('2026-01-01'), day: DAY, classOrGroup: '5а', originalTeacher: 'А', replacingTeacher: 'Б', subject: 'Физика', lessonNum: 1 as LessonNumber, room: '101' };
-    useScheduleStore.setState({ substitutions: [sub] });
+    useScheduleStore.setState({ substitutions: [sub], isDirty: false, jsonIsDirty: false });
     useScheduleStore.getState().removeSubstitution('s1');
-    expect(useScheduleStore.getState().substitutions).toHaveLength(0);
+    const state = useScheduleStore.getState();
+    expect(state.substitutions).toHaveLength(0);
+    expect(state.isDirty).toBe(true);
+    expect(state.jsonIsDirty).toBe(true);
   });
 
   it('removeSubstitution is a no-op for unknown id', () => {
-    useScheduleStore.setState({ substitutions: [] });
+    useScheduleStore.setState({ substitutions: [], isDirty: false, jsonIsDirty: false });
     useScheduleStore.getState().removeSubstitution('unknown');
-    expect(useScheduleStore.getState().substitutions).toHaveLength(0);
+    const state = useScheduleStore.getState();
+    expect(state.substitutions).toHaveLength(0);
+    expect(state.isDirty).toBe(false);
+    expect(state.jsonIsDirty).toBe(false);
+  });
+});
+
+describe('temporary lessons', () => {
+  it('removeTemporaryLesson marks the saved version and JSON export as dirty', () => {
+    const lesson: LessonRequirement = {
+      id: 'tmp1',
+      type: 'class',
+      classOrGroup: '5а',
+      subject: 'Физика',
+      teacher: 'А',
+      countPerWeek: 1,
+    };
+    useScheduleStore.setState({ temporaryLessons: [lesson], isDirty: false, jsonIsDirty: false });
+
+    useScheduleStore.getState().removeTemporaryLesson('tmp1');
+
+    const state = useScheduleStore.getState();
+    expect(state.temporaryLessons).toHaveLength(0);
+    expect(state.isDirty).toBe(true);
+    expect(state.jsonIsDirty).toBe(true);
   });
 });
 

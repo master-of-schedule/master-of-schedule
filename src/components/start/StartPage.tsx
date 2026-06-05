@@ -7,17 +7,24 @@ import { useState, useCallback, useEffect } from 'react';
 import type { VersionListItem, VersionType } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
-import { pickExcelFile, importFromExcel, exportToJson, saveJsonFile, downloadExcelTemplate } from '@/db/import-export';
+import {
+  pickExcelFile,
+  importFromExcel,
+  importLessonListsFromExcel,
+  exportToJson,
+  saveJsonFile,
+  downloadExcelTemplate,
+} from '@/db/import-export';
 import { createBackup } from '@/db/backup';
 import { getVersionsByType, getVersion, deleteVersion, setActiveTemplate, getActiveTemplate, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { ImportConfirmModal } from '@/components/common/ImportConfirmModal';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { VersionColumn } from './VersionColumn';
 import { NewYearWizard } from './NewYearWizard';
-import { pickFirstEditableClass } from '@/components/editor/ClassSelector';
+import { pickFirstEditableClass } from '@/components/editor/classSelection';
 import { useBackupList } from '@/hooks/useBackupList';
 import { useSaveAsModal } from '@/hooks/useSaveAsModal';
 import { useCreateWeeklyModal } from '@/hooks/useCreateWeeklyModal';
@@ -125,7 +132,20 @@ export function StartPage() {
     setCurrentClass: s.setCurrentClass,
   })));
 
-  const { newSchedule, loadSchedule, isDirty, jsonIsDirty, versionId, versionName, schedule, markSaved, markJsonSaved } = useScheduleStore(useShallow((s) => ({
+  const {
+    newSchedule,
+    loadSchedule,
+    isDirty,
+    jsonIsDirty,
+    versionId,
+    versionName,
+    schedule,
+    temporaryLessons,
+    lessonStatuses,
+    acknowledgedConflictKeys,
+    markSaved,
+    markJsonSaved,
+  } = useScheduleStore(useShallow((s) => ({
     newSchedule: s.newSchedule,
     loadSchedule: s.loadSchedule,
     isDirty: s.isDirty,
@@ -133,6 +153,9 @@ export function StartPage() {
     versionId: s.versionId,
     versionName: s.versionName,
     schedule: s.schedule,
+    temporaryLessons: s.temporaryLessons,
+    lessonStatuses: s.lessonStatuses,
+    acknowledgedConflictKeys: s.acknowledgedConflictKeys,
     markSaved: s.markSaved,
     markJsonSaved: s.markJsonSaved,
   })));
@@ -175,7 +198,6 @@ export function StartPage() {
   const {
     importModalOpen,
     importSummary,
-    pendingImportJson: _pendingImportJson,
     handleImportJsonStart,
     handleImportJsonConfirm,
     closeImportModal,
@@ -184,7 +206,6 @@ export function StartPage() {
   // ── Save As modal ──────────────────────────────────────────────────────────
   const {
     saveAsModalOpen,
-    saveAsSourceId: _saveAsSourceId,
     saveAsName, setSaveAsName,
     saveAsType, setSaveAsType,
     saveAsMondayDate, setSaveAsMondayDate,
@@ -215,30 +236,6 @@ export function StartPage() {
     loadVersions();
     loadBackups();
   }, [loadVersions, loadBackups]);
-
-  // Handle "Save and proceed" in unsaved changes modal
-  const handleSaveAndProceed = useCallback(async () => {
-    if (!versionId) {
-      // Can't save if no version exists, just proceed without saving
-      handleProceedWithoutSaving();
-      return;
-    }
-
-    setIsSavingBeforeLoad(true);
-    try {
-      await updateVersionSchedule(versionId, schedule);
-      await updateVersionMetadata(versionId, { name: versionName });
-      markSaved(versionId, versionName);
-
-      // Now proceed with the pending action
-      await handleProceedWithoutSaving();
-    } catch (err) {
-      console.error('Failed to save before loading:', err);
-      alert('Ошибка сохранения');
-    } finally {
-      setIsSavingBeforeLoad(false);
-    }
-  }, [versionId, schedule, versionName, markSaved]);
 
   // Handle "Proceed without saving" in unsaved changes modal
   const handleProceedWithoutSaving = useCallback(async () => {
@@ -272,6 +269,37 @@ export function StartPage() {
     }
   }, [unsavedChanges, closeUnsavedModal, loadSchedule, pickFirstClass, setCurrentClass, setActiveTab, newSchedule, openCreateWeekly]);
 
+  // Handle "Save and proceed" in unsaved changes modal
+  const handleSaveAndProceed = useCallback(async () => {
+    if (!versionId) {
+      handleProceedWithoutSaving();
+      return;
+    }
+
+    setIsSavingBeforeLoad(true);
+    try {
+      await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses, acknowledgedConflictKeys);
+      await updateVersionMetadata(versionId, { name: versionName });
+      markSaved(versionId, versionName);
+
+      await handleProceedWithoutSaving();
+    } catch (err) {
+      console.error('Failed to save before loading:', err);
+      alert('Ошибка сохранения');
+    } finally {
+      setIsSavingBeforeLoad(false);
+    }
+  }, [
+    versionId,
+    schedule,
+    temporaryLessons,
+    lessonStatuses,
+    acknowledgedConflictKeys,
+    versionName,
+    markSaved,
+    handleProceedWithoutSaving,
+  ]);
+
   // Handle Excel import (with backup)
   const handleImportExcel = useCallback(async () => {
     setImportError(null);
@@ -296,6 +324,29 @@ export function StartPage() {
       setIsImporting(false);
     }
   }, [reloadData, loadVersions, loadBackups, hasData, showToast]);
+
+  const handleImportLessonLists = useCallback(async () => {
+    setImportError(null);
+    const file = await pickExcelFile();
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      if (hasData) {
+        await createBackup('Загрузка списков занятий');
+      }
+      await importLessonListsFromExcel(file);
+      await reloadData();
+      await loadBackups();
+      showToast('Списки занятий загружены', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Ошибка импорта';
+      setImportError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  }, [reloadData, loadBackups, hasData, showToast]);
 
   // Handle JSON export
   const handleExportJson = useCallback(async () => {
@@ -397,7 +448,7 @@ export function StartPage() {
       setCurrentClass(firstClass);
     }
     setActiveTab('editor');
-  }, [isReadOnlyYear, readOnlyVersions, pickFirstClass, loadSchedule, setCurrentClass, setActiveTab, isDirty]);
+  }, [isReadOnlyYear, readOnlyVersions, pickFirstClass, loadSchedule, setCurrentClass, setActiveTab, isDirty, versionId]);
 
   // Delete version
   const handleDeleteVersion = useCallback(async (versionId: string, e: React.MouseEvent) => {
@@ -471,6 +522,15 @@ export function StartPage() {
             title="Импорт учителей, кабинетов, классов и занятий из Excel"
           >
             {isImporting ? 'Загрузка...' : 'Загрузить Excel'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={handleImportLessonLists}
+            disabled={isImporting}
+            title="Обновить только классные и групповые занятия из файла РН"
+          >
+            Загрузить занятия
           </Button>
           <Button
             variant="ghost"

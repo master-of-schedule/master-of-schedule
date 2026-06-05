@@ -11,7 +11,7 @@ import { saveJsonFile, parseExportData } from '@/db/import-export';
 import type { Schedule } from '@/types/schedule';
 import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/common/Button';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { version as APP_VERSION } from '../../../package.json';
 import styles from './SettingsPage.module.css';
 
@@ -94,7 +94,7 @@ export function SettingsPage() {
       await clearDatabase();
       await reloadData();
       alert('Данные успешно удалены');
-    } catch (err) {
+    } catch {
       alert('Ошибка при удалении данных');
     } finally {
       setIsClearing(false);
