@@ -21,7 +21,7 @@ export function useDataTable<T>(): UseDataTableResult<T> {
   const [search, setSearch] = useState('');
   const [editingItem, setEditingItem] = useState<T | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [copyLabel, setCopyLabel] = useState('Копировать');
+  const [copyLabel, setCopyLabel] = useState('Копировать таблицу');
 
   const openEdit = useCallback((item: T) => setEditingItem(item), []);
   const openNew = useCallback(() => setIsAddingNew(true), []);
@@ -31,7 +31,7 @@ export function useDataTable<T>(): UseDataTableResult<T> {
   }, []);
   const showCopied = useCallback(() => {
     setCopyLabel('Скопировано!');
-    setTimeout(() => setCopyLabel('Копировать'), 1500);
+    setTimeout(() => setCopyLabel('Копировать таблицу'), 1500);
   }, []);
 
   return { search, setSearch, editingItem, isAddingNew, copyLabel, openEdit, openNew, closeModal, showCopied };
