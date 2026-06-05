@@ -10,6 +10,7 @@ import { useScheduleStore, useUIStore, useDataStore, usePartnerStore } from '@/s
 import { useShallow } from 'zustand/react/shallow';
 import { getCellStatus, getSlotLessons } from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
+import { getActiveGridStatusLesson } from './scheduleGridStatus';
 import styles from './ScheduleGrid.module.css';
 
 interface ScheduleGridProps {
@@ -123,15 +124,50 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     [highlightedMovableCell, highlightedMovableTeacher, schedule, className]
   );
 
+  const getCellStatusForLesson = useCallback(
+    (day: Day, lessonNum: LessonNumber): CellStatusInfo => {
+      const activeLesson = getActiveGridStatusLesson(selectedLesson, copiedLesson, movingLesson);
+      if (!activeLesson) {
+        return { status: 'available' };
+      }
+      return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups, partnerClassNames);
+    },
+    [schedule, teachers, selectedLesson, copiedLesson, movingLesson, className, partnerBusySet, groups, partnerClassNames]
+  );
+
+  // Handle cell click
+  const handleCellClick = useCallback(
+    (day: Day, lessonNum: LessonNumber) => {
+      // Set focus to clicked cell
+      setFocusedCell(day, lessonNum);
+      // Clear any highlighted movable cell/teacher
+      clearHighlightedMovableCell();
+      clearHighlightedMovableTeacher();
+
+      if (movingLesson) {
+        // Moving a lesson — forward to EditorPage which opens room picker
+        onAssignLesson?.(day, lessonNum);
+      } else if (selectedLesson || copiedLesson) {
+        // If a lesson is selected or copied, try to assign/paste it
+        const status = getCellStatusForLesson(day, lessonNum);
+        if (status.status === 'available' && onAssignLesson) {
+          onAssignLesson(day, lessonNum);
+        }
+      } else {
+        // Select the cell
+        selectCell({ className, day, lessonNum });
+      }
+    },
+    [selectedLesson, copiedLesson, movingLesson, getCellStatusForLesson, className, selectCell, onAssignLesson, setFocusedCell, clearHighlightedMovableCell, clearHighlightedMovableTeacher]
+  );
+
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input field
       const activeElement = document.activeElement;
       const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
       if (isInputFocused) return;
 
-      // Only handle if grid is focused or a cell is focused
       if (!gridRef.current?.contains(document.activeElement) && !focusedCell) {
         return;
       }
@@ -166,47 +202,7 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusedCell, moveFocus, effectiveDays.length, effectiveLessons.length]);
-
-
-
-  // Get cell status based on selected lesson or copied lesson
-  const getCellStatusForLesson = useCallback(
-    (day: Day, lessonNum: LessonNumber): CellStatusInfo => {
-      const activeLesson = selectedLesson ?? copiedLesson?.requirement ?? null;
-      if (!activeLesson) {
-        return { status: 'available' };
-      }
-      return getCellStatus(schedule, teachers, activeLesson, className, day, lessonNum, partnerBusySet, groups, partnerClassNames);
-    },
-    [schedule, teachers, selectedLesson, copiedLesson, className, partnerBusySet, groups, partnerClassNames]
-  );
-
-  // Handle cell click
-  const handleCellClick = useCallback(
-    (day: Day, lessonNum: LessonNumber) => {
-      // Set focus to clicked cell
-      setFocusedCell(day, lessonNum);
-      // Clear any highlighted movable cell/teacher
-      clearHighlightedMovableCell();
-      clearHighlightedMovableTeacher();
-
-      if (movingLesson) {
-        // Moving a lesson — forward to EditorPage which opens room picker
-        onAssignLesson?.(day, lessonNum);
-      } else if (selectedLesson || copiedLesson) {
-        // If a lesson is selected or copied, try to assign/paste it
-        const status = getCellStatusForLesson(day, lessonNum);
-        if (status.status === 'available' && onAssignLesson) {
-          onAssignLesson(day, lessonNum);
-        }
-      } else {
-        // Select the cell
-        selectCell({ className, day, lessonNum });
-      }
-    },
-    [selectedLesson, copiedLesson, movingLesson, getCellStatusForLesson, className, selectCell, onAssignLesson, setFocusedCell, clearHighlightedMovableCell, clearHighlightedMovableTeacher]
-  );
+  }, [focusedCell, moveFocus, effectiveDays.length, effectiveLessons.length, handleCellClick]);
 
   // Handle context menu — also select the cell so the user can see which cell was right-clicked
   const handleContextMenu = useCallback(

@@ -7,7 +7,7 @@
  * so the user can track which absences have been handled.
  */
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { DAYS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
@@ -32,19 +32,18 @@ export function AbsentPanel() {
   const [sickMode, setSickMode] = useState(false);
   const isWeekly = versionType === 'weekly';
 
-  // Sorted teacher names + set for O(1) lookup
-  const teacherNameSet = useRef(new Set<string>());
-  const teacherNames = (() => {
-    const names = Object.values(teachers).map(t => t.name).sort((a, b) => a.localeCompare(b, 'ru'));
-    teacherNameSet.current = new Set(names);
-    return names;
-  })();
+  const teacherNames = useMemo(
+    () => Object.values(teachers).map(t => t.name).sort((a, b) => a.localeCompare(b, 'ru')),
+    [teachers]
+  );
+  const teacherNameSet = useMemo(() => new Set(teacherNames), [teacherNames]);
 
   // Local input state for type-ahead
   const [teacherInput, setTeacherInput] = useState(absentTeacher ?? '');
 
   // Sync local input when store value changes externally (e.g., cleared)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTeacherInput(absentTeacher ?? '');
   }, [absentTeacher]);
 
@@ -64,14 +63,14 @@ export function AbsentPanel() {
 
   const handleTeacherInputChange = useCallback((value: string) => {
     setTeacherInput(value);
-    setAbsentTeacher(teacherNameSet.current.has(value) ? value : null, absentDay);
-  }, [absentDay, setAbsentTeacher]);
+    setAbsentTeacher(teacherNameSet.has(value) ? value : null, absentDay);
+  }, [teacherNameSet, absentDay, setAbsentTeacher]);
 
   const handleTeacherBlur = useCallback(() => {
-    if (!teacherNameSet.current.has(teacherInput)) {
+    if (!teacherNameSet.has(teacherInput)) {
       setTeacherInput(absentTeacher ?? '');
     }
-  }, [teacherInput, absentTeacher]);
+  }, [teacherNameSet, teacherInput, absentTeacher]);
 
   const handleDayChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const day = (e.target.value || null) as Day | null;

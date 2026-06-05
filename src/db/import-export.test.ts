@@ -2,9 +2,22 @@
  * Tests for import/export functionality
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseExcelWorkbook, parseExportData, getExportSummary, CURRENT_SCHEMA_VERSION, type ExportData } from './import-export';
+import {
+  parseExcelWorkbook,
+  mergeLessonImportData,
+  parseExportData,
+  importFromJson,
+  getExportSummary,
+  CURRENT_SCHEMA_VERSION,
+  type ExportData,
+} from './import-export';
+import { db } from './database';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // Helper to create a minimal valid export data object
 function createExportData(overrides: Partial<ExportData> = {}): ExportData {
@@ -169,6 +182,34 @@ describe('parseExcelWorkbook', () => {
     expect(result.lessonRequirements[0].className).toBe('5а');
   });
 
+  it('parses lesson-list workbook exported by the workload editor', () => {
+    const workbook = createWorkbook({
+      'Занятия (классы)': [
+        ['Класс', 'Предмет', 'Учитель', 'Кол-во в неделю'],
+        ['4-э', 'Англ', 'Толмачева Л.Н.', 2],
+        ['5-а', 'ДНКР', 'Коломицкая Е.А.', 0.5],
+      ],
+      'Занятия (группы)': [
+        ['Группа', 'Класс', 'Предмет', 'Учитель', 'Параллельная группа', 'Кол-во в неделю'],
+        ['2-а (АЮ)', '2-а', 'Англ', 'Вербицкая А.Ю.', '2-а (КС)', 2],
+        ['2-а (КС)', '2-а', 'Англ', 'Занина К.С.', '2-а (АЮ)', 2],
+      ],
+    });
+
+    const result = parseExcelWorkbook(workbook);
+
+    expect(result.lessonRequirements).toHaveLength(4);
+    expect(result.classes.map(schoolClass => schoolClass.name)).toEqual(['4-э', '5-а', '2-а']);
+    expect(result.groups.map(group => group.name)).toEqual(['2-а (АЮ)', '2-а (КС)']);
+    expect(result.lessonRequirements[1].countPerWeek).toBe(0.5);
+    expect(result.teachers.map(teacher => teacher.name)).toEqual([
+      'Толмачева Л.Н.',
+      'Коломицкая Е.А.',
+      'Вербицкая А.Ю.',
+      'Занина К.С.',
+    ]);
+  });
+
   it('should parse complete file with all sheets', () => {
     const workbook = createWorkbook({
       'Учителя': [
@@ -324,6 +365,193 @@ describe('parseExcelWorkbook', () => {
   });
 });
 
+describe('mergeLessonImportData', () => {
+  it('replaces lesson lists while preserving stable data and adding missing entities', () => {
+    const current = {
+      teachers: [
+        {
+          id: 'teacher-existing',
+          name: 'Иванова И.И.',
+          bans: { 'Пн': [1 as const] },
+          subjects: ['Алгебра'],
+          phone: '+7 900 000-00-00',
+          defaultRoom: '-101-',
+        },
+        {
+          id: 'teacher-unused',
+          name: 'Петров П.П.',
+          bans: {},
+          subjects: ['История'],
+        },
+      ],
+      classes: [
+        { id: 'class-existing', name: '5-а', studentCount: 28, isPartner: true },
+      ],
+      groups: [
+        {
+          id: 'group-existing',
+          name: '5-а (1)',
+          className: '5-а',
+          index: '(1)',
+          parallelGroup: '5-а (2)',
+        },
+      ],
+      lessonRequirements: [
+        {
+          id: 'req-existing',
+          type: 'class' as const,
+          classOrGroup: '5-а',
+          subject: 'Алгебра',
+          teacher: 'Иванова И.И.',
+          countPerWeek: 4,
+        },
+        {
+          id: 'req-removed',
+          type: 'class' as const,
+          classOrGroup: '5-а',
+          subject: 'Старый предмет',
+          teacher: 'Петров П.П.',
+          countPerWeek: 1,
+        },
+      ],
+    };
+    const imported = {
+      teachers: [],
+      classes: [
+        { id: 'class-imported-1', name: '5-а' },
+        { id: 'class-imported-2', name: '6-б' },
+      ],
+      groups: [
+        {
+          id: 'group-imported-1',
+          name: '5-а (1)',
+          className: '5-а',
+          index: '(1)',
+          parallelGroup: '5-а (2)',
+        },
+        {
+          id: 'group-imported-2',
+          name: '6-б (1)',
+          className: '6-б',
+          index: '(1)',
+          parallelGroup: '6-б (2)',
+        },
+      ],
+      lessonRequirements: [
+        {
+          id: 'req-imported-1',
+          type: 'class' as const,
+          classOrGroup: '5-а',
+          subject: 'Алгебра',
+          teacher: 'Иванова И.И.',
+          countPerWeek: 5,
+        },
+        {
+          id: 'req-imported-2',
+          type: 'group' as const,
+          classOrGroup: '6-б (1)',
+          className: '6-б',
+          subject: 'Англ',
+          teacher: 'Сидорова С.С.',
+          countPerWeek: 2,
+          parallelGroup: '6-б (2)',
+        },
+      ],
+    };
+
+    const result = mergeLessonImportData(current, imported);
+
+    expect(result.classes).toContainEqual({
+      id: 'class-existing',
+      name: '5-а',
+      studentCount: 28,
+      isPartner: true,
+    });
+    expect(result.classes.some(schoolClass => schoolClass.name === '6-б')).toBe(true);
+
+    const existingTeacher = result.teachers.find(teacher => teacher.name === 'Иванова И.И.');
+    expect(existingTeacher).toMatchObject({
+      id: 'teacher-existing',
+      phone: '+7 900 000-00-00',
+      defaultRoom: '-101-',
+      bans: { 'Пн': [1] },
+      subjects: ['Алгебра'],
+    });
+    expect(result.teachers.some(teacher => teacher.name === 'Петров П.П.')).toBe(true);
+    expect(result.teachers.find(teacher => teacher.name === 'Сидорова С.С.')).toMatchObject({
+      bans: {},
+      subjects: ['Англ'],
+    });
+
+    expect(result.groups.find(group => group.name === '5-а (1)')?.id).toBe('group-existing');
+    expect(result.lessonRequirements).toHaveLength(2);
+    expect(result.lessonRequirements.find(requirement => requirement.subject === 'Алгебра')?.id)
+      .toBe('req-existing');
+    expect(result.lessonRequirements.some(requirement => requirement.subject === 'Старый предмет'))
+      .toBe(false);
+  });
+
+  it('adds newly imported subjects to an existing teacher without clearing their subjects', () => {
+    const result = mergeLessonImportData(
+      {
+        teachers: [{ id: 't1', name: 'Иванова И.И.', bans: {}, subjects: ['Алгебра'] }],
+        classes: [],
+        groups: [],
+        lessonRequirements: [],
+      },
+      {
+        teachers: [],
+        classes: [{ id: 'c1', name: '5-а' }],
+        groups: [],
+        lessonRequirements: [
+          {
+            id: 'r1',
+            type: 'class',
+            classOrGroup: '5-а',
+            subject: 'Геометрия',
+            teacher: 'Иванова И.И.',
+            countPerWeek: 2,
+          },
+        ],
+      }
+    );
+
+    expect(result.teachers[0].subjects).toEqual(['Алгебра', 'Геометрия']);
+  });
+
+  it('keeps duplicate imported rows on distinct requirement IDs', () => {
+    const duplicateRequirement = {
+      id: 'imported',
+      type: 'class' as const,
+      classOrGroup: '5-а',
+      subject: 'Математика',
+      teacher: 'Иванова И.И.',
+      countPerWeek: 1,
+    };
+    const result = mergeLessonImportData(
+      {
+        teachers: [{ id: 't1', name: 'Иванова И.И.', bans: {}, subjects: ['Математика'] }],
+        classes: [{ id: 'c1', name: '5-а' }],
+        groups: [],
+        lessonRequirements: [{ ...duplicateRequirement, id: 'existing' }],
+      },
+      {
+        teachers: [],
+        classes: [{ id: 'c2', name: '5-а' }],
+        groups: [],
+        lessonRequirements: [
+          duplicateRequirement,
+          { ...duplicateRequirement, id: 'imported-duplicate' },
+        ],
+      }
+    );
+
+    expect(result.lessonRequirements).toHaveLength(2);
+    expect(result.lessonRequirements[0].id).toBe('existing');
+    expect(result.lessonRequirements[1].id).not.toBe('existing');
+  });
+});
+
 describe('parseExportData', () => {
   it('should parse valid export data', () => {
     const data = createExportData({
@@ -347,6 +575,12 @@ describe('parseExportData', () => {
 
   it('should throw on newer version', () => {
     const data = createExportData({ version: '99.0' });
+    const json = JSON.stringify(data);
+    expect(() => parseExportData(json)).toThrow('более новой версии');
+  });
+
+  it('should compare schema versions numerically when rejecting newer files', () => {
+    const data = createExportData({ version: '3.10' });
     const json = JSON.stringify(data);
     expect(() => parseExportData(json)).toThrow('более новой версии');
   });
@@ -439,6 +673,51 @@ describe('parseExportData', () => {
     expect(result.version).toBe('3.8');
     // acknowledgedConflictKeys is optional — absent in old data is fine
     expect(result.scheduleVersions[0].acknowledgedConflictKeys).toBeUndefined();
+  });
+});
+
+describe('importFromJson', () => {
+  it('imports the complete JSON file inside one transaction', async () => {
+    const transaction = vi.spyOn(db, 'transaction').mockResolvedValue(undefined);
+    const data = createExportData({
+      teachers: [{ id: 't1', name: 'А', bans: {}, subjects: [] }],
+      rooms: [{ id: 'r1', fullName: 'Кабинет 1', shortName: '1' }],
+      classes: [{ id: 'c1', name: '5а' }],
+      groups: [{ id: 'g1', name: '5а(д)', className: '5а', index: '1' }],
+      lessonRequirements: [{
+        id: 'lr1',
+        type: 'class',
+        classOrGroup: '5а',
+        subject: 'Математика',
+        teacher: 'А',
+        countPerWeek: 1,
+      }],
+      scheduleVersions: [{
+        id: 'v1',
+        name: 'Шаблон',
+        type: 'template',
+        createdAt: new Date(),
+        schedule: {},
+        substitutions: [],
+        isActiveTemplate: true,
+      }],
+    });
+
+    await importFromJson(JSON.stringify(data));
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    const [mode, tables] = transaction.mock.calls[0];
+    expect(mode).toBe('rw');
+    expect(tables).toEqual([
+      db.teachers,
+      db.rooms,
+      db.classes,
+      db.groups,
+      db.lessonRequirements,
+      db.versions,
+      db.substitutions,
+      db.settings,
+    ]);
   });
 });
 

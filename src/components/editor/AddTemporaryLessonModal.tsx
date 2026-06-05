@@ -2,14 +2,15 @@
  * AddTemporaryLessonModal - Modal for adding temporary extra lessons to a version
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { LessonRequirement } from '@/types';
 import { useDataStore, useScheduleStore } from '@/stores';
 import { generateId } from '@/utils/generateId';
 
 type CompensationType = 'none' | 'budget' | 'union';
 import { Modal } from '@/components/common/Modal';
-import { FormField, formStyles } from '@/components/common/FormField';
+import { FormField } from '@/components/common/FormField';
+import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import { DatalistInput } from '@/components/common/DatalistInput';
 import { Button } from '@/components/common/Button';
@@ -40,6 +41,26 @@ export function AddTemporaryLessonModal({
   initialSubject,
   onSaved,
 }: AddTemporaryLessonModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <AddTemporaryLessonModalContent
+      onClose={onClose}
+      currentClass={currentClass}
+      initialTeacher={initialTeacher}
+      initialSubject={initialSubject}
+      onSaved={onSaved}
+    />
+  );
+}
+
+function AddTemporaryLessonModalContent({
+  onClose,
+  currentClass,
+  initialTeacher,
+  initialSubject,
+  onSaved,
+}: Omit<AddTemporaryLessonModalProps, 'isOpen'>) {
   const teachers = useDataStore((state) => state.teachers);
   const classes = useDataStore((state) => state.classes);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
@@ -50,23 +71,14 @@ export function AddTemporaryLessonModal({
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
   const versionType = useScheduleStore((state) => state.versionType);
 
-  const [teacher, setTeacher] = useState('');
+  const [teacher, setTeacher] = useState(initialTeacher ?? '');
   const [teacher2, setTeacher2] = useState('');
   const [className, setClassName] = useState(currentClass);
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(initialSubject ?? '');
   const [count, setCount] = useState(1);
   const [groupSuffix, setGroupSuffix] = useState('');
   const [compensationType, setCompensationType] = useState<CompensationType>('none');
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
-
-  // Sync class + optional pre-fill when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setClassName(currentClass);
-      if (initialTeacher !== undefined) setTeacher(initialTeacher);
-      if (initialSubject !== undefined) setSubject(initialSubject);
-    }
-  }, [isOpen, currentClass, initialTeacher, initialSubject]);
 
   // Build sorted teacher names for datalist
   const teacherNames = useMemo(
@@ -134,7 +146,7 @@ export function AddTemporaryLessonModal({
     setConfirmState(null);
     onSaved?.(lesson);
     onClose();
-  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, addTemporaryLesson, onClose, onSaved, lessonRequirements, temporaryLessons, addCustomSubject]);
+  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, groups, addTemporaryLesson, onClose, onSaved, addCustomSubject]);
 
   const handleSave = useCallback(() => {
     if (!canSave) return;
@@ -245,7 +257,7 @@ export function AddTemporaryLessonModal({
   }, [currentClass, onClose]);
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Добавить занятие" size="small">
+    <Modal isOpen={true} onClose={handleClose} title="Добавить занятие" size="small">
       <div className={formStyles.form}>
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-sm) 0', textAlign: 'center' }}>
           Временное занятие действует только в этой версии расписания

@@ -9,7 +9,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { exportToJson, saveJsonFile } from '@/db/import-export';
 import { getAvailableRooms, isRoomAvailable, getUnscheduledLessons, mergeWithTemporaryLessons, createScheduledLesson, getSlotLessons, findRequirementForScheduledLesson } from '@/logic';
-import { ClassSelector, groupClassesByGrade } from './ClassSelector';
+import { ClassSelector } from './ClassSelector';
+import { pickFirstEditableClass } from './classSelection';
 import { ScheduleGrid } from './ScheduleGrid';
 import { UnscheduledPanel } from './UnscheduledPanel';
 import { ProtocolPanel } from './ProtocolPanel';
@@ -23,7 +24,7 @@ import { ContextMenu, ContextMenuItem, ContextMenuDivider } from '@/components/c
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { HintBar } from '@/components/common/HintBar';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { usePickerState } from '@/hooks/usePickerState';
 import { useEditorKeyboard } from '@/hooks/useEditorKeyboard';
 import styles from './EditorPage.module.css';
@@ -181,9 +182,7 @@ export function EditorPage() {
   // Set initial class if none selected — pick the first non-partner, non-excluded class
   useEffect(() => {
     if (!currentClass && classes.length > 0) {
-      const ownClassNames = classes.filter(c => !c.isPartner).map(c => c.name);
-      const sorted = groupClassesByGrade(ownClassNames.length > 0 ? ownClassNames : classes.map(c => c.name), gapExcludedClasses);
-      const firstClass = sorted[0]?.[1][0] ?? classes[0].name;
+      const firstClass = pickFirstEditableClass(classes, gapExcludedClasses) ?? classes[0].name;
       setCurrentClass(firstClass);
     }
   }, [currentClass, classes, gapExcludedClasses, setCurrentClass]);
@@ -338,7 +337,10 @@ export function EditorPage() {
 
         // Check room availability
         if (lesson.room) {
-          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum);
+          const targetStudentCount = req.type === 'group'
+            ? undefined
+            : classes.find(c => c.name === currentClass)?.studentCount;
+          const roomFree = isRoomAvailable(schedule, rooms, lesson.room, day, lessonNum, classes, targetStudentCount, currentClass);
           if (!roomFree) {
             let occupant = '';
             for (const [cn, classSchedule] of Object.entries(schedule)) {
@@ -370,7 +372,7 @@ export function EditorPage() {
       if (!selectedLesson) return;
       roomPicker.open({ day, lessonNum });
     },
-    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, requirements, temporaryLessons, assignLesson, setCopiedLesson, roomPicker, moveTargetPicker]
+    [movingLesson, copiedLesson, selectedLesson, currentClass, schedule, rooms, classes, requirements, temporaryLessons, assignLesson, roomPicker, moveTargetPicker]
   );
 
   // Handle quick assign (double-click) - auto-select first available room
@@ -378,7 +380,7 @@ export function EditorPage() {
     (day: Day, lessonNum: LessonNumber) => {
       if (!selectedLesson || !currentClass) return;
 
-      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum);
+      const availableRooms = getAvailableRooms(schedule, rooms, day, lessonNum, classes, currentClassStudentCount, currentClass);
       if (availableRooms.length === 0) {
         // No rooms available, open picker to show message
         roomPicker.open({ day, lessonNum });
@@ -398,7 +400,7 @@ export function EditorPage() {
 
       selectLesson(null);
     },
-    [selectedLesson, currentClass, schedule, rooms, assignLesson, selectLesson, roomPicker]
+    [selectedLesson, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, roomPicker]
   );
 
   // Handle force-assign (Shift+click on banned/busy cell in weekly mode)
@@ -839,6 +841,7 @@ export function EditorPage() {
           preferredSubject={selectedLesson?.subject}
           preferredRoom={selectedLesson ? teachers[selectedLesson.teacher]?.defaultRoom : undefined}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
@@ -853,6 +856,7 @@ export function EditorPage() {
           preferredSubject={changeRoomPicker.data.subject}
           preferredRoom={teachers[changeRoomPicker.data.teacher]?.defaultRoom}
           studentCount={changeRoomPicker.data.isGroup ? undefined : currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 
@@ -867,6 +871,7 @@ export function EditorPage() {
           preferredSubject={movingLesson.requirement.subject}
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
+          targetClassName={currentClass ?? undefined}
         />
       )}
 

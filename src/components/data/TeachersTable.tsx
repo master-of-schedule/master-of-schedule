@@ -8,7 +8,7 @@ import { useDataStore } from '@/stores';
 import { useDataTable } from '@/hooks/useDataTable';
 import { Button } from '@/components/common/Button';
 import { TableActions } from '@/components/common/TableActions';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { TeacherEditModal } from './TeacherEditModal';
 import styles from './DataTable.module.css';
 

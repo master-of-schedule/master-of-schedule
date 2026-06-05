@@ -26,7 +26,7 @@ export interface UseBackupListReturn {
 }
 
 export function useBackupList(params: UseBackupListParams): UseBackupListReturn {
-  const { hasData, setIsImporting, setImportError, reloadData, loadVersions } = params;
+  const { setIsImporting, setImportError, reloadData, loadVersions } = params;
 
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [showBackups, setShowBackups] = useState(false);
@@ -55,7 +55,7 @@ export function useBackupList(params: UseBackupListParams): UseBackupListReturn 
     } finally {
       setIsImporting(false);
     }
-  }, [hasData, setIsImporting, setImportError, reloadData, loadVersions, loadBackups]);
+  }, [setIsImporting, setImportError, reloadData, loadVersions, loadBackups]);
 
   const handleDeleteBackup = useCallback(async (backupId: number) => {
     await deleteBackup(backupId);

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { forEachSlot, forEachSlotAt } from './traversal';
-import type { Schedule, ScheduledLesson } from '@/types';
+import type { Day, LessonNumber, Schedule, ScheduledLesson } from '@/types';
 
 function makeLesson(overrides: Partial<ScheduledLesson> = {}): ScheduledLesson {
   return {
@@ -97,7 +97,7 @@ describe('forEachSlotAt', () => {
   it('visits the same time-slot across all classes', () => {
     const schedule = makeSchedule();
     const classNames: string[] = [];
-    forEachSlotAt(schedule, 'Пн' as any, 1 as any, (className) => {
+    forEachSlotAt(schedule, 'Пн', 1, (className) => {
       classNames.push(className);
     });
     expect(classNames).toContain('5А');
@@ -107,7 +107,7 @@ describe('forEachSlotAt', () => {
   it('provides lessons for each class at the specified slot', () => {
     const schedule = makeSchedule();
     const results: Record<string, string[]> = {};
-    forEachSlotAt(schedule, 'Пн' as any, 1 as any, (className, lessons) => {
+    forEachSlotAt(schedule, 'Пн', 1, (className, lessons) => {
       results[className] = lessons.map((l) => l.id);
     });
     expect(results['5А']).toEqual(['l1']);
@@ -118,7 +118,7 @@ describe('forEachSlotAt', () => {
     const schedule = makeSchedule();
     const results: Record<string, ScheduledLesson[]> = {};
     // Вт lesson 2 exists for neither class
-    forEachSlotAt(schedule, 'Вт' as any, 2 as any, (className, lessons) => {
+    forEachSlotAt(schedule, 'Вт', 2, (className, lessons) => {
       results[className] = lessons;
     });
     expect(results['5А']).toEqual([]);
@@ -128,7 +128,7 @@ describe('forEachSlotAt', () => {
   it('handles a missing day gracefully (returns empty array)', () => {
     const schedule = makeSchedule();
     const results: ScheduledLesson[][] = [];
-    forEachSlotAt(schedule, 'Сб' as any, 1 as any, (_cn, lessons) => {
+    forEachSlotAt(schedule, 'Сб' as Day, 1, (_cn, lessons) => {
       results.push(lessons);
     });
     expect(results.every((l) => l.length === 0)).toBe(true);
@@ -136,7 +136,7 @@ describe('forEachSlotAt', () => {
 
   it('handles an empty schedule without error', () => {
     const cb = vi.fn();
-    forEachSlotAt({} as Schedule, 'Пн' as any, 1 as any, cb);
+    forEachSlotAt({} as Schedule, 'Пн', 1 as LessonNumber, cb);
     expect(cb).not.toHaveBeenCalled();
   });
 });

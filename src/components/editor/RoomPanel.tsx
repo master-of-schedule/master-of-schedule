@@ -4,7 +4,7 @@
  * Mirror of AbsentPanel but indexed by room instead of teacher.
  */
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { DAYS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
@@ -21,17 +21,16 @@ export function RoomPanel() {
   const roomPanelLessons = useUIStore((state) => state.roomPanelLessons);
   const { setRoomPanel, setRoomPanelLessons, toggleRoomPanelCell, clearRoomPanelMarked } = useUIStore();
 
-  // Sorted room short names + set for O(1) lookup
-  const roomNameSet = useRef(new Set<string>());
-  const roomNames = (() => {
-    const names = Object.values(rooms).map(r => r.shortName).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
-    roomNameSet.current = new Set(names);
-    return names;
-  })();
+  const roomNames = useMemo(
+    () => Object.values(rooms).map(r => r.shortName).sort((a, b) => a.localeCompare(b, 'ru', { numeric: true })),
+    [rooms]
+  );
+  const roomNameSet = useMemo(() => new Set(roomNames), [roomNames]);
 
   const [roomInput, setRoomInput] = useState(roomPanelRoom ?? '');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoomInput(roomPanelRoom ?? '');
   }, [roomPanelRoom]);
 
@@ -51,14 +50,14 @@ export function RoomPanel() {
 
   const handleRoomInputChange = useCallback((value: string) => {
     setRoomInput(value);
-    setRoomPanel(roomNameSet.current.has(value) ? value : null, roomPanelDay);
-  }, [roomPanelDay, setRoomPanel]);
+    setRoomPanel(roomNameSet.has(value) ? value : null, roomPanelDay);
+  }, [roomNameSet, roomPanelDay, setRoomPanel]);
 
   const handleRoomBlur = useCallback(() => {
-    if (!roomNameSet.current.has(roomInput)) {
+    if (!roomNameSet.has(roomInput)) {
       setRoomInput(roomPanelRoom ?? '');
     }
-  }, [roomInput, roomPanelRoom]);
+  }, [roomNameSet, roomInput, roomPanelRoom]);
 
   const handleDayChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const day = (e.target.value || null) as Day | null;

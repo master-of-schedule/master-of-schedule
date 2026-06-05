@@ -20,6 +20,7 @@ interface RoomPickerProps {
   preferredRoom?: string;
   /** Student count for capacity validation */
   studentCount?: number;
+  targetClassName?: string;
 }
 
 export function RoomPicker({
@@ -31,6 +32,7 @@ export function RoomPicker({
   preferredSubject,
   preferredRoom,
   studentCount,
+  targetClassName,
 }: RoomPickerProps) {
   const rooms = useDataStore((state) => state.rooms);
   const classes = useDataStore((state) => state.classes);
@@ -43,8 +45,8 @@ export function RoomPicker({
   const roomList = useMemo(() => Object.values(rooms), [rooms]);
 
   const availableRooms = useMemo(
-    () => getAvailableRooms(schedule, rooms, day, lessonNum, classes, studentCount),
-    [schedule, rooms, day, lessonNum, classes, studentCount]
+    () => getAvailableRooms(schedule, rooms, day, lessonNum, classes, studentCount, targetClassName),
+    [schedule, rooms, day, lessonNum, classes, studentCount, targetClassName]
   );
 
   const availableRoomIds = useMemo(

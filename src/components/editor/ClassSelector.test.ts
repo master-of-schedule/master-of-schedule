@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupClassesByGrade, pickFirstEditableClass } from './ClassSelector';
+import { groupClassesByGrade, pickFirstEditableClass } from './classSelection';
 
 describe('groupClassesByGrade', () => {
   const allClasses = ['1а', '1б', '2а', '5а', '9б', '10а', '10б', '11в'];

@@ -7,7 +7,8 @@ import { useMemo, useState, useCallback } from 'react';
 import { useDataStore } from '@/stores';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { FormField, formStyles } from '@/components/common/FormField';
+import { FormField } from '@/components/common/FormField';
+import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import styles from './DataTable.module.css';
 
