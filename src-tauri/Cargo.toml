@@ -1,6 +1,6 @@
 [package]
 name = "timetable-editor"
-version = "3.33.1"
+version = "3.34.0"
 edition = "2021"
 
 [lib]
