@@ -50,12 +50,17 @@ workload/gh-index.html
 workload/src-tauri/workload/
 
 # Development-only docs (not for public repo)
+AGENTS.md
 CLAUDE.md
 ROADMAP.md
 ROADMAP_ARCHIVE.md
 ARCHITECTURE.md
 GUIDELINES.md
 docs/
+
+# Local timetable data
+data/
+workload/data/
 
 # Claude Code and tool state
 .claude/
