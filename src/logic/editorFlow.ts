@@ -3,7 +3,12 @@ import type {
   Day,
   LessonNumber,
   LessonRequirement,
+  VersionType,
 } from '@/types';
+
+export function supportsForcePlacement(versionType: VersionType): boolean {
+  return versionType === 'technical' || versionType === 'weekly';
+}
 
 export interface CopiedLessonData {
   requirement: LessonRequirement;
@@ -84,6 +89,7 @@ export interface RoomDialogData {
   day: Day;
   lessonNum: LessonNumber;
   bulkCells?: CellRef[];
+  forceOverride?: boolean;
 }
 
 export interface ReplacementDialogData {

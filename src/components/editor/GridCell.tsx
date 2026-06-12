@@ -24,7 +24,7 @@ interface GridCellProps {
   onDoubleClick?: () => void;
   onContextMenu: (e: React.MouseEvent, lessonIndex: number | null) => void;
   onCtrlClick: () => void;
-  onShiftClick?: () => void;
+  onAltClick?: () => void;
   onNavigateToClass?: (className: string) => void;
 }
 
@@ -44,18 +44,19 @@ export const GridCell = memo(function GridCell({
   onDoubleClick,
   onContextMenu,
   onCtrlClick,
-  onShiftClick,
+  onAltClick,
   onNavigateToClass,
 }: GridCellProps) {
   const handleClick = useCallback((e: React.MouseEvent) => {
-    if (e.shiftKey) {
-      onShiftClick?.();
+    if (e.altKey) {
+      e.preventDefault();
+      onAltClick?.();
     } else if (e.ctrlKey || e.metaKey) {
       onCtrlClick();
     } else {
       onClick();
     }
-  }, [onClick, onCtrlClick, onShiftClick]);
+  }, [onClick, onCtrlClick, onAltClick]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {

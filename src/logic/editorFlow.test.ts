@@ -7,10 +7,19 @@ import {
   getMovingLesson,
   reduceEditorDialog,
   reduceEditorInteraction,
+  supportsForcePlacement,
   type CopiedLessonData,
   type EditorDialog,
   type MovingLessonData,
 } from './editorFlow';
+
+describe('supportsForcePlacement', () => {
+  it('allows technical and weekly schedules only', () => {
+    expect(supportsForcePlacement('technical')).toBe(true);
+    expect(supportsForcePlacement('weekly')).toBe(true);
+    expect(supportsForcePlacement('template')).toBe(false);
+  });
+});
 
 const requirement: LessonRequirement = {
   id: 'req-1',
@@ -105,5 +114,21 @@ describe('reduceEditorDialog', () => {
         { type: 'CLOSE' }
       )
     ).toEqual({ type: 'none' });
+  });
+
+  it('keeps force override scoped to the room dialog', () => {
+    const room = reduceEditorDialog(
+      { type: 'none' },
+      {
+        type: 'OPEN_ROOM',
+        data: { day: 'Пн', lessonNum: 1, forceOverride: true },
+      }
+    );
+
+    expect(room).toEqual({
+      type: 'room',
+      data: { day: 'Пн', lessonNum: 1, forceOverride: true },
+    });
+    expect(reduceEditorDialog(room, { type: 'CLOSE' })).toEqual({ type: 'none' });
   });
 });

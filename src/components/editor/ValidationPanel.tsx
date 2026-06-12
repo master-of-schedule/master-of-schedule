@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ScheduleConflict, ScheduleGap } from '@/logic';
-import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
+import { useScheduleStore, useDataStore, useUIStore, usePartnerStore } from '@/stores';
 import { validateSchedule, findGaps } from '@/logic';
 import { GapExclusionsModal } from './GapExclusionsModal';
 import styles from './ValidationPanel.module.css';
@@ -13,8 +13,12 @@ function getConflictIcon(type: ScheduleConflict['type']): string {
   switch (type) {
     case 'teacher_double_booked':
       return '👤';
+    case 'teacher_partner_busy':
+      return '👤';
     case 'room_double_booked':
       return '🚪';
+    case 'class_double_booked':
+      return '⚠';
     case 'force_override_ban':
       return '⚠️';
     default:
@@ -26,8 +30,12 @@ function getConflictLabel(type: ScheduleConflict['type']): string {
   switch (type) {
     case 'teacher_double_booked':
       return 'Учитель в двух классах';
+    case 'teacher_partner_busy':
+      return 'Учитель занят у партнёра';
     case 'room_double_booked':
       return 'Кабинет занят';
+    case 'class_double_booked':
+      return 'В классе два занятия';
     case 'force_override_ban':
       return 'Поставлено вопреки запрету';
     default:
@@ -39,12 +47,14 @@ export function ValidationPanel() {
   const schedule = useScheduleStore((state) => state.schedule);
   const teachers = useDataStore((state) => state.teachers);
   const groups = useDataStore((state) => state.groups);
+  const rooms = useDataStore((state) => state.rooms);
   const gapExcludedClasses = useDataStore((state) => state.gapExcludedClasses);
   const classes = useDataStore((state) => state.classes);
   const setCurrentClass = useUIStore((state) => state.setCurrentClass);
   const setFocusedCell = useUIStore((state) => state.setFocusedCell);
   const acknowledgedConflictKeys = useScheduleStore((state) => state.acknowledgedConflictKeys);
   const acknowledgeConflict = useScheduleStore((state) => state.acknowledgeConflict);
+  const partnerBusySet = usePartnerStore((state) => state.partnerBusySet);
   const [showGaps, setShowGaps] = useState(false);
   const [showExclusions, setShowExclusions] = useState(false);
 
@@ -55,8 +65,18 @@ export function ValidationPanel() {
 
   // Validate schedule (excluding partner class slots)
   const allConflicts = useMemo(
-    () => validateSchedule(schedule, teachers, partnerClassNames),
-    [schedule, teachers, partnerClassNames]
+    () => validateSchedule(
+      schedule,
+      teachers,
+      partnerClassNames,
+      {
+        rooms,
+        classes,
+        groups: Object.values(groups),
+        partnerBusySet,
+      }
+    ),
+    [schedule, teachers, partnerClassNames, rooms, classes, groups, partnerBusySet]
   );
 
   // Filter out acknowledged conflicts
@@ -144,14 +164,6 @@ export function ValidationPanel() {
       <div className={styles.list}>
         {conflicts.map((conflict, index) => {
           const key = `${conflict.type}|${conflict.day}|${conflict.lessonNum}|${conflict.details}`;
-          // Show "Верно" button for force_override_ban conflicts and teacher_double_booked
-          // where the slot contains a force-override lesson
-          const slotLessons = Object.values(schedule).flatMap(cls =>
-            cls[conflict.day]?.[conflict.lessonNum]?.lessons ?? []
-          );
-          const hasForceOverride = slotLessons.some(l => l.forceOverride);
-          const canAcknowledge = conflict.type === 'force_override_ban' ||
-            (conflict.type === 'teacher_double_booked' && hasForceOverride);
           return (
             <div key={`c-${index}`} className={styles.conflict}>
               <span className={styles.icon}>{getConflictIcon(conflict.type)}</span>
@@ -162,7 +174,7 @@ export function ValidationPanel() {
                 </span>
                 <span className={styles.description}>{conflict.details}</span>
               </div>
-              {canAcknowledge && (
+              {conflict.acknowledgeable && (
                 <button
                   className={styles.acknowledgeButton}
                   onClick={() => acknowledgeConflict(key)}
