@@ -13,6 +13,7 @@ export {
   getCopiedLesson,
   getMovingLesson,
   getInteractionRequirement,
+  supportsForcePlacement,
 } from './editorFlow';
 export type {
   CopiedLessonData,
@@ -62,7 +63,12 @@ export {
   findGaps,
   suggestGapExclusions,
 } from './validation';
-export type { AssignmentCheckResult, ScheduleConflict, ScheduleGap } from './validation';
+export type {
+  AssignmentCheckResult,
+  ScheduleConflict,
+  ScheduleValidationOptions,
+  ScheduleGap,
+} from './validation';
 
 // Counting and progress
 export {

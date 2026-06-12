@@ -21,6 +21,7 @@ interface RoomPickerProps {
   /** Student count for capacity validation */
   studentCount?: number;
   targetClassName?: string;
+  allowUnavailable?: boolean;
 }
 
 export function RoomPicker({
@@ -33,13 +34,14 @@ export function RoomPicker({
   preferredRoom,
   studentCount,
   targetClassName,
+  allowUnavailable = false,
 }: RoomPickerProps) {
   const rooms = useDataStore((state) => state.rooms);
   const classes = useDataStore((state) => state.classes);
   const schedule = useScheduleStore((state) => state.schedule);
 
   const [filter, setFilter] = useState('');
-  const [showOnlyAvailable, setShowOnlyAvailable] = useState(true);
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(!allowUnavailable);
 
   // Get available rooms for this slot
   const roomList = useMemo(() => Object.values(rooms), [rooms]);
@@ -56,7 +58,7 @@ export function RoomPicker({
 
   // Filter and sort rooms
   const displayedRooms = useMemo(() => {
-    let list = showOnlyAvailable ? availableRooms : roomList;
+    let list = showOnlyAvailable && !allowUnavailable ? availableRooms : roomList;
 
     // Apply text filter
     if (filter) {
@@ -80,7 +82,7 @@ export function RoomPicker({
       }
       return a.fullName.localeCompare(b.fullName, 'ru');
     });
-  }, [roomList, availableRooms, showOnlyAvailable, filter, preferredRoom]);
+  }, [roomList, availableRooms, showOnlyAvailable, allowUnavailable, filter, preferredRoom]);
 
   const handleSelect = (room: Room) => {
     onSelect(room);
@@ -99,19 +101,22 @@ export function RoomPicker({
             onChange={(e) => setFilter(e.target.value)}
             autoFocus
           />
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={showOnlyAvailable}
-              onChange={(e) => setShowOnlyAvailable(e.target.checked)}
-            />
-            Только свободные
-          </label>
+          {!allowUnavailable && (
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={showOnlyAvailable}
+                onChange={(e) => setShowOnlyAvailable(e.target.checked)}
+              />
+              Только свободные
+            </label>
+          )}
         </div>
 
         <div className={styles.info}>
           {day}, {lessonNum} урок
           {preferredSubject && <span> • {preferredSubject}</span>}
+          {allowUnavailable && <span> • ограничения отключены</span>}
         </div>
 
         <div className={styles.roomList}>
@@ -136,7 +141,7 @@ export function RoomPicker({
                   key={room.id}
                   className={`${styles.roomButton} ${!isAvailable ? styles.occupied : ''} ${isMultiClass ? styles.virtual : ''} ${isDefault ? styles.preferred : ''}`}
                   onClick={() => handleSelect(room)}
-                  disabled={!isAvailable && !isMultiClass}
+                  disabled={!allowUnavailable && !isAvailable && !isMultiClass}
                 >
                   <span className={styles.roomName}>
                     {room.fullName}

@@ -8,6 +8,8 @@ import type {
   ScheduledLesson,
   LessonRequirement,
   Teacher,
+  Room,
+  SchoolClass,
   Group,
   Day,
   LessonNumber,
@@ -337,21 +339,37 @@ export function getCellStatus(
  * Returns list of all conflicts found
  */
 export interface ScheduleConflict {
-  type: 'teacher_double_booked' | 'room_double_booked' | 'force_override_ban';
+  type:
+    | 'teacher_double_booked'
+    | 'teacher_partner_busy'
+    | 'room_double_booked'
+    | 'class_double_booked'
+    | 'force_override_ban';
   day: Day;
   lessonNum: LessonNumber;
   details: string;
+  acknowledgeable: boolean;
+}
+
+export interface ScheduleValidationOptions {
+  rooms?: Record<string, Room>;
+  classes?: SchoolClass[];
+  groups?: Group[];
+  partnerBusySet?: Set<string>;
 }
 
 export function validateSchedule(
   schedule: Schedule,
   teachers: Record<string, Teacher>,
-  partnerClassNames?: Set<string>
+  partnerClassNames?: Set<string>,
+  options: ScheduleValidationOptions = {}
 ): ScheduleConflict[] {
   const conflicts: ScheduleConflict[] = [];
   const days = DAYS;
+  const classStudentCounts = new Map(
+    (options.classes ?? []).map(schoolClass => [schoolClass.name, schoolClass.studentCount ?? 0])
+  );
 
-  // For each timeslot, check for teacher double-booking
   for (const day of days) {
     const lessonNums = new Set<LessonNumber>();
 
@@ -366,24 +384,59 @@ export function validateSchedule(
     }
 
     for (const lessonNum of lessonNums) {
-      const teacherAssignments = new Map<string, string[]>();
+      const teacherAssignments = new Map<string, { className: string; lesson: ScheduledLesson }[]>();
+      const roomAssignments = new Map<string, { className: string; lesson: ScheduledLesson }[]>();
 
       forEachSlotAt(schedule, day, lessonNum, (className, lessons) => {
-        // Skip partner school class slots — their teacher assignments don't count as conflicts
         if (partnerClassNames?.has(className)) return;
+
+        const lessonsWithoutOverrides = lessons.filter(lesson => !lesson.forceOverride);
+        const classHasConflict = hasClassConflict(lessons, options.groups);
+        const overrideCausedClassConflict =
+          classHasConflict &&
+          lessons.some(lesson => lesson.forceOverride) &&
+          !hasClassConflict(lessonsWithoutOverrides, options.groups);
+        if (overrideCausedClassConflict) {
+          conflicts.push({
+            type: 'class_double_booked',
+            day,
+            lessonNum,
+            details: `${className}: ${lessons.map(lesson => lesson.subject).join(', ')}`,
+            acknowledgeable: true,
+          });
+        }
+
         for (const lesson of lessons) {
           const existing = teacherAssignments.get(lesson.teacher) ?? [];
-          existing.push(className);
+          existing.push({ className, lesson });
           teacherAssignments.set(lesson.teacher, existing);
 
           if (lesson.teacher2) {
             const existing2 = teacherAssignments.get(lesson.teacher2) ?? [];
-            existing2.push(className);
+            existing2.push({ className, lesson });
             teacherAssignments.set(lesson.teacher2, existing2);
           }
 
-          // Check force-override ban violations
+          if (lesson.room) {
+            const roomExisting = roomAssignments.get(lesson.room) ?? [];
+            roomExisting.push({ className, lesson });
+            roomAssignments.set(lesson.room, roomExisting);
+          }
+
           if (lesson.forceOverride) {
+            const partnerBusyTeachers = [lesson.teacher, lesson.teacher2]
+              .filter((teacher): teacher is string => Boolean(teacher))
+              .filter(teacher => options.partnerBusySet?.has(`${teacher}|${day}|${lessonNum}`));
+            if (partnerBusyTeachers.length > 0) {
+              conflicts.push({
+                type: 'teacher_partner_busy',
+                day,
+                lessonNum,
+                details: `${partnerBusyTeachers.join(', ')} (${className}, ${lesson.subject})`,
+                acknowledgeable: true,
+              });
+            }
+
             const bannedTeachers: string[] = [];
             if (isTeacherBanned(teachers, lesson.teacher, day, lessonNum)) {
               bannedTeachers.push(lesson.teacher);
@@ -397,20 +450,46 @@ export function validateSchedule(
                 day,
                 lessonNum,
                 details: `${bannedTeachers.join(', ')} (${className}, ${lesson.subject})`,
+                acknowledgeable: true,
               });
             }
           }
         }
       });
 
-      // Check for teachers assigned to multiple classes
-      for (const [teacher, classes] of teacherAssignments) {
-        if (classes.length > 1) {
+      for (const [teacher, assignments] of teacherAssignments) {
+        const assignedClasses = assignments.map(assignment => assignment.className);
+        if (assignedClasses.length > 1) {
+          const regularClasses = assignments
+            .filter(assignment => !assignment.lesson.forceOverride)
+            .map(assignment => assignment.className);
           conflicts.push({
             type: 'teacher_double_booked',
             day,
             lessonNum,
-            details: `${teacher} assigned to ${classes.join(', ')}`,
+            details: `${teacher} assigned to ${assignedClasses.join(', ')}`,
+            acknowledgeable:
+              assignments.some(assignment => assignment.lesson.forceOverride) &&
+              regularClasses.length <= 1,
+          });
+        }
+      }
+
+      for (const [roomName, assignments] of roomAssignments) {
+        const room = Object.values(options.rooms ?? {}).find(candidate => candidate.shortName === roomName);
+        if (!room || !assignments.some(assignment => assignment.lesson.forceOverride)) continue;
+
+        const regularAssignments = assignments.filter(assignment => !assignment.lesson.forceOverride);
+        if (
+          hasRoomConflict(assignments, room, classStudentCounts) &&
+          !hasRoomConflict(regularAssignments, room, classStudentCounts)
+        ) {
+          conflicts.push({
+            type: 'room_double_booked',
+            day,
+            lessonNum,
+            details: `${roomName}: ${[...new Set(assignments.map(assignment => assignment.className))].join(', ')}`,
+            acknowledgeable: true,
           });
         }
       }
@@ -418,6 +497,35 @@ export function validateSchedule(
   }
 
   return conflicts;
+}
+
+function hasClassConflict(lessons: ScheduledLesson[], groups?: Group[]): boolean {
+  for (let first = 0; first < lessons.length; first += 1) {
+    for (let second = first + 1; second < lessons.length; second += 1) {
+      const firstLesson = lessons[first];
+      const secondLesson = lessons[second];
+      const coexist =
+        canLessonsCoexist(firstLesson, { group: secondLesson.group }, groups) ||
+        canLessonsCoexist(secondLesson, { group: firstLesson.group }, groups);
+      if (!coexist) return true;
+    }
+  }
+  return false;
+}
+
+function hasRoomConflict(
+  assignments: { className: string; lesson: ScheduledLesson }[],
+  room: Room,
+  classStudentCounts: Map<string, number>
+): boolean {
+  const classNames = [...new Set(assignments.map(assignment => assignment.className))];
+  if (classNames.length > (room.multiClass ?? 1)) return true;
+  if (!room.capacity) return false;
+  const studentCount = classNames.reduce(
+    (total, className) => total + (classStudentCounts.get(className) ?? 0),
+    0
+  );
+  return studentCount > room.capacity;
 }
 
 /**
