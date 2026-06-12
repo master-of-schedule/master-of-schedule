@@ -50,7 +50,7 @@ export interface ScheduledLesson {
   isSubstitution?: boolean;
   /** Original teacher if this is a substitution */
   originalTeacher?: string;
-  /** True if placed bypassing teacher bans / busy constraints (weekly mode only) */
+  /** True if placed bypassing schedule constraints */
   forceOverride?: boolean;
   /** True when this substitution is paid by the union (профсоюз), not the budget */
   isUnionSubstitution?: boolean;

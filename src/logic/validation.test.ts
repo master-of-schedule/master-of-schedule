@@ -14,7 +14,7 @@ import {
   findGaps,
   suggestGapExclusions,
 } from './validation';
-import type { Schedule, Teacher, LessonRequirement, Group } from '@/types';
+import type { Schedule, Teacher, LessonRequirement, Group, Room, SchoolClass } from '@/types';
 
 // Test fixtures
 const createTestTeachers = (): Record<string, Teacher> => ({
@@ -1304,6 +1304,159 @@ describe('validateSchedule — Z27-4 force_override_ban', () => {
     };
     const conflicts = validateSchedule(schedule, createTestTeachers());
     expect(conflicts.some(c => c.type === 'force_override_ban')).toBe(false);
+  });
+});
+
+describe('validateSchedule — Z43 force override conflicts', () => {
+  const rooms: Record<string, Room> = {
+    '-114-': {
+      id: 'room-114',
+      fullName: 'Кабинет 114',
+      shortName: '-114-',
+      capacity: 30,
+      multiClass: 1,
+    },
+    '-СЗ-': {
+      id: 'room-gym',
+      fullName: 'Спортзал',
+      shortName: '-СЗ-',
+      capacity: 30,
+      multiClass: 2,
+    },
+  };
+  const classes: SchoolClass[] = [
+    { id: '10a', name: '10а', studentCount: 20 },
+    { id: '10b', name: '10б', studentCount: 20 },
+  ];
+
+  it('reports an acknowledgeable class conflict caused by a forced lesson', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: {
+          1: {
+            lessons: [
+              { id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '-114-' },
+              { id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петрова А.П.', room: '-СЗ-', forceOverride: true },
+            ],
+          },
+        },
+      },
+    };
+
+    const conflict = validateSchedule(schedule, createTestTeachers(), undefined, { rooms, classes })
+      .find(item => item.type === 'class_double_booked');
+
+    expect(conflict?.acknowledgeable).toBe(true);
+    expect(conflict?.details).toContain('10а');
+  });
+
+  it('reports an acknowledgeable room multiClass conflict caused by a forced lesson', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '-114-' }] } },
+      },
+      '10б': {
+        Пн: { 1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петрова А.П.', room: '-114-', forceOverride: true }] } },
+      },
+    };
+
+    const conflict = validateSchedule(schedule, createTestTeachers(), undefined, { rooms, classes })
+      .find(item => item.type === 'room_double_booked');
+
+    expect(conflict?.acknowledgeable).toBe(true);
+    expect(conflict?.details).toContain('-114-');
+  });
+
+  it('reports room capacity overflow even when multiClass allows both classes', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '-СЗ-' }] } },
+      },
+      '10б': {
+        Пн: { 1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Петрова А.П.', room: '-СЗ-', forceOverride: true }] } },
+      },
+    };
+
+    expect(
+      validateSchedule(schedule, createTestTeachers(), undefined, { rooms, classes })
+        .some(item => item.type === 'room_double_booked' && item.acknowledgeable)
+    ).toBe(true);
+  });
+
+  it('marks a second-teacher double booking as acknowledgeable', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '-114-' }] } },
+      },
+      '10б': {
+        Пн: {
+          1: {
+            lessons: [{
+              id: 'l2',
+              requirementId: 'r2',
+              subject: 'Физика',
+              teacher: 'Петрова А.П.',
+              teacher2: 'Иванова Т.С.',
+              room: '-СЗ-',
+              forceOverride: true,
+            }],
+          },
+        },
+      },
+    };
+
+    const conflict = validateSchedule(schedule, createTestTeachers())
+      .find(item => item.type === 'teacher_double_booked');
+
+    expect(conflict?.acknowledgeable).toBe(true);
+    expect(conflict?.details).toContain('Иванова Т.С.');
+  });
+
+  it('reports partner-school occupancy for either teacher on a forced lesson', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: {
+          1: {
+            lessons: [{
+              id: 'l1',
+              requirementId: 'r1',
+              subject: 'Математика',
+              teacher: 'Петрова А.П.',
+              teacher2: 'Иванова Т.С.',
+              room: '-114-',
+              forceOverride: true,
+            }],
+          },
+        },
+      },
+    };
+    const partnerBusySet = new Set(['Иванова Т.С.|Пн|1']);
+
+    const conflict = validateSchedule(
+      schedule,
+      createTestTeachers(),
+      undefined,
+      { rooms, classes, partnerBusySet }
+    ).find(item => item.type === 'teacher_partner_busy');
+
+    expect(conflict?.acknowledgeable).toBe(true);
+    expect(conflict?.details).toContain('Иванова Т.С.');
+  });
+
+  it('does not make an unrelated existing teacher conflict acknowledgeable', () => {
+    const schedule: Schedule = {
+      '10а': {
+        Пн: { 1: { lessons: [{ id: 'l1', requirementId: 'r1', subject: 'Математика', teacher: 'Иванова Т.С.', room: '-114-' }] } },
+      },
+      '10б': {
+        Пн: { 1: { lessons: [{ id: 'l2', requirementId: 'r2', subject: 'Физика', teacher: 'Иванова Т.С.', room: '-СЗ-' }] } },
+      },
+    };
+
+    const conflict = validateSchedule(schedule, createTestTeachers())
+      .find(item => item.type === 'teacher_double_booked');
+
+    expect(conflict?.acknowledgeable).toBe(false);
   });
 });
 

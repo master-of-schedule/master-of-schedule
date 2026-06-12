@@ -112,9 +112,6 @@ export function EditorPage() {
   // Track substitution metadata across the replacement → room picker flow
   const substitutionRef = useRef<{ originalTeacher: string; isUnionSubstitution?: boolean } | null>(null);
 
-  // Track force-override flag across the shift+click → room picker flow
-  const forceOverrideRef = useRef(false);
-
   // Student count for current class (used for room capacity validation)
   // For group lessons, skip capacity check (any group fits any room)
   const currentClassStudentCount = useMemo(() => {
@@ -130,7 +127,7 @@ export function EditorPage() {
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
     if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
-      ? 'Нажмите на ячейку для назначения. Shift+клик на запрет — поставить вопреки.'
+      ? 'Нажмите на ячейку для назначения. Alt+клик — поставить в обход ограничений.'
       : 'Нажмите на свободную ячейку сетки для назначения.';
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
   }, [movingLesson, absentTeacher, copiedLesson, selectedCells.length, selectedLesson, versionType]);
@@ -217,10 +214,9 @@ export function EditorPage() {
           originalTeacher: substitutionRef.current?.originalTeacher,
           isSubstitution: substitutionRef.current ? true : undefined,
           isUnionSubstitution: substitutionRef.current?.isUnionSubstitution ? true : undefined,
-          forceOverride: forceOverrideRef.current ? true : undefined,
+          forceOverride: roomDialogData.forceOverride ? true : undefined,
         };
         substitutionRef.current = null;
-        forceOverrideRef.current = false;
         const lesson = createScheduledLesson(selectedLesson, room.shortName, opts);
 
         assignLesson({
@@ -391,13 +387,12 @@ export function EditorPage() {
     [selectedLesson, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, editorDialog]
   );
 
-  // Handle force-assign (Shift+click on banned/busy cell in weekly mode)
   const handleForceAssign = useCallback(
     (day: Day, lessonNum: LessonNumber) => {
-      forceOverrideRef.current = true;
-      handleAssignLesson(day, lessonNum);
+      if (!selectedLesson) return;
+      editorDialog.openRoom({ day, lessonNum, forceOverride: true });
     },
-    [handleAssignLesson]
+    [selectedLesson, editorDialog]
   );
 
   // Context menu handlers
@@ -826,6 +821,7 @@ export function EditorPage() {
           preferredRoom={selectedLesson ? teachers[selectedLesson.teacher]?.defaultRoom : undefined}
           studentCount={currentClassStudentCount}
           targetClassName={currentClass ?? undefined}
+          allowUnavailable={roomDialogData.forceOverride}
         />
       )}
 

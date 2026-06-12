@@ -15,6 +15,7 @@ import {
   getInteractionRequirement,
   getMovingLesson,
   getSlotLessons,
+  supportsForcePlacement,
 } from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
 import styles from './ScheduleGrid.module.css';
@@ -242,16 +243,13 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
     [selectedLesson, getCellStatusForLesson, onQuickAssign]
   );
 
-  // Handle Shift+click for force-place (weekly mode only, on banned/busy cells)
-  const handleShiftClick = useCallback(
+  const handleAltClick = useCallback(
     (day: Day, lessonNum: LessonNumber) => {
-      if (versionType !== 'weekly' && versionType !== 'technical') return;
+      if (!supportsForcePlacement(versionType)) return;
       if (!selectedLesson) return;
-      const status = getCellStatusForLesson(day, lessonNum);
-      if (status.status !== 'teacher_banned' && status.status !== 'teacher_busy') return;
       onForceAssign?.(day, lessonNum);
     },
-    [versionType, selectedLesson, getCellStatusForLesson, onForceAssign]
+    [versionType, selectedLesson, onForceAssign]
   );
 
   const gridClassNames = styles.grid;
@@ -301,7 +299,7 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
                 onDoubleClick={() => handleDoubleClick(day, lessonNum)}
                 onContextMenu={(e, lessonIndex) => handleContextMenu(e, day, lessonNum, lessonIndex)}
                 onCtrlClick={() => handleCtrlClick(day, lessonNum)}
-                onShiftClick={() => handleShiftClick(day, lessonNum)}
+                onAltClick={() => handleAltClick(day, lessonNum)}
                 onNavigateToClass={onNavigateToClass}
               />
             );
