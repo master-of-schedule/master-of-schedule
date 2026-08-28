@@ -43,6 +43,7 @@ import {
   cascadeClassRename,
   cascadeGroupRenameInVersions,
   cascadeSubjectRename,
+  findVersionsUsingSubject,
 } from '@/db';
 import { usePartnerStore } from './partnerStore';
 import { indexBy } from '@/utils/indexBy';
@@ -144,6 +145,7 @@ interface DataState {
    */
   renameSubject: (oldName: string, newName: string) => Promise<void>;
   addCustomSubject: (subject: string) => Promise<void>;
+  deleteSubject: (subject: string) => Promise<void>;
 
   // Mutation actions - Gap Exclusions
   setGapExcludedClasses: (classes: string[]) => Promise<void>;
@@ -662,6 +664,42 @@ export const useDataStore = create<DataState>((set, get) => ({
     const updated = [...current, subject];
     await updateSettings({ customSubjects: updated });
     set({ customSubjects: updated });
+  },
+
+  deleteSubject: async (subject) => {
+    const usedInRequirements = get().lessonRequirements.some(r => r.subject === subject);
+    if (usedInRequirements) {
+      throw new Error('SUBJECT_USED_IN_REQUIREMENTS');
+    }
+
+    const versionsUsingSubject = await findVersionsUsingSubject(subject);
+    if (versionsUsingSubject.length > 0) {
+      throw new Error('SUBJECT_USED_IN_VERSIONS');
+    }
+
+    const teachersWithSubject = Object.values(get().teachers).filter(t => t.subjects.includes(subject));
+    for (const teacher of teachersWithSubject) {
+      await dbUpdateTeacher(teacher.id, {
+        subjects: teacher.subjects.filter(s => s !== subject),
+      });
+    }
+
+    const currentCustom = get().customSubjects;
+    if (currentCustom.includes(subject)) {
+      await updateSettings({ customSubjects: currentCustom.filter(s => s !== subject) });
+    }
+
+    set((state) => ({
+      teachers: Object.fromEntries(
+        Object.entries(state.teachers).map(([name, teacher]) => [
+          name,
+          teacher.subjects.includes(subject)
+            ? { ...teacher, subjects: teacher.subjects.filter(s => s !== subject) }
+            : teacher,
+        ])
+      ),
+      customSubjects: state.customSubjects.filter(s => s !== subject),
+    }));
   },
 
   // Mutation actions - Gap Exclusions
