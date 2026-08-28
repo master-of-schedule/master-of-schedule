@@ -728,6 +728,7 @@ function requirementKey(requirement: LessonRequirement): string {
     requirement.classOrGroup,
     requirement.subject,
     requirement.teacher,
+    requirement.teacher2 ?? '',
     requirement.parallelGroup ?? '',
     requirement.className ?? '',
   ].join('\u0000');
