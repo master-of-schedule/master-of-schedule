@@ -1,7 +1,7 @@
 {
   "productName": "master-of-workload",
   "identifier": "com.school.workload-editor",
-  "version": "1.15.1",
+  "version": "1.21.0",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5174",
