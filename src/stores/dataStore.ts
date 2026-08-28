@@ -47,6 +47,7 @@ import {
 } from '@/db';
 import { usePartnerStore } from './partnerStore';
 import { indexBy } from '@/utils/indexBy';
+import { getRequirementClassName } from '@/utils/classNames';
 
 /** Removes the entry with the given id from a Record<string, T> keyed by a display name. */
 function deleteFromMapById<T extends { id: string }>(
@@ -61,6 +62,37 @@ function deleteFromMapById<T extends { id: string }>(
     }
   }
   return updated;
+}
+
+function deriveGroupIndex(groupName: string): string {
+  return groupName.match(/\(([^)]+)\)$/)?.[0] ?? '';
+}
+
+async function upsertGroupForRequirement(
+  requirement: LessonRequirement,
+  groups: Group[]
+): Promise<Group[]> {
+  if (requirement.type !== 'group') return groups;
+
+  const groupData = {
+    name: requirement.classOrGroup,
+    className: requirement.className ?? getRequirementClassName(requirement),
+    index: deriveGroupIndex(requirement.classOrGroup),
+    parallelGroup: requirement.parallelGroup,
+  };
+  const existing = groups.find(group => group.name === requirement.classOrGroup);
+
+  if (existing) {
+    await dbUpdateGroup(existing.id, groupData);
+    return groups.map(group => group.id === existing.id ? { ...group, ...groupData } : group);
+  }
+
+  const newGroup: Group = {
+    id: `group-${Date.now()}`,
+    ...groupData,
+  };
+  await dbAddGroup(newGroup);
+  return [...groups, newGroup];
 }
 
 interface DataState {
@@ -594,18 +626,24 @@ export const useDataStore = create<DataState>((set, get) => ({
   addRequirement: async (req) => {
     const id = await dbAddRequirement(req);
     const newReq = { ...req, id };
+    const groups = await upsertGroupForRequirement(newReq, get().groups);
     set((state) => ({
       lessonRequirements: [...state.lessonRequirements, newReq],
+      groups,
     }));
     return id;
   },
 
   updateRequirement: async (id, data) => {
+    const existing = get().lessonRequirements.find(req => req.id === id);
+    const updated = existing ? { ...existing, ...data } : null;
     await dbUpdateRequirement(id, data);
+    const groups = updated ? await upsertGroupForRequirement(updated, get().groups) : get().groups;
     set((state) => ({
       lessonRequirements: state.lessonRequirements.map((req) =>
         req.id === id ? { ...req, ...data } : req
       ),
+      groups,
     }));
   },
 
