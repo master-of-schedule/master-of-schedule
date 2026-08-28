@@ -17,6 +17,7 @@ const TABS: { id: AppTab; label: string; title: string }[] = [
   { id: 'export', label: 'Экспорт', title: 'Экспорт расписания для печати' },
   { id: 'data', label: 'Данные', title: 'Просмотр и редактирование справочников' },
   { id: 'settings', label: 'Настройки', title: 'Настройки приложения' },
+  { id: 'help', label: 'Помощь', title: 'Справочник пользователя' },
 ];
 
 const VERSION_TYPE_LABELS: Record<VersionType, string> = {

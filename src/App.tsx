@@ -12,6 +12,7 @@ import { EditorPage } from '@/components/editor/EditorPage';
 import { ExportPage } from '@/components/export/ExportPage';
 import { DataPage } from '@/components/data/DataPage';
 import { SettingsPage } from '@/components/settings/SettingsPage';
+import { HelpPage } from '@/components/help/HelpPage';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { useToast } from '@/components/common/toastContext';
@@ -136,6 +137,8 @@ export function App() {
         return <DataPage />;
       case 'settings':
         return <SettingsPage />;
+      case 'help':
+        return <HelpPage />;
       default:
         return <StartPage />;
     }
