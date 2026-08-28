@@ -13,6 +13,8 @@ import {
   findRequirementForScheduledLesson,
   getAssigningLesson,
   getAvailableRooms,
+  findLessonListCleanupPlan,
+  getLessonListCleanupSignature,
   getCopiedLesson,
   getMovingLesson,
   getSlotLessons,
@@ -63,12 +65,13 @@ export function EditorPage() {
   const copiedLesson = getCopiedLesson(interaction);
   const movingLesson = getMovingLesson(interaction);
 
-  const { classes, gapExcludedClasses, requirements, teachers, rooms } = useDataStore(useShallow((s) => ({
+  const { classes, gapExcludedClasses, requirements, teachers, rooms, isReadOnlyYear } = useDataStore(useShallow((s) => ({
     classes: s.classes,
     gapExcludedClasses: s.gapExcludedClasses,
     requirements: s.lessonRequirements,
     teachers: s.teachers,
     rooms: s.rooms,
+    isReadOnlyYear: s.isReadOnlyYear,
   })));
 
   const {
@@ -107,6 +110,7 @@ export function EditorPage() {
   const restorePartnerClassLessons = useScheduleStore((s) => s.restorePartnerClassLessons);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [dismissedCleanupSignature, setDismissedCleanupSignature] = useState<string | null>(null);
   const { showToast } = useToast();
 
   // Track substitution metadata across the replacement → room picker flow
@@ -145,6 +149,17 @@ export function EditorPage() {
   const moveRoomDialogData = editorDialog.dialog.type === 'moveRoom'
     ? editorDialog.dialog.data
     : null;
+  const cleanupPlan = useMemo(
+    () => findLessonListCleanupPlan(schedule, requirements, temporaryLessons),
+    [schedule, requirements, temporaryLessons]
+  );
+  const cleanupSignature = useMemo(
+    () => getLessonListCleanupSignature(cleanupPlan),
+    [cleanupPlan]
+  );
+  const shouldShowCleanupPrompt = !isReadOnlyYear
+    && cleanupPlan.removals.length > 0
+    && cleanupSignature !== dismissedCleanupSignature;
 
   // Partner modal state (Z35-4 / Z39-3: open AddTemporaryLessonModal from ReplacementPanel partner section)
   const [partnerModal, setPartnerModal] = useState<{
@@ -240,6 +255,17 @@ export function EditorPage() {
       restorePartnerClassLessons(savedSchedule);
     }
   }, [clearPartnerFile, restorePartnerClassLessons]);
+
+  const handleApplyLessonListCleanup = useCallback(() => {
+    removeLessons(cleanupPlan.removals.map(removal => ({
+      className: removal.className,
+      day: removal.day,
+      lessonNum: removal.lessonNum,
+      lessonIndex: removal.lessonIndex,
+    })));
+    setDismissedCleanupSignature(null);
+    showToast('Лишние занятия удалены из сетки', 'success');
+  }, [cleanupPlan.removals, removeLessons, showToast]);
 
   // Handle save
   const handleSave = useCallback(async () => {
@@ -904,6 +930,38 @@ export function EditorPage() {
           }
         >
           <p>{pasteWarning.message}</p>
+        </Modal>
+      )}
+
+      {shouldShowCleanupPrompt && (
+        <Modal
+          isOpen={true}
+          onClose={() => setDismissedCleanupSignature(cleanupSignature)}
+          title="Список занятий изменился"
+          size="medium"
+          footer={
+            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
+              <Button variant="ghost" size="small" onClick={() => setDismissedCleanupSignature(cleanupSignature)}>
+                Оставить как есть
+              </Button>
+              <Button variant="danger" size="small" onClick={handleApplyLessonListCleanup}>
+                Удалить из сетки
+              </Button>
+            </div>
+          }
+        >
+          <p>
+            В открытом расписании есть занятия, которых больше нет в списке, или их стало меньше.
+            Можно удалить их только из этой сетки.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            {cleanupPlan.missingCount > 0 && (
+              <li>Нет в новом списке: {cleanupPlan.missingCount}</li>
+            )}
+            {cleanupPlan.excessCount > 0 && (
+              <li>Лишние после уменьшения нагрузки: {cleanupPlan.excessCount}</li>
+            )}
+          </ul>
         </Modal>
       )}
     </div>

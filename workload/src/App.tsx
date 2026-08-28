@@ -7,9 +7,11 @@ import { DepartmentsPage } from './pages/DepartmentsPage';
 import { AssignPage } from './pages/AssignPage';
 import { HomeroomPage } from './pages/HomeroomPage';
 import { ExportPage } from './pages/ExportPage';
+import { HelpPage } from './pages/HelpPage';
 import { useDownloadFolder, isFileSystemAccessSupported } from './hooks/useDownloadFolder';
 import { useToast } from './hooks/useToast';
 import { ToastContainer } from './components/ToastContainer';
+import { checkForUpdate } from './logic/updateCheck';
 import styles from './App.module.css';
 
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -21,6 +23,7 @@ const TABS = [
   { id: 'assign', label: '4. Назначения' },
   { id: 'homeroom', label: '5. Классные руководители' },
   { id: 'export', label: '6. Экспорт' },
+  { id: 'help', label: 'Помощь' },
 ] as const;
 
 export function App() {
@@ -45,6 +48,20 @@ export function App() {
     setIsDirty(true);
     isDirtyRef.current = true;
   }, [teachers, deptGroups, assignments, homeroomAssignments, curriculumPlan]);
+
+  useEffect(() => {
+    void checkForUpdate({
+      appId: 'rn',
+      currentVersion: import.meta.env.VITE_APP_VERSION,
+      tagPrefix: 'workload/v',
+      storage: window.localStorage,
+      fetcher: window.fetch.bind(window),
+    }).then((result) => {
+      if (result.status === 'available') {
+        notify(`Доступна новая версия РН ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      }
+    });
+  }, [notify]);
 
   // Register Tauri close interceptor
   useEffect(() => {
@@ -327,6 +344,7 @@ export function App() {
         <div style={activeTab !== 'assign' ? { display: 'none' } : undefined}><AssignPage plan={curriculumPlan} /></div>
         {activeTab === 'homeroom' && <HomeroomPage plan={curriculumPlan} />}
         {activeTab === 'export' && <ExportPage />}
+        {activeTab === 'help' && <HelpPage />}
       </main>
 
       <ToastContainer />

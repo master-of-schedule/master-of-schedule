@@ -884,6 +884,16 @@ describe('canLessonsCoexist — groups table lookup (Z29-1)', () => {
     expect(canLessonsCoexist(existing, newLesson, groups10a)).toBe(true);
   });
 
+  it('allows parallel groups when only the new group definition points back to the existing group', () => {
+    const groups: Group[] = [
+      { id: 'g1', name: '10а(д)', className: '10а', index: '(д)' },
+      { id: 'g2', name: '10а(м)', className: '10а', index: '(м)', parallelGroup: '10а(д)' },
+    ];
+    const existing = { id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Иванова Т.С.', room: '-Зал-', group: '10а(д)' };
+    const newLesson = { group: '10а(м)' };
+    expect(canLessonsCoexist(existing, newLesson, groups)).toBe(true);
+  });
+
   it('Z29-1 regression: blocks non-parallel groups from same class', () => {
     // 10а(м) is parallel to 10а(д), NOT to 10а(В.Е.) — different parallel pair
     const existing = { id: 'l1', requirementId: 'r1', subject: 'Физра', teacher: 'Пепкин А.В.', room: '-Зал-', group: '10а(м)' };

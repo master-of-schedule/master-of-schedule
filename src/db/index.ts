@@ -15,6 +15,7 @@ export {
   getVersion,
   getVersionsByType,
   getAllVersions,
+  findVersionsUsingSubject,
   updateVersionSchedule,
   updateVersionMetadata,
   deleteVersion,

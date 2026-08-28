@@ -43,6 +43,7 @@ vi.mock('@/db', () => ({
   addLessonRequirement: vi.fn().mockResolvedValue('req-123'),
   updateLessonRequirement: vi.fn().mockResolvedValue(undefined),
   deleteLessonRequirement: vi.fn().mockResolvedValue(undefined),
+  findVersionsUsingSubject: vi.fn().mockResolvedValue([]),
   // Cascade functions
   cascadeTeacherRename: vi.fn().mockResolvedValue(undefined),
   cascadeRoomRename: vi.fn().mockResolvedValue(undefined),
@@ -67,7 +68,9 @@ describe('dataStore mutations', () => {
       isLoading: false,
       isLoaded: true,
       error: null,
+      customSubjects: [],
     });
+    vi.mocked(db.findVersionsUsingSubject).mockResolvedValue([]);
     vi.clearAllMocks();
   });
 
@@ -270,6 +273,37 @@ describe('dataStore mutations', () => {
       expect(lessonRequirements[0].subject).toBe('Математика');
     });
 
+    it('addRequirement creates a group definition for a group lesson', async () => {
+      const { addRequirement } = useDataStore.getState();
+
+      await addRequirement({
+        type: 'group',
+        classOrGroup: '10а(д)',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 3,
+        className: '10а',
+        parallelGroup: '10а(м)',
+      });
+
+      expect(db.addGroup).toHaveBeenCalledWith(expect.objectContaining({
+        name: '10а(д)',
+        className: '10а',
+        index: '(д)',
+        parallelGroup: '10а(м)',
+      }));
+
+      const { groups } = useDataStore.getState();
+      expect(groups).toEqual([
+        expect.objectContaining({
+          name: '10а(д)',
+          className: '10а',
+          index: '(д)',
+          parallelGroup: '10а(м)',
+        }),
+      ]);
+    });
+
     it('updateRequirement updates requirement in store and database', async () => {
       useDataStore.setState({
         lessonRequirements: [
@@ -292,6 +326,42 @@ describe('dataStore mutations', () => {
 
       const { lessonRequirements } = useDataStore.getState();
       expect(lessonRequirements[0].countPerWeek).toBe(6);
+    });
+
+    it('updateRequirement keeps group definition parallelism in sync after manual teacher edits', async () => {
+      useDataStore.setState({
+        groups: [
+          { id: 'group-1', name: '10а(д)', className: '10а', index: '(д)' },
+        ],
+        lessonRequirements: [
+          {
+            id: 'req-1',
+            type: 'group',
+            classOrGroup: '10а(д)',
+            subject: 'Английский',
+            teacher: 'Иванова Т.С.',
+            countPerWeek: 3,
+            className: '10а',
+            parallelGroup: '10а(м)',
+          },
+        ],
+      });
+
+      const { updateRequirement } = useDataStore.getState();
+
+      await updateRequirement('req-1', { teacher: 'Петрова А.П.' });
+
+      expect(db.updateLessonRequirement).toHaveBeenCalledWith('req-1', { teacher: 'Петрова А.П.' });
+      expect(db.updateGroup).toHaveBeenCalledWith('group-1', {
+        name: '10а(д)',
+        className: '10а',
+        index: '(д)',
+        parallelGroup: '10а(м)',
+      });
+
+      const { groups, lessonRequirements } = useDataStore.getState();
+      expect(lessonRequirements[0].teacher).toBe('Петрова А.П.');
+      expect(groups[0].parallelGroup).toBe('10а(м)');
     });
 
     it('deleteRequirement removes requirement from store and database', async () => {
@@ -815,6 +885,66 @@ describe('dataStore mutations', () => {
       expect(customSubjects).toContain('Матан');
       expect(customSubjects).not.toContain('Математика');
       expect(customSubjects).toContain('Физика');
+    });
+  });
+
+  describe('deleteSubject', () => {
+    beforeEach(() => {
+      useDataStore.setState({
+        teachers: {
+          'Иванова Т.С.': { id: 't-1', name: 'Иванова Т.С.', subjects: ['Математика', 'Алгебра'], bans: {} },
+          'Петрова А.П.': { id: 't-2', name: 'Петрова А.П.', subjects: ['Математика'], bans: {} },
+        },
+        lessonRequirements: [],
+        customSubjects: ['Математика', 'Физика'],
+      });
+    });
+
+    it('removes the subject from teachers and customSubjects', async () => {
+      const { deleteSubject } = useDataStore.getState();
+
+      await deleteSubject('Математика');
+
+      expect(db.updateTeacher).toHaveBeenCalledWith('t-1', { subjects: ['Алгебра'] });
+      expect(db.updateTeacher).toHaveBeenCalledWith('t-2', { subjects: [] });
+      expect(db.updateSettings).toHaveBeenCalledWith({ customSubjects: ['Физика'] });
+
+      const state = useDataStore.getState();
+      expect(state.teachers['Иванова Т.С.'].subjects).toEqual(['Алгебра']);
+      expect(state.teachers['Петрова А.П.'].subjects).toEqual([]);
+      expect(state.customSubjects).toEqual(['Физика']);
+    });
+
+    it('blocks deletion when the subject is used in lesson requirements', async () => {
+      useDataStore.setState({
+        lessonRequirements: [
+          { id: 'r-1', type: 'class', classOrGroup: '10а', subject: 'Математика', teacher: 'Иванова Т.С.', countPerWeek: 5 },
+        ],
+      });
+      const { deleteSubject } = useDataStore.getState();
+
+      await expect(deleteSubject('Математика')).rejects.toThrow('SUBJECT_USED_IN_REQUIREMENTS');
+
+      expect(db.updateTeacher).not.toHaveBeenCalled();
+      expect(db.updateSettings).not.toHaveBeenCalled();
+    });
+
+    it('blocks deletion when the subject is used in saved schedules', async () => {
+      vi.mocked(db.findVersionsUsingSubject).mockResolvedValue([
+        {
+          id: 'v-1',
+          name: 'Техническое',
+          type: 'technical',
+          createdAt: new Date('2026-01-01'),
+          isActiveTemplate: false,
+        },
+      ]);
+      const { deleteSubject } = useDataStore.getState();
+
+      await expect(deleteSubject('Математика')).rejects.toThrow('SUBJECT_USED_IN_VERSIONS');
+
+      expect(db.updateTeacher).not.toHaveBeenCalled();
+      expect(db.updateSettings).not.toHaveBeenCalled();
     });
   });
 });

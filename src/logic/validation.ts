@@ -127,6 +127,10 @@ export function canLessonsCoexist(
     if (existingGroupDef?.parallelGroup === newLesson.group) {
       return true;
     }
+    const newGroupDef = groups.find(g => g.name === newLesson.group);
+    if (newGroupDef?.parallelGroup === existingLesson.group) {
+      return true;
+    }
   }
 
   return false;

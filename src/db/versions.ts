@@ -6,6 +6,7 @@
 import { db, updateSettings } from './database';
 import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement } from '@/types';
 import { generateId } from '@/utils/generateId';
+import { forEachSlot } from '@/logic/traversal';
 
 /**
  * Create a new version
@@ -89,6 +90,35 @@ export async function getAllVersions(): Promise<VersionListItem[]> {
     isActiveTemplate: v.isActiveTemplate,
     baseTemplateId: v.baseTemplateId,
   }));
+}
+
+export async function findVersionsUsingSubject(subject: string): Promise<VersionListItem[]> {
+  const versions = await db.versions.toArray();
+  const matching: VersionListItem[] = [];
+
+  for (const version of versions) {
+    let found = version.temporaryLessons?.some(lesson => lesson.subject === subject) ?? false;
+    if (!found) {
+      forEachSlot(version.schedule, (_className, _day, _lessonNum, lessons) => {
+        if (found) return;
+        found = lessons.some(lesson => lesson.subject === subject);
+      });
+    }
+    if (found) {
+      matching.push({
+        id: version.id,
+        name: version.name,
+        type: version.type,
+        createdAt: version.createdAt,
+        comment: version.comment,
+        mondayDate: version.mondayDate,
+        isActiveTemplate: version.isActiveTemplate,
+        baseTemplateId: version.baseTemplateId,
+      });
+    }
+  }
+
+  return matching;
 }
 
 /**

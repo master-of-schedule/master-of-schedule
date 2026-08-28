@@ -43,9 +43,11 @@ import {
   cascadeClassRename,
   cascadeGroupRenameInVersions,
   cascadeSubjectRename,
+  findVersionsUsingSubject,
 } from '@/db';
 import { usePartnerStore } from './partnerStore';
 import { indexBy } from '@/utils/indexBy';
+import { getRequirementClassName } from '@/utils/classNames';
 
 /** Removes the entry with the given id from a Record<string, T> keyed by a display name. */
 function deleteFromMapById<T extends { id: string }>(
@@ -60,6 +62,37 @@ function deleteFromMapById<T extends { id: string }>(
     }
   }
   return updated;
+}
+
+function deriveGroupIndex(groupName: string): string {
+  return groupName.match(/\(([^)]+)\)$/)?.[0] ?? '';
+}
+
+async function upsertGroupForRequirement(
+  requirement: LessonRequirement,
+  groups: Group[]
+): Promise<Group[]> {
+  if (requirement.type !== 'group') return groups;
+
+  const groupData = {
+    name: requirement.classOrGroup,
+    className: requirement.className ?? getRequirementClassName(requirement),
+    index: deriveGroupIndex(requirement.classOrGroup),
+    parallelGroup: requirement.parallelGroup,
+  };
+  const existing = groups.find(group => group.name === requirement.classOrGroup);
+
+  if (existing) {
+    await dbUpdateGroup(existing.id, groupData);
+    return groups.map(group => group.id === existing.id ? { ...group, ...groupData } : group);
+  }
+
+  const newGroup: Group = {
+    id: `group-${Date.now()}`,
+    ...groupData,
+  };
+  await dbAddGroup(newGroup);
+  return [...groups, newGroup];
 }
 
 interface DataState {
@@ -144,6 +177,7 @@ interface DataState {
    */
   renameSubject: (oldName: string, newName: string) => Promise<void>;
   addCustomSubject: (subject: string) => Promise<void>;
+  deleteSubject: (subject: string) => Promise<void>;
 
   // Mutation actions - Gap Exclusions
   setGapExcludedClasses: (classes: string[]) => Promise<void>;
@@ -592,18 +626,24 @@ export const useDataStore = create<DataState>((set, get) => ({
   addRequirement: async (req) => {
     const id = await dbAddRequirement(req);
     const newReq = { ...req, id };
+    const groups = await upsertGroupForRequirement(newReq, get().groups);
     set((state) => ({
       lessonRequirements: [...state.lessonRequirements, newReq],
+      groups,
     }));
     return id;
   },
 
   updateRequirement: async (id, data) => {
+    const existing = get().lessonRequirements.find(req => req.id === id);
+    const updated = existing ? { ...existing, ...data } : null;
     await dbUpdateRequirement(id, data);
+    const groups = updated ? await upsertGroupForRequirement(updated, get().groups) : get().groups;
     set((state) => ({
       lessonRequirements: state.lessonRequirements.map((req) =>
         req.id === id ? { ...req, ...data } : req
       ),
+      groups,
     }));
   },
 
@@ -662,6 +702,42 @@ export const useDataStore = create<DataState>((set, get) => ({
     const updated = [...current, subject];
     await updateSettings({ customSubjects: updated });
     set({ customSubjects: updated });
+  },
+
+  deleteSubject: async (subject) => {
+    const usedInRequirements = get().lessonRequirements.some(r => r.subject === subject);
+    if (usedInRequirements) {
+      throw new Error('SUBJECT_USED_IN_REQUIREMENTS');
+    }
+
+    const versionsUsingSubject = await findVersionsUsingSubject(subject);
+    if (versionsUsingSubject.length > 0) {
+      throw new Error('SUBJECT_USED_IN_VERSIONS');
+    }
+
+    const teachersWithSubject = Object.values(get().teachers).filter(t => t.subjects.includes(subject));
+    for (const teacher of teachersWithSubject) {
+      await dbUpdateTeacher(teacher.id, {
+        subjects: teacher.subjects.filter(s => s !== subject),
+      });
+    }
+
+    const currentCustom = get().customSubjects;
+    if (currentCustom.includes(subject)) {
+      await updateSettings({ customSubjects: currentCustom.filter(s => s !== subject) });
+    }
+
+    set((state) => ({
+      teachers: Object.fromEntries(
+        Object.entries(state.teachers).map(([name, teacher]) => [
+          name,
+          teacher.subjects.includes(subject)
+            ? { ...teacher, subjects: teacher.subjects.filter(s => s !== subject) }
+            : teacher,
+        ])
+      ),
+      customSubjects: state.customSubjects.filter(s => s !== subject),
+    }));
   },
 
   // Mutation actions - Gap Exclusions
