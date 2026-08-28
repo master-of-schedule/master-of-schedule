@@ -550,6 +550,51 @@ describe('mergeLessonImportData', () => {
     expect(result.lessonRequirements[0].id).toBe('existing');
     expect(result.lessonRequirements[1].id).not.toBe('existing');
   });
+
+  it('does not reuse a requirement ID when only the second teacher changed', () => {
+    const result = mergeLessonImportData(
+      {
+        teachers: [
+          { id: 't1', name: 'Иванова И.И.', bans: {}, subjects: ['Математика'] },
+          { id: 't2', name: 'Петрова П.П.', bans: {}, subjects: ['Математика'] },
+          { id: 't3', name: 'Сидорова С.С.', bans: {}, subjects: ['Математика'] },
+        ],
+        classes: [{ id: 'c1', name: '5-а' }],
+        groups: [],
+        lessonRequirements: [
+          {
+            id: 'existing',
+            type: 'class',
+            classOrGroup: '5-а',
+            subject: 'Математика',
+            teacher: 'Иванова И.И.',
+            teacher2: 'Петрова П.П.',
+            countPerWeek: 1,
+          },
+        ],
+      },
+      {
+        teachers: [],
+        classes: [{ id: 'c2', name: '5-а' }],
+        groups: [],
+        lessonRequirements: [
+          {
+            id: 'imported',
+            type: 'class',
+            classOrGroup: '5-а',
+            subject: 'Математика',
+            teacher: 'Иванова И.И.',
+            teacher2: 'Сидорова С.С.',
+            countPerWeek: 1,
+          },
+        ],
+      }
+    );
+
+    expect(result.lessonRequirements).toHaveLength(1);
+    expect(result.lessonRequirements[0].id).not.toBe('existing');
+    expect(result.lessonRequirements[0].teacher2).toBe('Сидорова С.С.');
+  });
 });
 
 describe('parseExportData', () => {
