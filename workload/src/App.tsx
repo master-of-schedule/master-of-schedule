@@ -10,6 +10,7 @@ import { ExportPage } from './pages/ExportPage';
 import { useDownloadFolder, isFileSystemAccessSupported } from './hooks/useDownloadFolder';
 import { useToast } from './hooks/useToast';
 import { ToastContainer } from './components/ToastContainer';
+import { checkForUpdate } from './logic/updateCheck';
 import styles from './App.module.css';
 
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -45,6 +46,20 @@ export function App() {
     setIsDirty(true);
     isDirtyRef.current = true;
   }, [teachers, deptGroups, assignments, homeroomAssignments, curriculumPlan]);
+
+  useEffect(() => {
+    void checkForUpdate({
+      appId: 'rn',
+      currentVersion: import.meta.env.VITE_APP_VERSION,
+      tagPrefix: 'workload/v',
+      storage: window.localStorage,
+      fetcher: window.fetch.bind(window),
+    }).then((result) => {
+      if (result.status === 'available') {
+        notify(`Доступна новая версия РН ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      }
+    });
+  }, [notify]);
 
   // Register Tauri close interceptor
   useEffect(() => {

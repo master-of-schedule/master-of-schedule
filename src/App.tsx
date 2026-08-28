@@ -14,12 +14,15 @@ import { DataPage } from '@/components/data/DataPage';
 import { SettingsPage } from '@/components/settings/SettingsPage';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
+import { useToast } from '@/components/common/toastContext';
+import { checkForUpdate } from '@/logic/updateCheck';
 import './styles/global.css';
 
 export function App() {
   const activeTab = useUIStore((state) => state.activeTab);
   const loadData = useDataStore((state) => state.loadData);
   const isDirty = useScheduleStore((state) => state.isDirty);
+  const { showToast } = useToast();
 
   const isDirtyRef = useRef(isDirty);
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
@@ -32,6 +35,20 @@ export function App() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    void checkForUpdate({
+      appId: 'rshr',
+      currentVersion: import.meta.env.VITE_APP_VERSION,
+      tagPrefix: 'v',
+      storage: window.localStorage,
+      fetcher: window.fetch.bind(window),
+    }).then((result) => {
+      if (result.status === 'available') {
+        showToast(`Доступна новая версия РШР ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      }
+    });
+  }, [showToast]);
 
   // Browser: warn before closing tab/window with unsaved changes
   useEffect(() => {
