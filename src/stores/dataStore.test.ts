@@ -273,6 +273,37 @@ describe('dataStore mutations', () => {
       expect(lessonRequirements[0].subject).toBe('Математика');
     });
 
+    it('addRequirement creates a group definition for a group lesson', async () => {
+      const { addRequirement } = useDataStore.getState();
+
+      await addRequirement({
+        type: 'group',
+        classOrGroup: '10а(д)',
+        subject: 'Английский',
+        teacher: 'Иванова Т.С.',
+        countPerWeek: 3,
+        className: '10а',
+        parallelGroup: '10а(м)',
+      });
+
+      expect(db.addGroup).toHaveBeenCalledWith(expect.objectContaining({
+        name: '10а(д)',
+        className: '10а',
+        index: '(д)',
+        parallelGroup: '10а(м)',
+      }));
+
+      const { groups } = useDataStore.getState();
+      expect(groups).toEqual([
+        expect.objectContaining({
+          name: '10а(д)',
+          className: '10а',
+          index: '(д)',
+          parallelGroup: '10а(м)',
+        }),
+      ]);
+    });
+
     it('updateRequirement updates requirement in store and database', async () => {
       useDataStore.setState({
         lessonRequirements: [
@@ -295,6 +326,42 @@ describe('dataStore mutations', () => {
 
       const { lessonRequirements } = useDataStore.getState();
       expect(lessonRequirements[0].countPerWeek).toBe(6);
+    });
+
+    it('updateRequirement keeps group definition parallelism in sync after manual teacher edits', async () => {
+      useDataStore.setState({
+        groups: [
+          { id: 'group-1', name: '10а(д)', className: '10а', index: '(д)' },
+        ],
+        lessonRequirements: [
+          {
+            id: 'req-1',
+            type: 'group',
+            classOrGroup: '10а(д)',
+            subject: 'Английский',
+            teacher: 'Иванова Т.С.',
+            countPerWeek: 3,
+            className: '10а',
+            parallelGroup: '10а(м)',
+          },
+        ],
+      });
+
+      const { updateRequirement } = useDataStore.getState();
+
+      await updateRequirement('req-1', { teacher: 'Петрова А.П.' });
+
+      expect(db.updateLessonRequirement).toHaveBeenCalledWith('req-1', { teacher: 'Петрова А.П.' });
+      expect(db.updateGroup).toHaveBeenCalledWith('group-1', {
+        name: '10а(д)',
+        className: '10а',
+        index: '(д)',
+        parallelGroup: '10а(м)',
+      });
+
+      const { groups, lessonRequirements } = useDataStore.getState();
+      expect(lessonRequirements[0].teacher).toBe('Петрова А.П.');
+      expect(groups[0].parallelGroup).toBe('10а(м)');
     });
 
     it('deleteRequirement removes requirement from store and database', async () => {
