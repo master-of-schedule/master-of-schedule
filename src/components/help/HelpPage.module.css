@@ -1,0 +1,201 @@
+.scrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--spacing-xl);
+  align-items: start;
+}
+
+.toc {
+  position: sticky;
+  top: var(--spacing-base);
+  background: var(--color-bg-card);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-base);
+  box-shadow: var(--shadow-base);
+}
+
+.tocTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.tocLink {
+  display: block;
+  padding: 7px 0;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
+.tocLink:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.article {
+  background: var(--color-bg-card);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.hero {
+  padding: var(--spacing-2xl) 36px;
+  background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 62%, var(--color-secondary-dark) 100%);
+  color: var(--color-text-inverse);
+}
+
+.hero h1 {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.hero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.55;
+}
+
+.kicker {
+  margin-bottom: var(--spacing-sm) !important;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.66) !important;
+}
+
+.section {
+  padding: 28px 36px;
+  border-top: var(--border);
+  scroll-margin-top: var(--spacing-lg);
+}
+
+.section h2 {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  margin: calc(-1 * var(--spacing-xs)) 0 var(--spacing-base);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+}
+
+.paragraph {
+  margin: 0 0 var(--spacing-base);
+  color: var(--color-text-primary);
+  line-height: 1.62;
+}
+
+.list {
+  margin: 0 0 var(--spacing-lg);
+  padding-left: var(--spacing-xl);
+  color: var(--color-text-primary);
+  line-height: 1.62;
+}
+
+.list li {
+  margin-bottom: var(--spacing-sm);
+}
+
+.note {
+  margin: var(--spacing-base) 0;
+  padding: var(--spacing-md) var(--spacing-base);
+  background: #fff8e1;
+  border: 1px solid #ffca28;
+  border-radius: var(--radius-md);
+  color: #5d4300;
+  line-height: 1.5;
+}
+
+.figure {
+  width: fit-content;
+  margin: var(--spacing-base) 0 var(--spacing-lg);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-gray-50);
+}
+
+.figure img {
+  display: block;
+  width: 76px;
+  height: auto;
+}
+
+.figure figcaption {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  border-top: var(--border);
+}
+
+.hotkeyTable {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-base) 0 var(--spacing-lg);
+}
+
+.hotkeyRow {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--spacing-md);
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-gray-50);
+  border: var(--border);
+  border-radius: var(--radius-base);
+}
+
+.hotkeyRow kbd {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 7px;
+  background: var(--color-bg-card);
+  border: var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-base);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.hotkeyRow span {
+  color: var(--color-text-primary);
+  line-height: 1.45;
+}
+
+@media (max-width: 860px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .toc {
+    position: static;
+  }
+
+  .hero,
+  .section {
+    padding: var(--spacing-xl);
+  }
+
+  .hotkeyRow {
+    grid-template-columns: 1fr;
+  }
+}

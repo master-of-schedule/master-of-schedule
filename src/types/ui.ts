@@ -12,7 +12,7 @@ export type { CellStatus };
 /**
  * Application tabs/views
  */
-export type AppTab = 'start' | 'editor' | 'export' | 'data' | 'settings';
+export type AppTab = 'start' | 'editor' | 'export' | 'data' | 'settings' | 'help';
 
 /**
  * Selected lesson from unscheduled list
