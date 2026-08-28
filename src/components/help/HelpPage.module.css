@@ -1,3 +1,10 @@
+.scrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+}
+
 .page {
   max-width: 1180px;
   margin: 0 auto;

@@ -49,31 +49,33 @@ function renderBlock(block: GuideBlock, index: number) {
 
 export function HelpPage() {
   return (
-    <div className={styles.page}>
-      <aside className={styles.toc}>
-        <div className={styles.tocTitle}>Содержание</div>
-        {userGuideSections.map((section) => (
-          <a key={section.id} href={`#${section.id}`} className={styles.tocLink}>
-            {section.title}
-          </a>
-        ))}
-      </aside>
+    <div className={styles.scrollArea} data-testid="help-scroll-area">
+      <div className={styles.page}>
+        <aside className={styles.toc}>
+          <div className={styles.tocTitle}>Содержание</div>
+          {userGuideSections.map((section) => (
+            <a key={section.id} href={`#${section.id}`} className={styles.tocLink}>
+              {section.title}
+            </a>
+          ))}
+        </aside>
 
-      <article className={styles.article}>
-        <header className={styles.hero}>
-          <p className={styles.kicker}>Справочник пользователя</p>
-          <h1>Редактор школьного расписания</h1>
-          <p>Короткая встроенная справка по основным шагам: от загрузки данных и версий до редактора, проверки, замен и экспорта.</p>
-        </header>
+        <article className={styles.article}>
+          <header className={styles.hero}>
+            <p className={styles.kicker}>Справочник пользователя</p>
+            <h1>Редактор школьного расписания</h1>
+            <p>Короткая встроенная справка по основным шагам: от загрузки данных и версий до редактора, проверки, замен и экспорта.</p>
+          </header>
 
-        {userGuideSections.map((section) => (
-          <section key={section.id} id={section.id} className={styles.section}>
-            <h2>{section.title}</h2>
-            {section.subtitle && <p className={styles.subtitle}>{section.subtitle}</p>}
-            {section.blocks.map(renderBlock)}
-          </section>
-        ))}
-      </article>
+          {userGuideSections.map((section) => (
+            <section key={section.id} id={section.id} className={styles.section}>
+              <h2>{section.title}</h2>
+              {section.subtitle && <p className={styles.subtitle}>{section.subtitle}</p>}
+              {section.blocks.map(renderBlock)}
+            </section>
+          ))}
+        </article>
+      </div>
     </div>
   );
 }
