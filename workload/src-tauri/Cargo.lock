@@ -5228,7 +5228,7 @@ dependencies = [
 
 [[package]]
 name = "workload-editor"
-version = "1.12.1"
+version = "1.21.0"
 dependencies = [
  "serde",
  "serde_json",
