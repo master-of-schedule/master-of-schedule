@@ -7,6 +7,7 @@ import { DepartmentsPage } from './pages/DepartmentsPage';
 import { AssignPage } from './pages/AssignPage';
 import { HomeroomPage } from './pages/HomeroomPage';
 import { ExportPage } from './pages/ExportPage';
+import { HelpPage } from './pages/HelpPage';
 import { useDownloadFolder, isFileSystemAccessSupported } from './hooks/useDownloadFolder';
 import { useToast } from './hooks/useToast';
 import { ToastContainer } from './components/ToastContainer';
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'assign', label: '4. Назначения' },
   { id: 'homeroom', label: '5. Классные руководители' },
   { id: 'export', label: '6. Экспорт' },
+  { id: 'help', label: 'Помощь' },
 ] as const;
 
 export function App() {
@@ -342,6 +344,7 @@ export function App() {
         <div style={activeTab !== 'assign' ? { display: 'none' } : undefined}><AssignPage plan={curriculumPlan} /></div>
         {activeTab === 'homeroom' && <HomeroomPage plan={curriculumPlan} />}
         {activeTab === 'export' && <ExportPage />}
+        {activeTab === 'help' && <HelpPage />}
       </main>
 
       <ToastContainer />

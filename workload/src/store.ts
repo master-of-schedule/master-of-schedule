@@ -30,7 +30,7 @@ interface RNState {
   subjectShortNames: Record<string, string>;
 
   // ── Active tab ────────────────────────────────────────────────────────────
-  activeTab: 'import' | 'teachers' | 'departments' | 'assign' | 'homeroom' | 'export';
+  activeTab: 'import' | 'teachers' | 'departments' | 'assign' | 'homeroom' | 'export' | 'help';
 
   // ── Actions ───────────────────────────────────────────────────────────────
   setCurriculumPlan: (plan: CurriculumPlan) => void;
