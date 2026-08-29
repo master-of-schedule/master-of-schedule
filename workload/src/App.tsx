@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from './store';
 import type { CurriculumPlan, RNTeacher, DeptGroup, Assignment, HomeroomAssignment } from './types';
 import { ImportPage } from './pages/ImportPage';
@@ -36,6 +36,7 @@ export function App() {
   const isDirtyRef = useRef(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const isFirstRender = useRef(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -49,19 +50,43 @@ export function App() {
     isDirtyRef.current = true;
   }, [teachers, deptGroups, assignments, homeroomAssignments, curriculumPlan]);
 
-  useEffect(() => {
-    void checkForUpdate({
+  const checkRnUpdate = useCallback(async (force = false) => {
+    const result = await checkForUpdate({
       appId: 'rn',
       currentVersion: import.meta.env.VITE_APP_VERSION,
       tagPrefix: 'workload/v',
       storage: window.localStorage,
       fetcher: window.fetch.bind(window),
-    }).then((result) => {
-      if (result.status === 'available') {
-        notify(`Доступна новая версия РН ${result.version}. Скачать: ${result.url}`, 'info', 0);
-      }
+      force,
     });
+
+    if (result.status === 'available' || (force && result.status === 'current' && result.version)) {
+      notify(`Доступна новая версия РН ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      return;
+    }
+
+    if (force) {
+      notify(
+        result.status === 'unavailable'
+          ? 'Не удалось проверить обновления. Проверьте подключение к интернету.'
+          : 'Установлена актуальная версия РН',
+        result.status === 'unavailable' ? 'warning' : 'success'
+      );
+    }
   }, [notify]);
+
+  useEffect(() => {
+    void checkRnUpdate();
+  }, [checkRnUpdate]);
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setIsCheckingUpdate(true);
+    try {
+      await checkRnUpdate(true);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }, [checkRnUpdate]);
 
   // Register Tauri close interceptor
   useEffect(() => {
@@ -369,6 +394,9 @@ export function App() {
             <h2 className={styles.aboutTitle}>Редактор нагрузки</h2>
             <p className={styles.aboutVersion}>Версия {import.meta.env.VITE_APP_VERSION}</p>
             <p className={styles.aboutAuthors}>Авторы: Минухин В., Минухин Д., Клаудиа</p>
+            <button className={styles.aboutCheck} onClick={handleCheckForUpdate} disabled={isCheckingUpdate}>
+              {isCheckingUpdate ? 'Проверяем...' : 'Проверить обновления'}
+            </button>
             <button className={styles.aboutClose} onClick={() => setAboutOpen(false)}>Закрыть</button>
           </div>
         </div>

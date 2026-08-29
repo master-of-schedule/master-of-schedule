@@ -13,6 +13,7 @@ export interface UpdateCheckOptions {
   fetcher: typeof fetch;
   now?: () => number;
   intervalMs?: number;
+  force?: boolean;
 }
 
 export interface UpdateCheckResult {
@@ -71,16 +72,16 @@ export async function checkForUpdate(options: UpdateCheckOptions): Promise<Updat
     const lastCheckedAt = Number(options.storage.getItem(lastCheckedKey) ?? 0);
     const currentTime = now();
 
-    if (lastCheckedAt > 0 && currentTime - lastCheckedAt < intervalMs) {
+    if (!options.force && lastCheckedAt > 0 && currentTime - lastCheckedAt < intervalMs) {
       return { status: 'skipped' };
     }
-
-    options.storage.setItem(lastCheckedKey, String(currentTime));
 
     const response = await options.fetcher(RELEASES_URL, {
       headers: { Accept: 'application/vnd.github+json' },
     });
     if (!response.ok) return { status: 'unavailable' };
+
+    options.storage.setItem(lastCheckedKey, String(currentTime));
 
     const releases = await response.json() as GitHubRelease[];
     const latest = pickLatestRelease(releases, options.tagPrefix);
