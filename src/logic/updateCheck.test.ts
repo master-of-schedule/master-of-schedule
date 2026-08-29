@@ -98,17 +98,41 @@ describe('updateCheck', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('fails silently when the releases request fails', async () => {
+  it('allows a manual check to bypass the interval', async () => {
+    const storage = makeStorage({ 'rshr.updateCheck.lastCheckedAt': '1000' });
+    const fetcher = makeFetch([
+      { tag_name: 'v3.36.0', html_url: 'https://example.com/3.36.0' },
+    ]);
+
     const result = await checkForUpdate({
       appId: 'rshr',
       currentVersion: '3.35.0',
       tagPrefix: 'v',
-      storage: makeStorage(),
+      storage,
+      fetcher,
+      now: () => 1500,
+      intervalMs: 1000,
+      force: true,
+    });
+
+    expect(result).toMatchObject({ status: 'available', version: '3.36.0' });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(storage.data['rshr.updateCheck.lastCheckedAt']).toBe('1500');
+  });
+
+  it('fails silently when the releases request fails', async () => {
+    const storage = makeStorage();
+    const result = await checkForUpdate({
+      appId: 'rshr',
+      currentVersion: '3.35.0',
+      tagPrefix: 'v',
+      storage,
       fetcher: vi.fn().mockRejectedValue(new Error('offline')) as unknown as typeof fetch,
       now: () => 1000,
       intervalMs: 0,
     });
 
     expect(result.status).toBe('unavailable');
+    expect(storage.data['rshr.updateCheck.lastCheckedAt']).toBeUndefined();
   });
 });

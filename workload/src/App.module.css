@@ -181,6 +181,20 @@
 .aboutTitle { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
 .aboutVersion { font-size: 14px; color: #555; margin: 0 0 4px; }
 .aboutAuthors { font-size: 13px; color: #777; margin: 0 0 20px; }
+.aboutCheck {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 7px 20px;
+  background: #247ba0;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.aboutCheck:hover:not(:disabled) { background: #1c6380; }
+.aboutCheck:disabled { opacity: 0.6; cursor: not-allowed; }
 .aboutClose {
   padding: 7px 20px;
   background: #1a1a2e;

@@ -49,4 +49,41 @@ describe('workload updateCheck', () => {
     expect(storage.data['rn.updateCheck.lastCheckedAt']).toBe('1000');
     expect(storage.data['rn.updateCheck.notifiedVersion']).toBe('1.21.0');
   });
+
+  it('allows a manual check to bypass the interval', async () => {
+    const storage = makeStorage({ 'rn.updateCheck.lastCheckedAt': '1000' });
+    const fetcher = makeFetch([
+      { tag_name: 'workload/v1.21.0', html_url: 'https://example.com/rn' },
+    ]);
+
+    const result = await checkForUpdate({
+      appId: 'rn',
+      currentVersion: '1.20.0',
+      tagPrefix: 'workload/v',
+      storage,
+      fetcher,
+      now: () => 1500,
+      intervalMs: 1000,
+      force: true,
+    });
+
+    expect(result).toMatchObject({ status: 'available', version: '1.21.0' });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(storage.data['rn.updateCheck.lastCheckedAt']).toBe('1500');
+  });
+
+  it('does not cache a failed request', async () => {
+    const storage = makeStorage();
+
+    const result = await checkForUpdate({
+      appId: 'rn',
+      currentVersion: '1.20.0',
+      tagPrefix: 'workload/v',
+      storage,
+      fetcher: vi.fn().mockRejectedValue(new Error('offline')) as unknown as typeof fetch,
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(storage.data['rn.updateCheck.lastCheckedAt']).toBeUndefined();
+  });
 });
