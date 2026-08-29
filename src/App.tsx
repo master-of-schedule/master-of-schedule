@@ -3,7 +3,7 @@
  * Handles tab routing between start, editor, export, and settings views
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
 import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/db';
 import { AppHeader } from '@/components/common/AppHeader';
@@ -37,19 +37,34 @@ export function App() {
     loadData();
   }, [loadData]);
 
-  useEffect(() => {
-    void checkForUpdate({
+  const checkRshrUpdate = useCallback(async (force = false) => {
+    const result = await checkForUpdate({
       appId: 'rshr',
       currentVersion: import.meta.env.VITE_APP_VERSION,
       tagPrefix: 'v',
       storage: window.localStorage,
       fetcher: window.fetch.bind(window),
-    }).then((result) => {
-      if (result.status === 'available') {
-        showToast(`Доступна новая версия РШР ${result.version}. Скачать: ${result.url}`, 'info', 0);
-      }
+      force,
     });
+
+    if (result.status === 'available' || (force && result.status === 'current' && result.version)) {
+      showToast(`Доступна новая версия РШР ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      return;
+    }
+
+    if (force) {
+      showToast(
+        result.status === 'unavailable'
+          ? 'Не удалось проверить обновления. Проверьте подключение к интернету.'
+          : 'Установлена актуальная версия РШР',
+        result.status === 'unavailable' ? 'warning' : 'success'
+      );
+    }
   }, [showToast]);
+
+  useEffect(() => {
+    void checkRshrUpdate();
+  }, [checkRshrUpdate]);
 
   // Browser: warn before closing tab/window with unsaved changes
   useEffect(() => {
@@ -146,7 +161,7 @@ export function App() {
 
   return (
     <div className="app">
-      <AppHeader />
+      <AppHeader onCheckForUpdate={() => checkRshrUpdate(true)} />
       <main className="app-content">{renderTab()}</main>
 
       {/* Tauri: unsaved changes on window close */}

@@ -7,6 +7,7 @@ import type { AppTab, VersionType } from '@/types';
 import { useUIStore, useScheduleStore, useDataStore } from '@/stores';
 import { formatWeekFull } from '@/utils/dateFormat';
 import { Modal } from './Modal';
+import { Button } from './Button';
 import styles from './AppHeader.module.css';
 
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -26,7 +27,11 @@ const VERSION_TYPE_LABELS: Record<VersionType, string> = {
   weekly: 'На неделю',
 };
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onCheckForUpdate: () => Promise<void>;
+}
+
+export function AppHeader({ onCheckForUpdate }: AppHeaderProps) {
   const activeTab = useUIStore((state) => state.activeTab);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
 
@@ -41,6 +46,7 @@ export function AppHeader() {
   const exitReadOnlyYear = useDataStore((state) => state.exitReadOnlyYear);
 
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
 
@@ -60,6 +66,15 @@ export function AppHeader() {
     setIsEditingName(false);
     setEditedName('');
   }, []);
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setIsCheckingUpdate(true);
+    try {
+      await onCheckForUpdate();
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }, [onCheckForUpdate]);
 
   return (
     <>
@@ -144,6 +159,9 @@ export function AppHeader() {
       <div className={styles.aboutContent}>
         <p className={styles.aboutVersion}>Версия {import.meta.env.VITE_APP_VERSION}</p>
         <p className={styles.aboutAuthors}>Авторы: Минухин В., Минухин Д., Клаудиа</p>
+        <Button variant="secondary" size="small" onClick={handleCheckForUpdate} disabled={isCheckingUpdate}>
+          {isCheckingUpdate ? 'Проверяем...' : 'Проверить обновления'}
+        </Button>
       </div>
     </Modal>
     </>
