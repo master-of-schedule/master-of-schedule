@@ -89,9 +89,14 @@ export type { ClassProgress } from './counting';
 
 export {
   findLessonListCleanupPlan,
+  getLessonListRequirementUpdates,
   getLessonListCleanupSignature,
 } from './lessonListCleanup';
-export type { LessonListCleanupPlan, LessonListCleanupRemoval } from './lessonListCleanup';
+export type {
+  LessonListCleanupPlan,
+  LessonListCleanupRemoval,
+  LessonListRequirementUpdates,
+} from './lessonListCleanup';
 
 // Schedule traversal
 export { forEachSlot, forEachSlotAt } from './traversal';
