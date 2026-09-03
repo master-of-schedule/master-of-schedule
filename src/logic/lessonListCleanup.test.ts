@@ -96,6 +96,58 @@ describe('findLessonListCleanupPlan', () => {
     expect(plan.removals).toHaveLength(0);
   });
 
+  it('does not flag an extra lesson added via "+" even when it is tagged with the real requirement id', () => {
+    // Regression: the "+" flow can end up tagging the extra lesson with the
+    // matching real requirement's id instead of the temporary lesson's id
+    // (the panel shows one merged row for both). The cleanup check must not
+    // depend on that id being correct — it should allow up to
+    // requirement.countPerWeek + temp.countPerWeek occurrences of the same
+    // subject/teacher/class, regardless of which id each one carries.
+    const requirement = makeRequirement({ countPerWeek: 3 });
+    const temp = makeRequirement({ id: 'temp-1', countPerWeek: 1 });
+    const schedule: Schedule = {
+      '10а': {
+        Пн: {
+          1: { lessons: [makeLesson({ id: 'lesson-1' })] },
+          2: { lessons: [makeLesson({ id: 'lesson-2' })] },
+        },
+        Вт: {
+          1: { lessons: [makeLesson({ id: 'lesson-3' })] },
+          2: { lessons: [makeLesson({ id: 'lesson-4' })] },
+        },
+      },
+    };
+
+    const plan = findLessonListCleanupPlan(schedule, [requirement], [temp]);
+
+    expect(plan.removals).toHaveLength(0);
+  });
+
+  it('still flags an excess lesson beyond the combined real + temporary allowance', () => {
+    const requirement = makeRequirement({ countPerWeek: 3 });
+    const temp = makeRequirement({ id: 'temp-1', countPerWeek: 1 });
+    const schedule: Schedule = {
+      '10а': {
+        Пн: {
+          1: { lessons: [makeLesson({ id: 'lesson-1' })] },
+          2: { lessons: [makeLesson({ id: 'lesson-2' })] },
+        },
+        Вт: {
+          1: { lessons: [makeLesson({ id: 'lesson-3' })] },
+          2: { lessons: [makeLesson({ id: 'lesson-4' })] },
+        },
+        Ср: {
+          1: { lessons: [makeLesson({ id: 'lesson-5' })] },
+        },
+      },
+    };
+
+    const plan = findLessonListCleanupPlan(schedule, [requirement], [temp]);
+
+    expect(plan.removals).toHaveLength(1);
+    expect(plan.removals[0]).toMatchObject({ lessonNum: 1, day: 'Ср', reason: 'excess' });
+  });
+
   it('matches lessons by second teacher as part of the lesson identity', () => {
     const schedule = makeSchedule([
       makeLesson({
