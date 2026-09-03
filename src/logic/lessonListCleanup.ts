@@ -51,9 +51,8 @@ export function findLessonListCleanupPlan(
   temporaryLessons: LessonRequirement[]
 ): LessonListCleanupPlan {
   const allowedCounts = new Map<string, number>();
-  const temporaryIds = new Set(temporaryLessons.map(lesson => lesson.id));
 
-  for (const requirement of requirements) {
+  for (const requirement of [...requirements, ...temporaryLessons]) {
     const key = requirementCleanupKey(requirement);
     allowedCounts.set(key, (allowedCounts.get(key) ?? 0) + allowedLessonCount(requirement.countPerWeek));
   }
@@ -63,8 +62,6 @@ export function findLessonListCleanupPlan(
 
   forEachSlot(schedule, (className, day, lessonNum, lessons) => {
     lessons.forEach((lesson, lessonIndex) => {
-      if (temporaryIds.has(lesson.requirementId)) return;
-
       const key = scheduledLessonCleanupKey(className, lesson);
       const allowed = allowedCounts.get(key) ?? 0;
 
