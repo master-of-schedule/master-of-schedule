@@ -22,6 +22,7 @@ import {
   getUnscheduledLessons,
   isRoomAvailable,
   mergeWithTemporaryLessons,
+  supportsForcePlacement,
 } from '@/logic';
 import { ClassSelector } from './ClassSelector';
 import { pickFirstEditableClass } from './classSelection';
@@ -138,8 +139,9 @@ export function EditorPage() {
     if (movingLesson) return 'Кликните по ячейке, куда переместить занятие. Esc — отмена';
     if (absentTeacher) return 'Отметьте уроки, требующие замены';
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
+    if (selectedLesson && selectedCells.length > 0) return `Занятие «${selectedLesson.subject}» выбрано. «Назначить» поставит его во все выделенные ячейки (${selectedCells.length}).`;
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
-    if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
+    if (selectedLesson) return supportsForcePlacement(versionType)
       ? 'Нажмите на ячейку для назначения. Alt+клик — поставить в обход ограничений.'
       : 'Нажмите на свободную ячейку сетки для назначения.';
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
