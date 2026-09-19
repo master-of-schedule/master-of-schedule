@@ -473,20 +473,20 @@ export function ExportPage() {
       return;
     }
 
-    // Resolve telegram folder (pick on first use, re-check permission otherwise)
+    // Resolve telegram folder (pick on first use, re-check permission otherwise).
+    // If the picker fails or is refused, fall through with telegramDir = null —
+    // saveCanvases() falls back to plain <a download> in that case.
     let telegramDir: FileSystemDirectoryHandle | null = folderHandle;
     if (!telegramDir) {
       telegramDir = await pickFolder('telegram');
-      if (!telegramDir) return;
     } else {
       telegramDir = await ensurePermission(telegramDir);
       if (!telegramDir) {
         telegramDir = await pickFolder('telegram');
-        if (!telegramDir) return;
       }
     }
 
-    // 1. Save PNG images to telegram folder
+    // 1. Save PNG images to telegram folder (or download directly if no folder is available)
     await saveCanvases(telegramDir);
 
     // 2. Save замены image(s) to deputy folder (weekly mode only)
