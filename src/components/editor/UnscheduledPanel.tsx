@@ -67,16 +67,27 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     [lessonStatuses]
   );
 
-  // Filter out completed lessons from the main list
-  const visibleLessons = useMemo(
-    () => unscheduled.filter(item => !isCompleted(item.requirement.id)),
-    [unscheduled, isCompleted]
+  const isSickStatus = useCallback(
+    (id: string) => lessonStatuses[id] === 'sick',
+    [lessonStatuses]
   );
 
-  // Completed lessons shown at bottom with badge
+  // Filter out completed and sick lessons from the main, assignable list
+  const visibleLessons = useMemo(
+    () => unscheduled.filter(item => !isCompleted(item.requirement.id) && !isSickStatus(item.requirement.id)),
+    [unscheduled, isCompleted, isSickStatus]
+  );
+
+  // Completed lessons shown at bottom with a ✓N badge
   const completedLessons = useMemo(
     () => unscheduled.filter(item => isCompleted(item.requirement.id)),
     [unscheduled, isCompleted]
+  );
+
+  // Sick lessons shown at bottom, not assignable
+  const sickLessons = useMemo(
+    () => unscheduled.filter(item => isSickStatus(item.requirement.id)),
+    [unscheduled, isSickStatus]
   );
 
   // Handle lesson click
@@ -126,7 +137,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     closeContextMenu();
   }, [ctxMenu.targetId, setLessonStatus, closeContextMenu]);
 
-  const handleClearCompleted = useCallback(() => {
+  const handleClearStatus = useCallback(() => {
     if (ctxMenu.targetId) {
       clearLessonStatus(ctxMenu.targetId);
     }
@@ -167,7 +178,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       </div>
 
       <div className={styles.list}>
-        {visibleLessons.length === 0 && completedLessons.length === 0 ? (
+        {visibleLessons.length === 0 && completedLessons.length === 0 && sickLessons.length === 0 ? (
           <div className={styles.empty}>
             Все занятия расставлены
             {showAddButton && (
@@ -185,12 +196,11 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                   const isSubstitution = item.requirement.type === 'group';
                   const isTemporary = temporaryIds.has(item.requirement.id);
                   const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
-                  const isSick = lessonStatuses[item.requirement.id] === 'sick';
 
                   return (
                     <button
                       key={item.requirement.id}
-                      className={`${styles.lesson} ${isSelected ? styles.selected : ''} ${isTemporary || mergedTemp ? styles.temporary : ''} ${isSick ? styles.sick : ''}`}
+                      className={`${styles.lesson} ${isSelected ? styles.selected : ''} ${isTemporary || mergedTemp ? styles.temporary : ''}`}
                       onClick={() => handleLessonClick(item.requirement)}
                       onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
                     >
@@ -241,6 +251,28 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                 </button>
               );
             })}
+            {sickLessons.map((item) => {
+              const isSubstitution = item.requirement.type === 'group';
+              return (
+                <button
+                  key={item.requirement.id}
+                  className={`${styles.lesson} ${styles.conducted}`}
+                  onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
+                  onClick={() => {}}
+                >
+                  <span className={styles.subject}>
+                    {item.requirement.subject}
+                    {isSubstitution && (
+                      <span className={styles.groupIndex}>
+                        ({extractGroupIndex(item.requirement.classOrGroup)})
+                      </span>
+                    )}
+                  </span>
+                  <span className={styles.teacher}>{item.requirement.teacher}</span>
+                  <span className={styles.sickBadge}>больничный</span>
+                </button>
+              );
+            })}
           </>
         )}
       </div>
@@ -248,7 +280,9 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       {isWeekly && (
         <ContextMenu isOpen={ctxMenu.isOpen} x={ctxMenu.x} y={ctxMenu.y} onClose={closeContextMenu}>
           {targetStatus === 'completed' || targetStatus === 'completed2' ? (
-            <ContextMenuItem onClick={handleClearCompleted}>Снять отметку</ContextMenuItem>
+            <ContextMenuItem onClick={handleClearStatus}>Снять отметку</ContextMenuItem>
+          ) : targetStatus === 'sick' ? (
+            <ContextMenuItem onClick={handleClearStatus}>Снять «Больничный»</ContextMenuItem>
           ) : (
             <>
               <ContextMenuItem onClick={() => handleMarkCompleted(1)}>Проведено (1 занятие)</ContextMenuItem>

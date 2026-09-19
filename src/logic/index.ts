@@ -78,6 +78,7 @@ export {
   getTotalUnscheduledCount,
   isClassFullyScheduled,
   getClassProgress,
+  getClassesWithRemaining,
   getLessonsPerDay,
   getTeacherLessonsPerDay,
   getTeachersOnDay,

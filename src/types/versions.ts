@@ -6,6 +6,9 @@ import type { VersionType } from './constants';
 import type { Schedule, LessonRequirement } from './schedule';
 import type { Substitution } from './substitutions';
 
+/** Per-requirement lesson status: 'sick' (teacher on sick leave) or 'completed'/'completed2' (held elsewhere, covers 1 or 2 occurrences) */
+export type LessonStatus = 'sick' | 'completed' | 'completed2';
+
 /**
  * Saved schedule version
  */
@@ -34,7 +37,7 @@ export interface Version {
   /** Temporary extra lessons for this version only (not in master requirements) */
   temporaryLessons?: LessonRequirement[];
   /** Per-lesson statuses: 'sick' (gray, teacher on sick leave) or 'completed' (held elsewhere, hidden) */
-  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
+  lessonStatuses?: Record<string, LessonStatus>;
   /**
    * Acknowledged conflict keys for this version.
    * Conflicts acknowledged here are suppressed in the Check panel and persist across sessions.
