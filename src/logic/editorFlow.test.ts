@@ -14,10 +14,10 @@ import {
 } from './editorFlow';
 
 describe('supportsForcePlacement', () => {
-  it('allows technical and weekly schedules only', () => {
+  it('allows all version types', () => {
     expect(supportsForcePlacement('technical')).toBe(true);
     expect(supportsForcePlacement('weekly')).toBe(true);
-    expect(supportsForcePlacement('template')).toBe(false);
+    expect(supportsForcePlacement('template')).toBe(true);
   });
 });
 

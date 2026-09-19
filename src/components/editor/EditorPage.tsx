@@ -14,7 +14,6 @@ import {
   getAssigningLesson,
   getAvailableRooms,
   findLessonListCleanupPlan,
-  getLessonListRequirementUpdates,
   getLessonListCleanupSignature,
   getCopiedLesson,
   getMovingLesson,
@@ -22,6 +21,7 @@ import {
   getUnscheduledLessons,
   isRoomAvailable,
   mergeWithTemporaryLessons,
+  supportsForcePlacement,
 } from '@/logic';
 import { ClassSelector } from './ClassSelector';
 import { pickFirstEditableClass } from './classSelection';
@@ -67,18 +67,14 @@ export function EditorPage() {
   const movingLesson = getMovingLesson(interaction);
 
   const {
-    classes, gapExcludedClasses, requirements, groups, teachers, rooms, isReadOnlyYear,
-    addRequirement, updateRequirement,
+    classes, gapExcludedClasses, requirements, teachers, rooms, isReadOnlyYear,
   } = useDataStore(useShallow((s) => ({
     classes: s.classes,
     gapExcludedClasses: s.gapExcludedClasses,
     requirements: s.lessonRequirements,
-    groups: s.groups,
     teachers: s.teachers,
     rooms: s.rooms,
     isReadOnlyYear: s.isReadOnlyYear,
-    addRequirement: s.addRequirement,
-    updateRequirement: s.updateRequirement,
   })));
 
   const {
@@ -118,8 +114,7 @@ export function EditorPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [dismissedCleanupSignature, setDismissedCleanupSignature] = useState<string | null>(null);
-  const [cleanupAdditionIds, setCleanupAdditionIds] = useState<Set<string>>(() => new Set());
-  const [isApplyingCleanup, setIsApplyingCleanup] = useState(false);
+  const [cleanupDeletionIds, setCleanupDeletionIds] = useState<Set<string>>(() => new Set());
   const { showToast } = useToast();
 
   // Track substitution metadata across the replacement → room picker flow
@@ -138,8 +133,9 @@ export function EditorPage() {
     if (movingLesson) return 'Кликните по ячейке, куда переместить занятие. Esc — отмена';
     if (absentTeacher) return 'Отметьте уроки, требующие замены';
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
+    if (selectedLesson && selectedCells.length > 0) return `Занятие «${selectedLesson.subject}» выбрано. «Назначить» поставит его во все выделенные ячейки (${selectedCells.length}).`;
     if (selectedCells.length > 0) return `Выделено: ${selectedCells.length}. Delete — удалить, Ctrl+клик — добавить ещё`;
-    if (selectedLesson) return (versionType === 'weekly' || versionType === 'technical')
+    if (selectedLesson) return supportsForcePlacement(versionType)
       ? 'Нажмите на ячейку для назначения. Alt+клик — поставить в обход ограничений.'
       : 'Нажмите на свободную ячейку сетки для назначения.';
     return 'Выберите занятие из панели «Занятия» справа или нажмите на ячейку';
@@ -171,7 +167,7 @@ export function EditorPage() {
     && cleanupSignature !== dismissedCleanupSignature;
 
   useEffect(() => {
-    setCleanupAdditionIds(new Set());
+    setCleanupDeletionIds(new Set());
   }, [cleanupSignature]);
 
   // Partner modal state (Z35-4 / Z39-3: open AddTemporaryLessonModal from ReplacementPanel partner section)
@@ -269,55 +265,28 @@ export function EditorPage() {
     }
   }, [clearPartnerFile, restorePartnerClassLessons]);
 
-  const handleApplyLessonListCleanup = useCallback(async (additionIds = cleanupAdditionIds) => {
-    if (isApplyingCleanup) return;
-
-    const additions = cleanupPlan.removals.filter(removal => additionIds.has(removal.lesson.id));
-    const removals = cleanupPlan.removals.filter(removal => !additionIds.has(removal.lesson.id));
-    const requirementUpdates = getLessonListRequirementUpdates(additions, requirements, groups);
-
-    setIsApplyingCleanup(true);
-    try {
-      for (const update of requirementUpdates.updates) {
-        await updateRequirement(update.id, { countPerWeek: update.countPerWeek });
-      }
-      for (const addition of requirementUpdates.additions) {
-        await addRequirement(addition);
-      }
-      if (removals.length > 0) {
-        removeLessons(removals.map(removal => ({
-          className: removal.className,
-          day: removal.day,
-          lessonNum: removal.lessonNum,
-          lessonIndex: removal.lessonIndex,
-        })));
-      }
-      setDismissedCleanupSignature(null);
-
-      const messages = [
-        removals.length > 0 ? `удалено из сетки: ${removals.length}` : '',
-        additions.length > 0 ? `внесено в список занятий: ${additions.length}` : '',
-      ].filter(Boolean);
-      showToast(`Готово: ${messages.join(', ')}`, 'success');
-    } catch {
-      showToast('Не удалось обновить список занятий', 'error');
-    } finally {
-      setIsApplyingCleanup(false);
+  const handleDeleteCleanupSelection = useCallback((deletionIds = cleanupDeletionIds) => {
+    const toRemove = cleanupPlan.removals.filter(removal => deletionIds.has(removal.lesson.id));
+    if (toRemove.length > 0) {
+      removeLessons(toRemove.map(removal => ({
+        className: removal.className,
+        day: removal.day,
+        lessonNum: removal.lessonNum,
+        lessonIndex: removal.lessonIndex,
+      })));
+      showToast(`Удалено из сетки: ${toRemove.length}`, 'success');
     }
-  }, [addRequirement, cleanupAdditionIds, cleanupPlan.removals, groups, isApplyingCleanup, removeLessons, requirements, showToast, updateRequirement]);
+    setDismissedCleanupSignature(null);
+  }, [cleanupDeletionIds, cleanupPlan.removals, removeLessons, showToast]);
 
-  const toggleCleanupAddition = useCallback((lessonId: string) => {
-    setCleanupAdditionIds((current) => {
+  const toggleCleanupDeletion = useCallback((lessonId: string) => {
+    setCleanupDeletionIds((current) => {
       const next = new Set(current);
       if (next.has(lessonId)) next.delete(lessonId);
       else next.add(lessonId);
       return next;
     });
   }, []);
-
-  const markAllCleanupForAddition = useCallback(() => {
-    setCleanupAdditionIds(new Set(cleanupPlan.removals.map(removal => removal.lesson.id)));
-  }, [cleanupPlan.removals]);
 
   // Handle save
   const handleSave = useCallback(async () => {
@@ -993,43 +962,34 @@ export function EditorPage() {
           size="large"
           footer={
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-xs)', justifyContent: 'flex-end' }}>
-              <Button variant="ghost" size="small" onClick={() => setDismissedCleanupSignature(cleanupSignature)} disabled={isApplyingCleanup}>
-                Оставить как есть
+              <Button variant="ghost" size="small" onClick={() => setDismissedCleanupSignature(cleanupSignature)}>
+                Закрыть
               </Button>
-              <Button variant="secondary" size="small" onClick={markAllCleanupForAddition} disabled={isApplyingCleanup}>
-                Внести всё в список
-              </Button>
-              <Button variant="danger" size="small" onClick={() => void handleApplyLessonListCleanup(new Set())} disabled={isApplyingCleanup}>
-                Удалить всё из сетки
-              </Button>
-              <Button variant="primary" size="small" onClick={() => void handleApplyLessonListCleanup()} disabled={isApplyingCleanup}>
-                {isApplyingCleanup ? 'Сохраняем...' : 'Применить выбор'}
+              <Button variant="danger" size="small" onClick={() => handleDeleteCleanupSelection()}>
+                Удалить
               </Button>
             </div>
           }
         >
           <p className={styles.cleanupIntro}>
-            Отметьте занятия, которые нужно оставить в сетке и внести в список занятий.
-            Неотмеченные занятия будут удалены только из этой сетки.
+            Отметьте занятия, которых больше нет в списке занятий, чтобы удалить их из сетки.
           </p>
           <div className={styles.cleanupSummary}>
-            <span>К удалению: {cleanupPlan.removals.length - cleanupAdditionIds.size}</span>
-            <span>Внести в список: {cleanupAdditionIds.size}</span>
+            <span>Отмечено к удалению: {cleanupDeletionIds.size}</span>
           </div>
           <div className={styles.cleanupList}>
             {cleanupPlan.removals.map((removal) => {
-              const isMarkedForAddition = cleanupAdditionIds.has(removal.lesson.id);
-              const actionLabel = removal.reason === 'missing'
-                ? 'Внести в список занятий'
-                : 'Увеличить нагрузку в списке';
+              const isMarkedForDeletion = cleanupDeletionIds.has(removal.lesson.id);
+              const reasonLabel = removal.reason === 'missing'
+                ? 'нет в списке занятий'
+                : 'лишних уроков сверх нормы';
 
               return (
                 <label key={removal.lesson.id} className={styles.cleanupItem}>
                   <input
                     type="checkbox"
-                    checked={isMarkedForAddition}
-                    onChange={() => toggleCleanupAddition(removal.lesson.id)}
-                    disabled={isApplyingCleanup}
+                    checked={isMarkedForDeletion}
+                    onChange={() => toggleCleanupDeletion(removal.lesson.id)}
                   />
                   <span className={styles.cleanupDetails}>
                     <strong>{removal.lesson.subject}</strong>
@@ -1037,7 +997,7 @@ export function EditorPage() {
                     {removal.lesson.teacher2 && <span>Второй учитель: {removal.lesson.teacher2}</span>}
                     <span>{removal.day}, урок {removal.lessonNum}</span>
                   </span>
-                  <span className={styles.cleanupAction}>{actionLabel}</span>
+                  <span className={styles.cleanupAction}>{reasonLabel}</span>
                 </label>
               );
             })}

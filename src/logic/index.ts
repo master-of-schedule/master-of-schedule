@@ -78,6 +78,7 @@ export {
   getTotalUnscheduledCount,
   isClassFullyScheduled,
   getClassProgress,
+  getClassesWithRemaining,
   getLessonsPerDay,
   getTeacherLessonsPerDay,
   getTeachersOnDay,
@@ -89,13 +90,11 @@ export type { ClassProgress } from './counting';
 
 export {
   findLessonListCleanupPlan,
-  getLessonListRequirementUpdates,
   getLessonListCleanupSignature,
 } from './lessonListCleanup';
 export type {
   LessonListCleanupPlan,
   LessonListCleanupRemoval,
-  LessonListRequirementUpdates,
 } from './lessonListCleanup';
 
 // Schedule traversal
