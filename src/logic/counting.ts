@@ -10,8 +10,21 @@ import type {
   ScheduledLesson,
   LessonNumber,
   Day,
+  LessonStatus,
 } from '@/types';
 import { forEachSlot } from './traversal';
+
+/**
+ * How many of a requirement's weekly occurrences a status already covers
+ * outside the grid. 'sick' excuses all remaining occurrences for the week;
+ * 'completed'/'completed2' cover 1 or 2 occurrences conducted elsewhere.
+ */
+function getStatusCoverage(status: LessonStatus | undefined, countPerWeek: number): number {
+  if (status === 'sick') return countPerWeek;
+  if (status === 'completed2') return 2;
+  if (status === 'completed') return 1;
+  return 0;
+}
 
 /**
  * Create a unique key for a lesson requirement
@@ -66,7 +79,8 @@ export function getScheduledCounts(
 export function getUnscheduledLessons(
   requirements: LessonRequirement[],
   schedule: Schedule,
-  className: string
+  className: string,
+  lessonStatuses?: Record<string, LessonStatus>
 ): UnscheduledLesson[] {
   const scheduledCounts = getScheduledCounts(schedule, className);
   const unscheduled: UnscheduledLesson[] = [];
@@ -83,7 +97,8 @@ export function getUnscheduledLessons(
     });
 
     const scheduled = scheduledCounts.get(key) ?? 0;
-    const remaining = req.countPerWeek - scheduled;
+    const covered = getStatusCoverage(lessonStatuses?.[req.id], req.countPerWeek);
+    const remaining = Math.max(0, req.countPerWeek - scheduled - covered);
 
     if (remaining > 0) {
       unscheduled.push({
@@ -102,9 +117,10 @@ export function getUnscheduledLessons(
 export function getTotalUnscheduledCount(
   requirements: LessonRequirement[],
   schedule: Schedule,
-  className: string
+  className: string,
+  lessonStatuses?: Record<string, LessonStatus>
 ): number {
-  const unscheduled = getUnscheduledLessons(requirements, schedule, className);
+  const unscheduled = getUnscheduledLessons(requirements, schedule, className, lessonStatuses);
   return unscheduled.reduce((sum, item) => sum + item.remaining, 0);
 }
 
@@ -114,9 +130,30 @@ export function getTotalUnscheduledCount(
 export function isClassFullyScheduled(
   requirements: LessonRequirement[],
   schedule: Schedule,
-  className: string
+  className: string,
+  lessonStatuses?: Record<string, LessonStatus>
 ): boolean {
-  return getTotalUnscheduledCount(requirements, schedule, className) === 0;
+  return getTotalUnscheduledCount(requirements, schedule, className, lessonStatuses) === 0;
+}
+
+/**
+ * Get the set of class names (from the given list) that still have unscheduled
+ * lessons, for highlighting in the class list. Lessons covered by a status
+ * ('sick'/'completed'/'completed2') don't count as unscheduled.
+ */
+export function getClassesWithRemaining(
+  classNames: string[],
+  requirements: LessonRequirement[],
+  schedule: Schedule,
+  lessonStatuses?: Record<string, LessonStatus>
+): Set<string> {
+  const result = new Set<string>();
+  for (const name of classNames) {
+    if (getTotalUnscheduledCount(requirements, schedule, name, lessonStatuses) > 0) {
+      result.add(name);
+    }
+  }
+  return result;
 }
 
 /**
@@ -132,7 +169,8 @@ export interface ClassProgress {
 export function getClassProgress(
   requirements: LessonRequirement[],
   schedule: Schedule,
-  className: string
+  className: string,
+  lessonStatuses?: Record<string, LessonStatus>
 ): ClassProgress {
   // Calculate total required lessons for this class
   let totalRequired = 0;
@@ -145,7 +183,7 @@ export function getClassProgress(
     }
   }
 
-  const unscheduledCount = getTotalUnscheduledCount(requirements, schedule, className);
+  const unscheduledCount = getTotalUnscheduledCount(requirements, schedule, className, lessonStatuses);
   const totalScheduled = totalRequired - unscheduledCount;
   const percentage = totalRequired > 0 ? Math.round((totalScheduled / totalRequired) * 100) : 100;
 

@@ -7,7 +7,7 @@ import type {
 } from '@/types';
 
 export function supportsForcePlacement(versionType: VersionType): boolean {
-  return versionType === 'technical' || versionType === 'weekly';
+  return versionType === 'technical' || versionType === 'weekly' || versionType === 'template';
 }
 
 export interface CopiedLessonData {

@@ -1,4 +1,4 @@
-import type { Day, Group, LessonNumber, LessonRef, LessonRequirement, Schedule, ScheduledLesson } from '@/types';
+import type { Day, LessonNumber, LessonRef, LessonRequirement, Schedule, ScheduledLesson } from '@/types';
 import { forEachSlot } from './traversal';
 
 export interface LessonListCleanupRemoval extends LessonRef {
@@ -10,11 +10,6 @@ export interface LessonListCleanupPlan {
   removals: LessonListCleanupRemoval[];
   missingCount: number;
   excessCount: number;
-}
-
-export interface LessonListRequirementUpdates {
-  additions: Omit<LessonRequirement, 'id'>[];
-  updates: Array<{ id: string; countPerWeek: number }>;
 }
 
 function normalizeKeyPart(value: string | undefined): string {
@@ -111,48 +106,4 @@ export function getLessonListCleanupSignature(plan: LessonListCleanupPlan): stri
       removal.reason,
     ].join('|'))
     .join('||');
-}
-
-export function getLessonListRequirementUpdates(
-  selectedRemovals: LessonListCleanupRemoval[],
-  requirements: LessonRequirement[],
-  groups: Group[]
-): LessonListRequirementUpdates {
-  const selectedCounts = new Map<string, { removal: LessonListCleanupRemoval; count: number }>();
-
-  for (const removal of selectedRemovals) {
-    const key = scheduledLessonCleanupKey(removal.className, removal.lesson);
-    const selected = selectedCounts.get(key);
-    if (selected) {
-      selected.count += 1;
-    } else {
-      selectedCounts.set(key, { removal, count: 1 });
-    }
-  }
-
-  const additions: Omit<LessonRequirement, 'id'>[] = [];
-  const updates: Array<{ id: string; countPerWeek: number }> = [];
-
-  for (const [key, selected] of selectedCounts) {
-    const existing = requirements.find(requirement => requirementCleanupKey(requirement) === key);
-    if (existing) {
-      updates.push({ id: existing.id, countPerWeek: existing.countPerWeek + selected.count });
-      continue;
-    }
-
-    const { lesson, className } = selected.removal;
-    const group = lesson.group ? groups.find(item => item.name === lesson.group) : undefined;
-    additions.push({
-      type: lesson.group ? 'group' : 'class',
-      classOrGroup: lesson.group ?? className,
-      subject: lesson.subject,
-      teacher: lesson.teacher,
-      teacher2: lesson.teacher2,
-      countPerWeek: selected.count,
-      className: lesson.group ? group?.className ?? className : undefined,
-      parallelGroup: group?.parallelGroup,
-    });
-  }
-
-  return { additions, updates };
 }

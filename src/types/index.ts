@@ -35,7 +35,7 @@ export type {
 } from './schedule';
 
 // Versions
-export type { Version, VersionListItem } from './versions';
+export type { Version, VersionListItem, LessonStatus } from './versions';
 
 // Substitutions
 export type { Substitution } from './substitutions';

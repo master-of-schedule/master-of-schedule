@@ -10,6 +10,7 @@ import {
   getTotalUnscheduledCount,
   isClassFullyScheduled,
   getClassProgress,
+  getClassesWithRemaining,
   getLessonsPerDay,
   getTeacherLessonsPerDay,
   getTeacherLessonsOnDay,
@@ -219,6 +220,52 @@ describe('getUnscheduledLessons', () => {
     expect(unscheduled).toHaveLength(1);
     expect(unscheduled[0].remaining).toBe(2);
   });
+
+  it('excludes a requirement fully covered by "sick" status', () => {
+    const schedule = createTestSchedule(); // Has 3 Math lessons
+    const requirements = [
+      createRequirement({ id: 'r1', countPerWeek: 5 }), // Need 5, have 3
+    ];
+
+    const unscheduled = getUnscheduledLessons(requirements, schedule, '10а', { r1: 'sick' });
+
+    expect(unscheduled).toHaveLength(0);
+  });
+
+  it('reduces remaining by 1 for "completed" status', () => {
+    const schedule = createTestSchedule(); // Has 3 Math lessons
+    const requirements = [
+      createRequirement({ id: 'r1', countPerWeek: 5 }), // Need 5, have 3, need 2 more
+    ];
+
+    const unscheduled = getUnscheduledLessons(requirements, schedule, '10а', { r1: 'completed' });
+
+    expect(unscheduled).toHaveLength(1);
+    expect(unscheduled[0].remaining).toBe(1);
+  });
+
+  it('reduces remaining by 2 for "completed2" status, clamped at 0', () => {
+    const schedule = createTestSchedule(); // Has 3 Math lessons
+    const requirements = [
+      createRequirement({ id: 'r1', countPerWeek: 4 }), // Need 4, have 3, need 1 more
+    ];
+
+    const unscheduled = getUnscheduledLessons(requirements, schedule, '10а', { r1: 'completed2' });
+
+    expect(unscheduled).toHaveLength(0);
+  });
+
+  it('ignores lessonStatuses for a different requirement id', () => {
+    const schedule = createTestSchedule(); // Has 3 Math lessons
+    const requirements = [
+      createRequirement({ id: 'r1', countPerWeek: 5 }),
+    ];
+
+    const unscheduled = getUnscheduledLessons(requirements, schedule, '10а', { 'other-id': 'sick' });
+
+    expect(unscheduled).toHaveLength(1);
+    expect(unscheduled[0].remaining).toBe(2);
+  });
 });
 
 describe('getTotalUnscheduledCount', () => {
@@ -291,6 +338,35 @@ describe('getClassProgress', () => {
     const progress = getClassProgress(requirements, schedule, '10а');
 
     expect(progress.percentage).toBe(100);
+  });
+});
+
+describe('getClassesWithRemaining', () => {
+  it('flags classes with unscheduled lessons', () => {
+    const schedule = createTestSchedule(); // '10а' has 3 Math lessons
+    const requirements = [createRequirement({ classOrGroup: '10а', countPerWeek: 5 })];
+
+    const result = getClassesWithRemaining(['10а', '10б'], requirements, schedule);
+
+    expect(result.has('10а')).toBe(true);
+    expect(result.has('10б')).toBe(false);
+  });
+
+  it('does not flag a class fully covered by "sick" status', () => {
+    const schedule = createTestSchedule();
+    const requirements = [createRequirement({ id: 'r1', classOrGroup: '10а', countPerWeek: 5 })];
+
+    const result = getClassesWithRemaining(['10а'], requirements, schedule, { r1: 'sick' });
+
+    expect(result.has('10а')).toBe(false);
+  });
+
+  it('does not flag a class with no requirements at all', () => {
+    const schedule = createTestSchedule();
+
+    const result = getClassesWithRemaining(['10а'], [], schedule);
+
+    expect(result.has('10а')).toBe(false);
   });
 });
 

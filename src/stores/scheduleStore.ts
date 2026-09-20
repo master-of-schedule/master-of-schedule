@@ -13,6 +13,7 @@ import type {
   Day,
   LessonNumber,
   LessonRequirement,
+  LessonStatus,
   HistoryEntry,
   HistoryActionType,
 } from '@/types';
@@ -54,7 +55,7 @@ interface ScheduleState {
   temporaryLessons: LessonRequirement[];
 
   // Per-lesson statuses (sick / completed) — weekly schedules only
-  lessonStatuses: Record<string, 'sick' | 'completed' | 'completed2'>;
+  lessonStatuses: Record<string, LessonStatus>;
 
   /**
    * Acknowledged conflict keys for the current version.
@@ -111,7 +112,7 @@ interface ScheduleState {
   removeTemporaryLesson: (id: string) => void;
 
   // Actions - Lesson statuses
-  setLessonStatus: (id: string, status: 'sick' | 'completed' | 'completed2') => void;
+  setLessonStatus: (id: string, status: LessonStatus) => void;
   clearLessonStatus: (id: string) => void;
 
   // Actions - History
@@ -148,7 +149,7 @@ interface ScheduleState {
     versionDaysPerWeek?: number;
     substitutions?: Substitution[];
     temporaryLessons?: LessonRequirement[];
-    lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
+    lessonStatuses?: Record<string, LessonStatus>;
     acknowledgedConflictKeys?: string[];
     baseTemplateId?: string;
     baseTemplateSchedule?: Schedule;
