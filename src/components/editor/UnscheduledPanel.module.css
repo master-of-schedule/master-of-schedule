@@ -154,13 +154,6 @@
   margin-left: auto;
 }
 
-.sickBadge {
-  font-size: var(--font-size-xs);
-  color: var(--color-warning, #b8860b);
-  font-weight: 600;
-  flex-shrink: 0;
-  margin-left: auto;
-}
 
 .removeButton {
   display: flex;

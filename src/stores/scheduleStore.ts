@@ -54,7 +54,7 @@ interface ScheduleState {
   // Temporary extra lessons (per-version, not in master requirements)
   temporaryLessons: LessonRequirement[];
 
-  // Per-lesson statuses (sick / completed) — weekly schedules only
+  // Per-lesson statuses (completed) — weekly schedules only
   lessonStatuses: Record<string, LessonStatus>;
 
   /**
@@ -426,7 +426,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
     },
 
-    // Set lesson status (sick / completed)
+    // Set lesson status (completed)
     setLessonStatus: (id, status) => {
       if (useDataStore.getState().isReadOnlyYear) return;
       set((state) => {
