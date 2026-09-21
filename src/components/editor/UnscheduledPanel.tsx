@@ -62,32 +62,34 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     return computeMergedTemps(list, temporaryLessons, className);
   }, [mergedRequirements, schedule, className, temporaryLessons]);
 
-  const isCompleted = useCallback(
+  // Remaining count after subtracting "Проведено" coverage — a status only
+  // fully covers a requirement when this reaches 0 (it may need 3+ lessons
+  // per week while a single "Проведено" mark covers just 1 or 2).
+  const effectiveRemainingById = useMemo(() => {
+    const statusAware = getUnscheduledLessons(mergedRequirements, schedule, className, lessonStatuses);
+    return new Map(statusAware.map(item => [item.requirement.id, item.remaining]));
+  }, [mergedRequirements, schedule, className, lessonStatuses]);
+
+  const hasCompletedStatus = useCallback(
     (id: string) => lessonStatuses[id] === 'completed' || lessonStatuses[id] === 'completed2',
     [lessonStatuses]
   );
 
-  const isSickStatus = useCallback(
-    (id: string) => lessonStatuses[id] === 'sick',
-    [lessonStatuses]
+  const isFullyCovered = useCallback(
+    (id: string) => hasCompletedStatus(id) && (effectiveRemainingById.get(id) ?? 0) === 0,
+    [hasCompletedStatus, effectiveRemainingById]
   );
 
-  // Filter out completed and sick lessons from the main, assignable list
+  // Filter out fully-covered lessons from the main, assignable list
   const visibleLessons = useMemo(
-    () => unscheduled.filter(item => !isCompleted(item.requirement.id) && !isSickStatus(item.requirement.id)),
-    [unscheduled, isCompleted, isSickStatus]
+    () => unscheduled.filter(item => !isFullyCovered(item.requirement.id)),
+    [unscheduled, isFullyCovered]
   );
 
-  // Completed lessons shown at bottom with a ✓N badge
+  // Fully-covered lessons shown at bottom with a ✓N badge
   const completedLessons = useMemo(
-    () => unscheduled.filter(item => isCompleted(item.requirement.id)),
-    [unscheduled, isCompleted]
-  );
-
-  // Sick lessons shown at bottom, not assignable
-  const sickLessons = useMemo(
-    () => unscheduled.filter(item => isSickStatus(item.requirement.id)),
-    [unscheduled, isSickStatus]
+    () => unscheduled.filter(item => isFullyCovered(item.requirement.id)),
+    [unscheduled, isFullyCovered]
   );
 
   // Handle lesson click
@@ -178,7 +180,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       </div>
 
       <div className={styles.list}>
-        {visibleLessons.length === 0 && completedLessons.length === 0 && sickLessons.length === 0 ? (
+        {visibleLessons.length === 0 && completedLessons.length === 0 ? (
           <div className={styles.empty}>
             Все занятия расставлены
             {showAddButton && (
@@ -196,6 +198,9 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                   const isSubstitution = item.requirement.type === 'group';
                   const isTemporary = temporaryIds.has(item.requirement.id);
                   const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
+                  const isPartiallyCovered = hasCompletedStatus(item.requirement.id);
+                  const conductedCount = lessonStatuses[item.requirement.id] === 'completed2' ? 2 : 1;
+                  const remaining = effectiveRemainingById.get(item.requirement.id) ?? item.remaining;
 
                   return (
                     <button
@@ -213,7 +218,8 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                         )}
                       </span>
                       <span className={styles.teacher}>{item.requirement.teacher}</span>
-                      <span className={styles.lessonCount}>{item.remaining}</span>
+                      {isPartiallyCovered && <span className={styles.conductedBadge}>✓{conductedCount}</span>}
+                      <span className={styles.lessonCount}>{remaining}</span>
                       {(isTemporary || mergedTemp) && (
                         <button
                           className={styles.removeButton}
@@ -251,28 +257,6 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                 </button>
               );
             })}
-            {sickLessons.map((item) => {
-              const isSubstitution = item.requirement.type === 'group';
-              return (
-                <button
-                  key={item.requirement.id}
-                  className={`${styles.lesson} ${styles.conducted}`}
-                  onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
-                  onClick={() => {}}
-                >
-                  <span className={styles.subject}>
-                    {item.requirement.subject}
-                    {isSubstitution && (
-                      <span className={styles.groupIndex}>
-                        ({extractGroupIndex(item.requirement.classOrGroup)})
-                      </span>
-                    )}
-                  </span>
-                  <span className={styles.teacher}>{item.requirement.teacher}</span>
-                  <span className={styles.sickBadge}>больничный</span>
-                </button>
-              );
-            })}
           </>
         )}
       </div>
@@ -281,8 +265,6 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
         <ContextMenu isOpen={ctxMenu.isOpen} x={ctxMenu.x} y={ctxMenu.y} onClose={closeContextMenu}>
           {targetStatus === 'completed' || targetStatus === 'completed2' ? (
             <ContextMenuItem onClick={handleClearStatus}>Снять отметку</ContextMenuItem>
-          ) : targetStatus === 'sick' ? (
-            <ContextMenuItem onClick={handleClearStatus}>Снять «Больничный»</ContextMenuItem>
           ) : (
             <>
               <ContextMenuItem onClick={() => handleMarkCompleted(1)}>Проведено (1 занятие)</ContextMenuItem>

@@ -34,7 +34,7 @@ export function ClassSelector() {
   }, [classes, gapExcludedClasses]);
 
   // Track which classes have remaining unscheduled lessons (excluding lessons
-  // covered by a 'sick'/'completed' status)
+  // covered by a 'completed' status)
   const classesWithRemaining = useMemo(() => {
     const merged = mergeWithTemporaryLessons(requirements, temporaryLessons);
     return getClassesWithRemaining(classes.map(c => c.name), merged, schedule, lessonStatuses);

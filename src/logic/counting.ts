@@ -16,11 +16,10 @@ import { forEachSlot } from './traversal';
 
 /**
  * How many of a requirement's weekly occurrences a status already covers
- * outside the grid. 'sick' excuses all remaining occurrences for the week;
- * 'completed'/'completed2' cover 1 or 2 occurrences conducted elsewhere.
+ * outside the grid. 'completed'/'completed2' cover 1 or 2 occurrences
+ * conducted elsewhere.
  */
-function getStatusCoverage(status: LessonStatus | undefined, countPerWeek: number): number {
-  if (status === 'sick') return countPerWeek;
+function getStatusCoverage(status: LessonStatus | undefined): number {
   if (status === 'completed2') return 2;
   if (status === 'completed') return 1;
   return 0;
@@ -97,7 +96,7 @@ export function getUnscheduledLessons(
     });
 
     const scheduled = scheduledCounts.get(key) ?? 0;
-    const covered = getStatusCoverage(lessonStatuses?.[req.id], req.countPerWeek);
+    const covered = getStatusCoverage(lessonStatuses?.[req.id]);
     const remaining = Math.max(0, req.countPerWeek - scheduled - covered);
 
     if (remaining > 0) {
@@ -139,7 +138,7 @@ export function isClassFullyScheduled(
 /**
  * Get the set of class names (from the given list) that still have unscheduled
  * lessons, for highlighting in the class list. Lessons covered by a status
- * ('sick'/'completed'/'completed2') don't count as unscheduled.
+ * ('completed'/'completed2') don't count as unscheduled.
  */
 export function getClassesWithRemaining(
   classNames: string[],

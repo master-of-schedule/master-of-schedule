@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { VersionListItem, VersionType } from '@/types';
+import type { VersionListItem, VersionType, LessonStatus } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -45,7 +45,7 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
   versionDaysPerWeek?: number;
   substitutions: import('@/types').Substitution[];
   temporaryLessons?: import('@/types').LessonRequirement[];
-  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
+  lessonStatuses?: Record<string, LessonStatus>;
   acknowledgedConflictKeys?: string[];
   baseTemplateId?: string;
   baseTemplateSchedule?: Schedule;

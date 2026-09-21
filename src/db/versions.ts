@@ -4,7 +4,7 @@
  */
 
 import { db, updateSettings } from './database';
-import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement } from '@/types';
+import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement, LessonStatus } from '@/types';
 import { generateId } from '@/utils/generateId';
 import { forEachSlot } from '@/logic/traversal';
 
@@ -17,7 +17,7 @@ export async function createVersion(params: {
   schedule: Schedule;
   substitutions?: Substitution[];
   temporaryLessons?: LessonRequirement[];
-  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>;
+  lessonStatuses?: Record<string, LessonStatus>;
   acknowledgedConflictKeys?: string[];
   comment?: string;
   mondayDate?: Date;
@@ -129,7 +129,7 @@ export async function updateVersionSchedule(
   schedule: Schedule,
   substitutions?: Substitution[],
   temporaryLessons?: LessonRequirement[],
-  lessonStatuses?: Record<string, 'sick' | 'completed' | 'completed2'>,
+  lessonStatuses?: Record<string, LessonStatus>,
   acknowledgedConflictKeys?: string[]
 ): Promise<void> {
   const updates: Partial<Version> = { schedule };
