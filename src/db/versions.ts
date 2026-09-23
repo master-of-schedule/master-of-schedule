@@ -4,7 +4,7 @@
  */
 
 import { db, updateSettings } from './database';
-import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement, LessonStatus } from '@/types';
+import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement, LessonStatus, RemovedLesson, SickLeave } from '@/types';
 import { generateId } from '@/utils/generateId';
 import { forEachSlot } from '@/logic/traversal';
 
@@ -18,6 +18,8 @@ export async function createVersion(params: {
   substitutions?: Substitution[];
   temporaryLessons?: LessonRequirement[];
   lessonStatuses?: Record<string, LessonStatus>;
+  removedLessons?: RemovedLesson[];
+  sickLeaves?: SickLeave[];
   acknowledgedConflictKeys?: string[];
   comment?: string;
   mondayDate?: Date;
@@ -33,6 +35,8 @@ export async function createVersion(params: {
     substitutions: params.substitutions ?? [],
     temporaryLessons: params.temporaryLessons ?? [],
     lessonStatuses: params.lessonStatuses,
+    removedLessons: params.removedLessons ?? [],
+    sickLeaves: params.sickLeaves ?? [],
     acknowledgedConflictKeys: params.acknowledgedConflictKeys,
     comment: params.comment,
     mondayDate: params.mondayDate,
@@ -130,7 +134,9 @@ export async function updateVersionSchedule(
   substitutions?: Substitution[],
   temporaryLessons?: LessonRequirement[],
   lessonStatuses?: Record<string, LessonStatus>,
-  acknowledgedConflictKeys?: string[]
+  acknowledgedConflictKeys?: string[],
+  removedLessons?: RemovedLesson[],
+  sickLeaves?: SickLeave[],
 ): Promise<void> {
   const updates: Partial<Version> = { schedule };
   if (substitutions !== undefined) {
@@ -144,6 +150,12 @@ export async function updateVersionSchedule(
   }
   if (acknowledgedConflictKeys !== undefined) {
     updates.acknowledgedConflictKeys = acknowledgedConflictKeys;
+  }
+  if (removedLessons !== undefined) {
+    updates.removedLessons = removedLessons;
+  }
+  if (sickLeaves !== undefined) {
+    updates.sickLeaves = sickLeaves;
   }
   await db.versions.update(id, updates);
 }
@@ -248,6 +260,12 @@ export async function duplicateVersion(
     schedule: JSON.parse(JSON.stringify(source.schedule)), // Deep clone
     substitutions: source.substitutions.map(s => ({ ...s })),
     temporaryLessons: source.temporaryLessons?.map(l => ({ ...l })),
+    removedLessons: source.removedLessons?.map(item => ({
+      ...item,
+      requirement: { ...item.requirement },
+      lesson: { ...item.lesson },
+    })),
+    sickLeaves: source.sickLeaves?.map(item => ({ ...item })),
     comment: source.comment,
     mondayDate: newType === 'weekly' ? mondayDate : source.mondayDate,
     baseTemplateId: templateId,
