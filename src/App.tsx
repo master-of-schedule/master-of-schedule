@@ -17,6 +17,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { useToast } from '@/components/common/toastContext';
 import { checkForUpdate } from '@/logic/updateCheck';
+import { openExternalUrl } from '@/logic/openExternalUrl';
 import './styles/global.css';
 
 export function App() {
@@ -48,7 +49,15 @@ export function App() {
     });
 
     if (result.status === 'available' || (force && result.status === 'current' && result.version)) {
-      showToast(`Доступна новая версия РШР ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      showToast(
+        `Доступна новая версия РШР ${result.version}`,
+        'info',
+        0,
+        result.url ? {
+          label: 'Открыть выпуск',
+          onClick: () => openExternalUrl(result.url!),
+        } : undefined
+      );
       return;
     }
 
