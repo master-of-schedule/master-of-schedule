@@ -10,6 +10,7 @@ export {
   reduceEditorInteraction,
   reduceEditorDialog,
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getCopiedLesson,
   getMovingLesson,
   getInteractionRequirement,
@@ -124,6 +125,13 @@ export type { ClassesImageData, TeacherImageData, TeacherChangeDetail, Replaceme
 
 export { runIndependentSaveTasks } from './saveReliability';
 export type { NamedSaveTask } from './saveReliability';
+
+export {
+  buildWeeklyLessonGroups,
+  getClassesWithTemporaryRemovals,
+  isAssignableRemovalReason,
+} from './weeklyLessonGroups';
+export type { WeeklyLessonGroupItem, WeeklyLessonGroups } from './weeklyLessonGroups';
 
 // Availability
 export {

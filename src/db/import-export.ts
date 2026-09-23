@@ -24,7 +24,7 @@ import { generateId } from '@/utils/generateId';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.8';
+export const CURRENT_SCHEMA_VERSION = '3.9';
 
 export interface ExportData {
   version: string;
@@ -118,6 +118,15 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
     ...data,
     version: '3.8',
     // Version.acknowledgedConflictKeys is optional — no data transformation needed
+  }),
+  '3.8': (data) => ({
+    ...data,
+    version: '3.9',
+    scheduleVersions: (data.scheduleVersions ?? []).map(v => ({
+      ...v,
+      removedLessons: v.removedLessons ?? [],
+      sickLeaves: v.sickLeaves ?? [],
+    })),
   }),
 };
 

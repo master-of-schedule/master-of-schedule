@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LessonRequirement } from '@/types';
 import {
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getCopiedLesson,
   getInteractionRequirement,
   getMovingLesson,
@@ -83,6 +84,16 @@ describe('reduceEditorInteraction', () => {
     expect(getCopiedLesson(copying)).toBe(copiedLesson);
     expect(getMovingLesson(copying)).toBeNull();
     expect(getInteractionRequirement(copying)).toBe(requirement);
+  });
+
+  it('keeps the exact removed occurrence selected for reassignment', () => {
+    const assigning = reduceEditorInteraction(
+      { type: 'idle' },
+      { type: 'SELECT_LESSON', lesson: requirement, removedLessonIds: ['removed-1', 'removed-2'] },
+    );
+
+    expect(getAssigningLesson(assigning)).toBe(requirement);
+    expect(getAssigningRemovedLessonIds(assigning)).toEqual(['removed-1', 'removed-2']);
   });
 });
 

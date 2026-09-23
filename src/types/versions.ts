@@ -5,6 +5,7 @@
 import type { VersionType } from './constants';
 import type { Schedule, LessonRequirement } from './schedule';
 import type { Substitution } from './substitutions';
+import type { RemovedLesson, SickLeave } from './removedLessons';
 
 /** Per-requirement lesson status: 'completed'/'completed2' — held elsewhere, covers 1 or 2 occurrences */
 export type LessonStatus = 'completed' | 'completed2';
@@ -38,6 +39,10 @@ export interface Version {
   temporaryLessons?: LessonRequirement[];
   /** Per-lesson statuses: 'completed'/'completed2' — held elsewhere, hidden from the unscheduled panel */
   lessonStatuses?: Record<string, LessonStatus>;
+  /** Removed weekly lesson occurrences, grouped by the reason they left the grid. */
+  removedLessons?: RemovedLesson[];
+  /** Teacher/day illness marks for this weekly version. */
+  sickLeaves?: SickLeave[];
   /**
    * Acknowledged conflict keys for this version.
    * Conflicts acknowledged here are suppressed in the Check panel and persist across sessions.

@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { VersionListItem, VersionType, LessonStatus } from '@/types';
+import type { VersionListItem, VersionType, LessonStatus, RemovedLesson, SickLeave } from '@/types';
 import { useDataStore, useUIStore, useScheduleStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -46,6 +46,8 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
   substitutions: import('@/types').Substitution[];
   temporaryLessons?: import('@/types').LessonRequirement[];
   lessonStatuses?: Record<string, LessonStatus>;
+  removedLessons?: RemovedLesson[];
+  sickLeaves?: SickLeave[];
   acknowledgedConflictKeys?: string[];
   baseTemplateId?: string;
   baseTemplateSchedule?: Schedule;
@@ -78,6 +80,8 @@ async function loadVersionWithTemplate(versionId: string): Promise<{
     substitutions: version.substitutions,
     temporaryLessons: version.temporaryLessons,
     lessonStatuses: version.lessonStatuses,
+    removedLessons: version.removedLessons,
+    sickLeaves: version.sickLeaves,
     acknowledgedConflictKeys: version.acknowledgedConflictKeys,
     baseTemplateId: version.baseTemplateId,
     baseTemplateSchedule,
@@ -142,6 +146,8 @@ export function StartPage() {
     schedule,
     temporaryLessons,
     lessonStatuses,
+    removedLessons,
+    sickLeaves,
     acknowledgedConflictKeys,
     markSaved,
     markJsonSaved,
@@ -155,6 +161,8 @@ export function StartPage() {
     schedule: s.schedule,
     temporaryLessons: s.temporaryLessons,
     lessonStatuses: s.lessonStatuses,
+    removedLessons: s.removedLessons,
+    sickLeaves: s.sickLeaves,
     acknowledgedConflictKeys: s.acknowledgedConflictKeys,
     markSaved: s.markSaved,
     markJsonSaved: s.markJsonSaved,
@@ -278,7 +286,10 @@ export function StartPage() {
 
     setIsSavingBeforeLoad(true);
     try {
-      await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses, acknowledgedConflictKeys);
+      await updateVersionSchedule(
+        versionId, schedule, undefined, temporaryLessons, lessonStatuses,
+        acknowledgedConflictKeys, removedLessons, sickLeaves
+      );
       await updateVersionMetadata(versionId, { name: versionName });
       markSaved(versionId, versionName);
 
@@ -294,6 +305,8 @@ export function StartPage() {
     schedule,
     temporaryLessons,
     lessonStatuses,
+    removedLessons,
+    sickLeaves,
     acknowledgedConflictKeys,
     versionName,
     markSaved,
@@ -415,6 +428,8 @@ export function StartPage() {
         substitutions: v.substitutions ?? [],
         temporaryLessons: v.temporaryLessons,
         lessonStatuses: v.lessonStatuses,
+        removedLessons: v.removedLessons,
+        sickLeaves: v.sickLeaves,
         baseTemplateId: v.baseTemplateId,
       });
       const firstClass = pickFirstClass();

@@ -78,7 +78,7 @@ interface UIState {
 
   // Actions - Selection
   /** Select a lesson from the unscheduled panel, replacing any copy or move interaction. */
-  selectLesson: (lesson: LessonRequirement | null) => void;
+  selectLesson: (lesson: LessonRequirement | null, removedLessonIds?: string[]) => void;
   selectCell: (cellRef: CellRef) => void;
   selectContextCell: (cellRef: CellRef) => void;
   toggleCellSelection: (cellRef: CellRef) => void;
@@ -180,10 +180,10 @@ export const useUIStore = create<UIState>((set) => ({
   }),
 
   // Selection
-  selectLesson: (lesson) => set((state) => ({
+  selectLesson: (lesson, removedLessonIds) => set((state) => ({
     interaction: reduceEditorInteraction(
       state.interaction,
-      lesson ? { type: 'SELECT_LESSON', lesson } : { type: 'CANCEL' }
+      lesson ? { type: 'SELECT_LESSON', lesson, removedLessonIds } : { type: 'CANCEL' }
     ),
     selectedCells: [],
   })),
