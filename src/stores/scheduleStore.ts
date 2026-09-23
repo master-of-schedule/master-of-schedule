@@ -79,7 +79,7 @@ interface ScheduleState {
     lessonNum: LessonNumber;
     lesson: ScheduledLesson;
     /** Consume this explicit panel entry when returning a removed lesson. */
-    removedLessonId?: string;
+    removedLessonIds?: string[];
   }) => void;
 
   removeLesson: (params: {
@@ -294,7 +294,7 @@ export const useScheduleStore = create<ScheduleState>()(
     baseTemplateSchedule: null,
 
     // Assign a lesson to a slot
-    assignLesson: ({ className, day, lessonNum, lesson, removedLessonId }) => {
+    assignLesson: ({ className, day, lessonNum, lesson, removedLessonIds }) => {
       if (useDataStore.getState().isReadOnlyYear) return;
       const state = get();
 
@@ -302,8 +302,11 @@ export const useScheduleStore = create<ScheduleState>()(
       const newHistory = truncateHistory(state.history, state.historyIndex);
 
       const newSchedule = addLessonToSlot(state.schedule, className, day, lessonNum, lesson);
-      const newRemovedLessons = removedLessonId
-        ? state.removedLessons.filter(item => item.id !== removedLessonId)
+      const consumedRemovalId = removedLessonIds?.find(id =>
+        state.removedLessons.some(item => item.id === id)
+      );
+      const newRemovedLessons = consumedRemovalId
+        ? state.removedLessons.filter(item => item.id !== consumedRemovalId)
         : state.removedLessons;
 
       const description = describeAction('assign', {

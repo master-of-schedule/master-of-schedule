@@ -68,6 +68,19 @@
   margin-bottom: 2px;
 }
 
+.removalGroup {
+  margin-bottom: var(--spacing-sm);
+}
+
+.removalGroupTitle {
+  margin: var(--spacing-xs) var(--spacing-xs) 3px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .lesson {
   display: flex;
   align-items: center;
@@ -134,6 +147,32 @@
 .lesson.temporary.selected {
   background: var(--color-cell-selected);
   border-color: var(--color-warning);
+}
+
+.lesson.mustReturn {
+  border-color: #f59e0b;
+  background: #fff4d6;
+  font-weight: var(--font-weight-bold);
+}
+
+.lesson.mustReturn:hover {
+  background: #ffe8ad;
+}
+
+.lesson.withdrawn {
+  border-color: var(--color-gray-200);
+  background: var(--color-gray-50);
+}
+
+.lesson.sick {
+  border-color: #c4b5fd;
+  background: #f1edff;
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.lesson.sick:hover {
+  background: #f1edff;
 }
 
 .lesson.conducted {

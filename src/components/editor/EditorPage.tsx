@@ -13,6 +13,7 @@ import {
   createReplacementRoomDialog,
   findRequirementForScheduledLesson,
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getAvailableRooms,
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
@@ -66,6 +67,7 @@ export function EditorPage() {
     absentTeacher: s.absentTeacher,
   })));
   const selectedLesson = getAssigningLesson(interaction);
+  const selectedRemovedLessonIds = getAssigningRemovedLessonIds(interaction);
   const copiedLesson = getCopiedLesson(interaction);
   const movingLesson = getMovingLesson(interaction);
 
@@ -81,7 +83,7 @@ export function EditorPage() {
   })));
 
   const {
-    assignLesson, removeLesson, removeLessons, changeRoom, undo, redo,
+    assignLesson, removeLesson, removeLessonTemporarily, removeLessons, changeRoom, undo, redo,
     historyIndex, historyLength, schedule, versionId, versionType, versionName,
     isDirty, jsonIsDirty, markSaved, markJsonSaved, temporaryLessons,
     lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek,
@@ -89,6 +91,7 @@ export function EditorPage() {
   } = useScheduleStore(useShallow((s) => ({
     assignLesson: s.assignLesson,
     removeLesson: s.removeLesson,
+    removeLessonTemporarily: s.removeLessonTemporarily,
     removeLessons: s.removeLessons,
     changeRoom: s.changeRoom,
     undo: s.undo,
@@ -240,6 +243,7 @@ export function EditorPage() {
             day: cell.day,
             lessonNum: cell.lessonNum,
             lesson,
+            removedLessonIds: selectedRemovedLessonIds,
           });
         }
         clearCellSelection();
@@ -263,13 +267,14 @@ export function EditorPage() {
           day: roomDialogData.day,
           lessonNum: roomDialogData.lessonNum,
           lesson,
+          removedLessonIds: selectedRemovedLessonIds,
         });
       }
 
       editorDialog.close();
       selectLesson(null);
     },
-    [selectedLesson, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection]
+    [selectedLesson, selectedRemovedLessonIds, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection]
   );
 
   // Clear partner file and restore saved partner class schedules
@@ -448,11 +453,12 @@ export function EditorPage() {
         day,
         lessonNum,
         lesson,
+        removedLessonIds: selectedRemovedLessonIds,
       });
 
       selectLesson(null);
     },
-    [selectedLesson, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, editorDialog]
+    [selectedLesson, selectedRemovedLessonIds, currentClass, schedule, rooms, classes, currentClassStudentCount, assignLesson, selectLesson, editorDialog]
   );
 
   const handleForceAssign = useCallback(
@@ -474,6 +480,17 @@ export function EditorPage() {
     });
     closeContextMenu();
   }, [contextMenu, removeLesson, closeContextMenu]);
+
+  const handleRemoveLessonTemporarily = useCallback(() => {
+    if (!contextMenu.cellRef || contextMenu.lessonIndex === null) return;
+    removeLessonTemporarily({
+      className: contextMenu.cellRef.className,
+      day: contextMenu.cellRef.day,
+      lessonNum: contextMenu.cellRef.lessonNum,
+      lessonIndex: contextMenu.lessonIndex,
+    });
+    closeContextMenu();
+  }, [contextMenu, removeLessonTemporarily, closeContextMenu]);
 
   // Open replacement picker
   const handleOpenReplace = useCallback(() => {
@@ -586,7 +603,7 @@ export function EditorPage() {
       if (!movingLesson || !moveRoomDialogData || !currentClass) return;
 
       // Remove from source
-      removeLesson(movingLesson.sourceRef);
+      const removedLessonId = removeLesson(movingLesson.sourceRef);
 
       // Assign at target with new room, preserving substitution metadata
       const lesson = createScheduledLesson(movingLesson.requirement, room.shortName, {
@@ -598,6 +615,7 @@ export function EditorPage() {
         day: moveRoomDialogData.day,
         lessonNum: moveRoomDialogData.lessonNum,
         lesson,
+        removedLessonIds: removedLessonId ? [removedLessonId] : undefined,
       });
 
       editorDialog.close();
@@ -835,8 +853,13 @@ export function EditorPage() {
             <ContextMenuItem onClick={handleOpenChangeRoom}>
               Поменять кабинет
             </ContextMenuItem>
+            {versionType === 'weekly' && (
+              <ContextMenuItem onClick={handleRemoveLessonTemporarily}>
+                Удалить временно
+              </ContextMenuItem>
+            )}
             <ContextMenuItem onClick={handleRemoveLesson}>
-              Удалить занятие
+              {versionType === 'weekly' ? 'Снять занятие' : 'Удалить занятие'}
             </ContextMenuItem>
             <ContextMenuDivider />
           </>
@@ -844,7 +867,7 @@ export function EditorPage() {
         {selectedCells.length > 0 && (
           <>
             <ContextMenuItem onClick={() => { handleDeleteSelected(); closeContextMenu(); }}>
-              Удалить все выделенные ({selectedCells.length})
+              {versionType === 'weekly' ? 'Снять все выделенные' : 'Удалить все выделенные'} ({selectedCells.length})
             </ContextMenuItem>
             <ContextMenuDivider />
           </>

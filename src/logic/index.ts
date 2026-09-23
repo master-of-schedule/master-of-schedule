@@ -10,6 +10,7 @@ export {
   reduceEditorInteraction,
   reduceEditorDialog,
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getCopiedLesson,
   getMovingLesson,
   getInteractionRequirement,

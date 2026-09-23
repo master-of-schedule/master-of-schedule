@@ -18,6 +18,9 @@ import styles from './AbsentPanel.module.css';
 
 export function AbsentPanel() {
   const schedule = useScheduleStore((state) => state.schedule);
+  const versionType = useScheduleStore((state) => state.versionType);
+  const sickLeaves = useScheduleStore((state) => state.sickLeaves);
+  const setSickLeave = useScheduleStore((state) => state.setSickLeave);
   const teachers = useDataStore((state) => state.teachers);
   const absentTeacher = useUIStore((state) => state.absentTeacher);
   const absentDay = useUIStore((state) => state.absentDay);
@@ -71,11 +74,24 @@ export function AbsentPanel() {
   }, [absentTeacher, setAbsentTeacher]);
 
   const markedCount = absentMarkedCells.size;
+  const isSickDay = !!absentTeacher && !!absentDay && sickLeaves.some(
+    item => item.teacher === absentTeacher && item.day === absentDay
+  );
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
         <h3 className={styles.title}>Учитель</h3>
+        {versionType === 'weekly' && absentTeacher && absentDay && (
+          <label className={`${styles.sickToggle} ${isSickDay ? styles.sickActive : ''}`}>
+            <input
+              type="checkbox"
+              checked={isSickDay}
+              onChange={(event) => setSickLeave(absentTeacher, absentDay, event.target.checked)}
+            />
+            Больничный
+          </label>
+        )}
         {markedCount > 0 && (
           <button className={styles.clearButton} onClick={clearAbsentMarked} title="Очистить все отметки">
             Сброс ({markedCount})

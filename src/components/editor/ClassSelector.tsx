@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react';
 import { useUIStore, useDataStore, useScheduleStore } from '@/stores';
-import { getClassesWithRemaining, mergeWithTemporaryLessons } from '@/logic';
+import { getClassesWithRemaining, getClassesWithTemporaryRemovals, mergeWithTemporaryLessons } from '@/logic';
 import { groupClassesByGrade } from './classSelection';
 import styles from './ClassSelector.module.css';
 
@@ -17,6 +17,8 @@ export function ClassSelector() {
   const setCurrentClass = useUIStore((state) => state.setCurrentClass);
   const schedule = useScheduleStore((state) => state.schedule);
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
+  const removedLessons = useScheduleStore((state) => state.removedLessons);
+  const versionType = useScheduleStore((state) => state.versionType);
 
   // Group own classes by grade, then partner classes by grade (appended at end).
   // Partner grade groups use 'partner:<grade>' keys so the render can identify them.
@@ -36,9 +38,12 @@ export function ClassSelector() {
   // Track which classes have remaining unscheduled lessons (excluding lessons
   // covered by a 'completed' status)
   const classesWithRemaining = useMemo(() => {
+    if (versionType === 'weekly') {
+      return getClassesWithTemporaryRemovals(removedLessons);
+    }
     const merged = mergeWithTemporaryLessons(requirements, temporaryLessons);
     return getClassesWithRemaining(classes.map(c => c.name), merged, schedule, lessonStatuses);
-  }, [classes, requirements, temporaryLessons, schedule, lessonStatuses]);
+  }, [classes, requirements, temporaryLessons, schedule, lessonStatuses, removedLessons, versionType]);
 
   return (
     <div className={styles.panel}>

@@ -7,7 +7,9 @@ import type { LessonRequirement, UnscheduledLesson } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
 import {
   computeMergedTemps,
+  buildWeeklyLessonGroups,
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getUnscheduledLessons,
   mergeWithTemporaryLessons,
 } from '@/logic';
@@ -31,6 +33,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
+  const removedLessons = useScheduleStore((state) => state.removedLessons);
   const removeTemporaryLesson = useScheduleStore((state) => state.removeTemporaryLesson);
   const versionType = useScheduleStore((state) => state.versionType);
   const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
@@ -38,6 +41,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const clearLessonStatus = useScheduleStore((state) => state.clearLessonStatus);
   const interaction = useUIStore((state) => state.interaction);
   const selectedLesson = getAssigningLesson(interaction);
+  const selectedRemovedLessonIds = getAssigningRemovedLessonIds(interaction);
   const selectLesson = useUIStore((state) => state.selectLesson);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -70,6 +74,11 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     return new Map(statusAware.map(item => [item.requirement.id, item.remaining]));
   }, [mergedRequirements, schedule, className, lessonStatuses]);
 
+  const statusAwareUnscheduled = useMemo(
+    () => getUnscheduledLessons(mergedRequirements, schedule, className, lessonStatuses),
+    [mergedRequirements, schedule, className, lessonStatuses]
+  );
+
   const hasCompletedStatus = useCallback(
     (id: string) => lessonStatuses[id] === 'completed' || lessonStatuses[id] === 'completed2',
     [lessonStatuses]
@@ -88,21 +97,29 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
 
   // Fully-covered lessons shown at bottom with a ✓N badge
   const completedLessons = useMemo(
-    () => unscheduled.filter(item => isFullyCovered(item.requirement.id)),
+    () => unscheduled.filter(item => item.remaining > 0 && isFullyCovered(item.requirement.id)),
     [unscheduled, isFullyCovered]
+  );
+
+  const weeklyGroups = useMemo(
+    () => buildWeeklyLessonGroups(statusAwareUnscheduled, removedLessons, className),
+    [statusAwareUnscheduled, removedLessons, className]
   );
 
   // Handle lesson click
   const handleLessonClick = useCallback(
-    (requirement: LessonRequirement) => {
+    (requirement: LessonRequirement, removedLessonIds: string[] = []) => {
       // Toggle selection
-      if (selectedLesson?.id === requirement.id) {
+      if (
+        selectedLesson?.id === requirement.id &&
+        selectedRemovedLessonIds[0] === removedLessonIds[0]
+      ) {
         selectLesson(null);
       } else {
-        selectLesson(requirement);
+        selectLesson(requirement, removedLessonIds);
       }
     },
-    [selectedLesson, selectLesson]
+    [selectedLesson, selectedRemovedLessonIds, selectLesson]
   );
 
   // Handle removing a temporary lesson
@@ -163,6 +180,73 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const showAddButton = versionType !== 'template';
   const isWeekly = versionType === 'weekly';
   const targetStatus = ctxMenu.targetId ? lessonStatuses[ctxMenu.targetId] : undefined;
+  const weeklyCount = weeklyGroups.temporary.length + weeklyGroups.withdrawn.length + weeklyGroups.sick.length;
+
+  const renderWeeklyGroup = (
+    title: string,
+    items: typeof weeklyGroups.temporary,
+    kind: 'mustReturn' | 'withdrawn' | 'sick',
+  ) => {
+    if (items.length === 0) return null;
+    const isSick = kind === 'sick';
+
+    return (
+      <section className={styles.removalGroup} aria-label={title}>
+        <h4 className={styles.removalGroupTitle}>{title}</h4>
+        {items.map((item) => {
+          const isSelected = !isSick && selectedLesson?.id === item.requirement.id &&
+            selectedRemovedLessonIds[0] === item.removalIds[0];
+          const isSubstitution = item.requirement.type === 'group';
+          const isTemporary = temporaryIds.has(item.requirement.id);
+          const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
+          const classNames = [
+            styles.lesson,
+            styles[kind],
+            isSelected ? styles.selected : '',
+            isTemporary || mergedTemp ? styles.temporary : '',
+          ].filter(Boolean).join(' ');
+          const content = (
+            <>
+              <span className={styles.subject}>
+                {item.requirement.subject}
+                {isSubstitution && (
+                  <span className={styles.groupIndex}>
+                    ({extractGroupIndex(item.requirement.classOrGroup)})
+                  </span>
+                )}
+              </span>
+              <span className={styles.teacher}>{item.requirement.teacher}</span>
+              <span className={styles.lessonCount}>{item.remaining}</span>
+              {!isSick && (isTemporary || mergedTemp) && (
+                <button
+                  className={styles.removeButton}
+                  onClick={(e) => handleRemoveTemporary(e, mergedTemp?.id ?? item.requirement.id)}
+                  title="Удалить временное занятие"
+                >
+                  ×
+                </button>
+              )}
+            </>
+          );
+
+          return isSick ? (
+            <div key={`${kind}-${item.requirement.id}`} className={classNames} aria-disabled="true">
+              {content}
+            </div>
+          ) : (
+            <button
+              key={`${kind}-${item.requirement.id}`}
+              className={classNames}
+              onClick={() => handleLessonClick(item.requirement, item.removalIds)}
+              onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
+            >
+              {content}
+            </button>
+          );
+        })}
+      </section>
+    );
+  };
 
   return (
     <div className={styles.panel}>
@@ -180,7 +264,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       </div>
 
       <div className={styles.list}>
-        {visibleLessons.length === 0 && completedLessons.length === 0 ? (
+        {(isWeekly ? weeklyCount === 0 : visibleLessons.length === 0) && completedLessons.length === 0 ? (
           <div className={styles.empty}>
             Все занятия расставлены
             {showAddButton && (
@@ -191,7 +275,13 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
           </div>
         ) : (
           <>
-            {groupedLessons.map(([subject, items]) => (
+            {isWeekly ? (
+              <>
+                {renderWeeklyGroup('Временно удалённые — нужно вернуть', weeklyGroups.temporary, 'mustReturn')}
+                {renderWeeklyGroup('Снятые', weeklyGroups.withdrawn, 'withdrawn')}
+                {renderWeeklyGroup('Снятые по болезни', weeklyGroups.sick, 'sick')}
+              </>
+            ) : groupedLessons.map(([subject, items]) => (
               <div key={subject} className={styles.group}>
                 {items.map((item) => {
                   const isSelected = selectedLesson?.id === item.requirement.id;
@@ -234,6 +324,9 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                 })}
               </div>
             ))}
+            {completedLessons.length > 0 && (
+              <h4 className={styles.removalGroupTitle}>Проведено</h4>
+            )}
             {completedLessons.map((item) => {
               const conductedCount = lessonStatuses[item.requirement.id] === 'completed2' ? 2 : 1;
               const isSubstitution = item.requirement.type === 'group';

@@ -765,12 +765,48 @@ describe('weekly removal categories', () => {
       day: 'Вт',
       lessonNum: 2,
       lesson: makeLesson({ id: 'returned', requirementId: requirement.id }),
-      removedLessonId: firstId!,
+      removedLessonIds: [firstId!],
     });
 
     const state = useScheduleStore.getState();
     expect(state.removedLessons.map(item => item.id)).toEqual(['ordinary']);
     expect(state.schedule['5а']['Вт']?.[2]?.lessons).toHaveLength(1);
+  });
+
+  it('consumes successive removal occurrences during a bulk return', () => {
+    const requirement = loadWeeklyLesson();
+    const firstId = useScheduleStore.getState().removeLessonTemporarily({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+    expect(firstId).toBeTruthy();
+
+    useScheduleStore.setState(state => ({
+      removedLessons: [
+        ...state.removedLessons,
+        { ...state.removedLessons[0], id: 'second-removal' },
+      ],
+    }));
+
+    const removedLessonIds = [firstId!, 'second-removal'];
+    useScheduleStore.getState().assignLesson({
+      className: '5а',
+      day: 'Вт',
+      lessonNum: 2,
+      lesson: makeLesson({ id: 'returned-1', requirementId: requirement.id }),
+      removedLessonIds,
+    });
+    useScheduleStore.getState().assignLesson({
+      className: '5а',
+      day: 'Ср',
+      lessonNum: 3,
+      lesson: makeLesson({ id: 'returned-2', requirementId: requirement.id }),
+      removedLessonIds,
+    });
+
+    const state = useScheduleStore.getState();
+    expect(state.removedLessons).toEqual([]);
+    expect(state.schedule['5а']['Вт']?.[2]?.lessons).toHaveLength(1);
+    expect(state.schedule['5а']['Ср']?.[3]?.lessons).toHaveLength(1);
   });
 
   it('does not create removal records outside weekly versions', () => {
