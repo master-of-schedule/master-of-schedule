@@ -13,6 +13,7 @@ export {
   getCopiedLesson,
   getMovingLesson,
   getInteractionRequirement,
+  createReplacementRoomDialog,
   supportsForcePlacement,
 } from './editorFlow';
 export type {
