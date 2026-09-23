@@ -27,12 +27,12 @@ export interface MovingLessonData {
 
 export type EditorInteraction =
   | { type: 'idle' }
-  | { type: 'assigning'; lesson: LessonRequirement }
+  | { type: 'assigning'; lesson: LessonRequirement; removedLessonIds?: string[] }
   | { type: 'copying'; lesson: CopiedLessonData }
   | { type: 'moving'; lesson: MovingLessonData };
 
 export type EditorInteractionEvent =
-  | { type: 'SELECT_LESSON'; lesson: LessonRequirement }
+  | { type: 'SELECT_LESSON'; lesson: LessonRequirement; removedLessonIds?: string[] }
   | { type: 'START_COPY'; lesson: CopiedLessonData }
   | { type: 'START_MOVE'; lesson: MovingLessonData }
   | { type: 'CANCEL' };
@@ -43,7 +43,11 @@ export function reduceEditorInteraction(
 ): EditorInteraction {
   switch (event.type) {
     case 'SELECT_LESSON':
-      return { type: 'assigning', lesson: event.lesson };
+      return {
+        type: 'assigning',
+        lesson: event.lesson,
+        ...(event.removedLessonIds?.length ? { removedLessonIds: [...event.removedLessonIds] } : {}),
+      };
     case 'START_COPY':
       return { type: 'copying', lesson: event.lesson };
     case 'START_MOVE':
@@ -57,6 +61,10 @@ export function getAssigningLesson(
   interaction: EditorInteraction
 ): LessonRequirement | null {
   return interaction.type === 'assigning' ? interaction.lesson : null;
+}
+
+export function getAssigningRemovedLessonIds(interaction: EditorInteraction): string[] {
+  return interaction.type === 'assigning' ? interaction.removedLessonIds ?? [] : [];
 }
 
 export function getCopiedLesson(
@@ -90,16 +98,37 @@ export interface RoomDialogData {
   lessonNum: LessonNumber;
   bulkCells?: CellRef[];
   forceOverride?: boolean;
+  fromReplacement?: boolean;
+  replacementSource?: CellRef & { lessonIndex: number };
 }
 
 export interface ReplacementDialogData {
   day: Day;
   lessonNum: LessonNumber;
-  lessonIndex: number;
+  lessonIndex: number | null;
   currentLesson?: {
     subject: string;
     teacher: string;
     group?: string;
+  };
+}
+
+export function createReplacementRoomDialog(
+  replacement: ReplacementDialogData,
+  className: string
+): RoomDialogData {
+  return {
+    day: replacement.day,
+    lessonNum: replacement.lessonNum,
+    fromReplacement: true,
+    ...(replacement.lessonIndex === null ? {} : {
+      replacementSource: {
+        className,
+        day: replacement.day,
+        lessonNum: replacement.lessonNum,
+        lessonIndex: replacement.lessonIndex,
+      },
+    }),
   };
 }
 

@@ -17,6 +17,7 @@ import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/common/Button';
 import { useToast } from '@/components/common/toastContext';
 import { checkForUpdate } from '@/logic/updateCheck';
+import { openExternalUrl } from '@/logic/openExternalUrl';
 import './styles/global.css';
 
 export function App() {
@@ -48,7 +49,15 @@ export function App() {
     });
 
     if (result.status === 'available' || (force && result.status === 'current' && result.version)) {
-      showToast(`Доступна новая версия РШР ${result.version}. Скачать: ${result.url}`, 'info', 0);
+      showToast(
+        `Доступна новая версия РШР ${result.version}`,
+        'info',
+        0,
+        result.url ? {
+          label: 'Открыть выпуск',
+          onClick: () => openExternalUrl(result.url!),
+        } : undefined
+      );
       return;
     }
 
@@ -113,7 +122,10 @@ export function App() {
       const s = useScheduleStore.getState();
       const name = s.versionName || `Расписание ${new Date().toLocaleDateString('ru-RU')}`;
       if (s.versionId) {
-        await updateVersionSchedule(s.versionId, s.schedule, undefined, s.temporaryLessons, s.lessonStatuses, s.acknowledgedConflictKeys);
+        await updateVersionSchedule(
+          s.versionId, s.schedule, undefined, s.temporaryLessons, s.lessonStatuses,
+          s.acknowledgedConflictKeys, s.removedLessons, s.sickLeaves
+        );
         await updateVersionMetadata(s.versionId, { name });
         s.markSaved(s.versionId, name);
       } else {
@@ -123,6 +135,8 @@ export function App() {
           schedule: s.schedule,
           temporaryLessons: s.temporaryLessons,
           lessonStatuses: s.lessonStatuses,
+          removedLessons: s.removedLessons,
+          sickLeaves: s.sickLeaves,
           acknowledgedConflictKeys: s.acknowledgedConflictKeys,
           mondayDate: s.mondayDate ?? undefined,
           daysPerWeek: s.versionDaysPerWeek ?? undefined,

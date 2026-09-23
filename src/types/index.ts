@@ -43,6 +43,7 @@ export { formatSubstitution } from './substitutions';
 
 // History
 export type { HistoryActionType, HistoryEntry } from './history';
+export type { RemovedLessonReason, RemovedLesson, SickLeave } from './removedLessons';
 export { describeAction } from './history';
 
 // UI

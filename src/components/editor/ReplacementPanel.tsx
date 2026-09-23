@@ -21,7 +21,6 @@ interface ReplacementPanelProps {
   className: string;
   day: Day;
   lessonNum: LessonNumber;
-  lessonIndex: number;
   currentLesson?: {
     subject: string;
     teacher: string;

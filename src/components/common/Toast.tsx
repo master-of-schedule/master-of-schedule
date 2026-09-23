@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState, useCallback, type ReactNode } from 'react';
-import { ToastContext, type ToastType } from './toastContext';
+import { ToastContext, type ToastAction, type ToastType } from './toastContext';
 import styles from './Toast.module.css';
 
 const DEFAULT_DURATIONS: Record<ToastType, number> = {
@@ -21,6 +21,7 @@ interface Toast {
   message: string;
   type: ToastType;
   duration: number; // ms; 0 = persistent (manual close only)
+  action?: ToastAction;
 }
 
 interface ToastProviderProps {
@@ -30,11 +31,11 @@ interface ToastProviderProps {
 export function ToastProvider({ children }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration?: number) => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration?: number, action?: ToastAction) => {
     const id = crypto.randomUUID();
     const resolvedDuration = duration !== undefined ? duration : DEFAULT_DURATIONS[type];
     setToasts((prev) => {
-      const next = [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type, duration: resolvedDuration }];
+      const next = [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type, duration: resolvedDuration, action }];
       return next;
     });
   }, []);
@@ -82,7 +83,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
   return (
     <div
       className={`${styles.toast} ${styles[toast.type]} ${isExiting ? styles.exiting : ''}`}
-      onClick={onClose}
+      role="status"
     >
       <span className={styles.icon}>
         {toast.type === 'success' && '✓'}
@@ -91,6 +92,18 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
         {toast.type === 'info' && 'ℹ'}
       </span>
       <span className={styles.message}>{toast.message}</span>
+      {toast.action && (
+        <button
+          type="button"
+          className={styles.action}
+          onClick={() => void toast.action?.onClick()}
+        >
+          {toast.action.label}
+        </button>
+      )}
+      <button type="button" className={styles.close} onClick={onClose} aria-label="Закрыть уведомление">
+        ×
+      </button>
     </div>
   );
 }

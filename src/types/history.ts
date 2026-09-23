@@ -4,6 +4,7 @@
 
 import type { Schedule } from './schedule';
 import type { Substitution } from './substitutions';
+import type { RemovedLesson, SickLeave } from './removedLessons';
 
 /**
  * Action types that can be recorded in history
@@ -11,6 +12,8 @@ import type { Substitution } from './substitutions';
 export type HistoryActionType =
   | 'assign'
   | 'remove'
+  | 'temporary_remove'
+  | 'sick_leave'
   | 'change_room'
   | 'substitute'
   | 'multi_remove'
@@ -31,6 +34,10 @@ export interface HistoryEntry {
   schedule: Schedule;
   /** Complete substitutions state after this action */
   substitutions: Substitution[];
+  /** Weekly removal categories after this action. */
+  removedLessons?: RemovedLesson[];
+  /** Weekly teacher/day illness marks after this action. */
+  sickLeaves?: SickLeave[];
 }
 
 /**
@@ -53,6 +60,10 @@ export function describeAction(
       return `Добавлено: ${details.subject} ${details.className} ${details.day}-${details.lessonNum}`;
     case 'remove':
       return `Удалено: ${details.subject} ${details.className} ${details.day}-${details.lessonNum}`;
+    case 'temporary_remove':
+      return `Временно удалено: ${details.subject} ${details.className} ${details.day}-${details.lessonNum}`;
+    case 'sick_leave':
+      return `Больничный: ${details.teacher} ${details.day}`;
     case 'change_room':
       return `Кабинет: ${details.subject} ${details.className} → ${details.room}`;
     case 'substitute':

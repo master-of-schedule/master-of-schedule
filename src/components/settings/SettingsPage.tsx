@@ -51,9 +51,14 @@ export function SettingsPage() {
     setActiveTab('start');
   }, [loadYearSnapshot, setActiveTab]);
 
-  const handleDownloadSnapshot = useCallback((snapshot: YearSnapshot) => {
-    void saveJsonFile(snapshot.data, `год-${snapshot.yearLabel}.json`);
-  }, []);
+  const handleDownloadSnapshot = useCallback(async (snapshot: YearSnapshot) => {
+    try {
+      const saved = await saveJsonFile(snapshot.data, `год-${snapshot.yearLabel}.json`);
+      if (saved) showToast('Архив скачан', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Не удалось сохранить архив', 'error');
+    }
+  }, [showToast]);
 
   const handleDeleteSnapshot = useCallback(async (id: number) => {
     if (!confirm('Удалить архив этого года?')) return;

@@ -119,6 +119,18 @@ describe('uiStore editor interaction', () => {
     });
   });
 
+  it('stores the selected removed occurrence without clearing it on context-menu open', () => {
+    const store = useUIStore.getState();
+    store.selectLesson(requirement, ['removed-1']);
+    store.openContextMenu(100, 200, cellRef, null);
+
+    expect(useUIStore.getState().interaction).toEqual({
+      type: 'assigning',
+      lesson: requirement,
+      removedLessonIds: ['removed-1'],
+    });
+  });
+
   it('clearAllSelection cancels interaction and clears cells', () => {
     useUIStore.getState().setCopiedLesson(copiedLesson);
     useUIStore.setState({ selectedCells: [cellRef] });

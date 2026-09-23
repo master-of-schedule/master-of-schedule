@@ -10,9 +10,11 @@ export {
   reduceEditorInteraction,
   reduceEditorDialog,
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getCopiedLesson,
   getMovingLesson,
   getInteractionRequirement,
+  createReplacementRoomDialog,
   supportsForcePlacement,
 } from './editorFlow';
 export type {
@@ -91,6 +93,8 @@ export type { ClassProgress } from './counting';
 export {
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
+  LESSON_LIST_RECONCILIATION_ENABLED,
+  shouldShowLessonListCleanupPrompt,
 } from './lessonListCleanup';
 export type {
   LessonListCleanupPlan,
@@ -118,6 +122,16 @@ export {
   saveCanvasPngToFolder,
 } from './export-image';
 export type { ClassesImageData, TeacherImageData, TeacherChangeDetail, ReplacementEntry } from './export-image';
+
+export { runIndependentSaveTasks } from './saveReliability';
+export type { NamedSaveTask } from './saveReliability';
+
+export {
+  buildWeeklyLessonGroups,
+  getClassesWithTemporaryRemovals,
+  isAssignableRemovalReason,
+} from './weeklyLessonGroups';
+export type { WeeklyLessonGroupItem, WeeklyLessonGroups } from './weeklyLessonGroups';
 
 // Availability
 export {

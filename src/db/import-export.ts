@@ -24,7 +24,7 @@ import { generateId } from '@/utils/generateId';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.8';
+export const CURRENT_SCHEMA_VERSION = '3.9';
 
 export interface ExportData {
   version: string;
@@ -118,6 +118,15 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
     ...data,
     version: '3.8',
     // Version.acknowledgedConflictKeys is optional — no data transformation needed
+  }),
+  '3.8': (data) => ({
+    ...data,
+    version: '3.9',
+    scheduleVersions: (data.scheduleVersions ?? []).map(v => ({
+      ...v,
+      removedLessons: v.removedLessons ?? [],
+      sickLeaves: v.sickLeaves ?? [],
+    })),
   }),
 };
 
@@ -282,7 +291,7 @@ export async function importFromJson(jsonString: string): Promise<void> {
  * In browser: triggers <a download> to the default downloads folder.
  * In Tauri desktop: opens a native "Save as" dialog so the user can choose destination.
  */
-export async function saveJsonFile(data: string, defaultFilename: string): Promise<void> {
+export async function saveJsonFile(data: string, defaultFilename: string): Promise<boolean> {
   if ('__TAURI_INTERNALS__' in window) {
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
@@ -292,10 +301,12 @@ export async function saveJsonFile(data: string, defaultFilename: string): Promi
     });
     if (path) {
       await writeTextFile(path, data);
+      return true;
     }
-    return;
+    return false;
   }
   downloadJson(data, defaultFilename);
+  return true;
 }
 
 /** @deprecated Use saveJsonFile instead */

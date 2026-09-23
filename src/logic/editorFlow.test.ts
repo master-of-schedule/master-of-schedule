@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { LessonRequirement } from '@/types';
 import {
   getAssigningLesson,
+  getAssigningRemovedLessonIds,
   getCopiedLesson,
   getInteractionRequirement,
   getMovingLesson,
+  createReplacementRoomDialog,
   reduceEditorDialog,
   reduceEditorInteraction,
   supportsForcePlacement,
@@ -83,6 +85,16 @@ describe('reduceEditorInteraction', () => {
     expect(getMovingLesson(copying)).toBeNull();
     expect(getInteractionRequirement(copying)).toBe(requirement);
   });
+
+  it('keeps the exact removed occurrence selected for reassignment', () => {
+    const assigning = reduceEditorInteraction(
+      { type: 'idle' },
+      { type: 'SELECT_LESSON', lesson: requirement, removedLessonIds: ['removed-1', 'removed-2'] },
+    );
+
+    expect(getAssigningLesson(assigning)).toBe(requirement);
+    expect(getAssigningRemovedLessonIds(assigning)).toEqual(['removed-1', 'removed-2']);
+  });
 });
 
 describe('reduceEditorDialog', () => {
@@ -130,5 +142,24 @@ describe('reduceEditorDialog', () => {
       data: { day: 'Пн', lessonNum: 1, forceOverride: true },
     });
     expect(reduceEditorDialog(room, { type: 'CLOSE' })).toEqual({ type: 'none' });
+  });
+});
+
+describe('createReplacementRoomDialog', () => {
+  it('keeps the occupied lesson as a deferred replacement source', () => {
+    expect(createReplacementRoomDialog({ day: 'Вт', lessonNum: 2, lessonIndex: 0 }, '5а')).toEqual({
+      day: 'Вт',
+      lessonNum: 2,
+      fromReplacement: true,
+      replacementSource: { className: '5а', day: 'Вт', lessonNum: 2, lessonIndex: 0 },
+    });
+  });
+
+  it('opens an empty-cell replacement without a removal source', () => {
+    expect(createReplacementRoomDialog({ day: 'Ср', lessonNum: 3, lessonIndex: null }, '5а')).toEqual({
+      day: 'Ср',
+      lessonNum: 3,
+      fromReplacement: true,
+    });
   });
 });

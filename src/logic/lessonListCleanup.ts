@@ -12,6 +12,25 @@ export interface LessonListCleanupPlan {
   excessCount: number;
 }
 
+/**
+ * Temporarily disabled for the comfort-version cycle (Z49-9).
+ * Keep the comparison logic and tests intact for a later, less intrusive return.
+ */
+export const LESSON_LIST_RECONCILIATION_ENABLED = false;
+
+export function shouldShowLessonListCleanupPrompt(
+  plan: LessonListCleanupPlan,
+  isReadOnlyYear: boolean,
+  signature: string,
+  dismissedSignature: string | null,
+  enabled = LESSON_LIST_RECONCILIATION_ENABLED
+): boolean {
+  return enabled
+    && !isReadOnlyYear
+    && plan.removals.length > 0
+    && signature !== dismissedSignature;
+}
+
 function normalizeKeyPart(value: string | undefined): string {
   return (value ?? '').trim();
 }

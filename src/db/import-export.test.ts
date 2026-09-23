@@ -659,8 +659,10 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.8');
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(result.scheduleVersions[0].temporaryLessons).toEqual([]);
+    expect(result.scheduleVersions[0].removedLessons).toEqual([]);
+    expect(result.scheduleVersions[0].sickLeaves).toEqual([]);
   });
 
   it('should migrate 3.6 data to current version', () => {
@@ -677,7 +679,7 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.8');
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('should preserve gapExcludedClasses through 3.7→3.8 migration', () => {
@@ -695,7 +697,7 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.8');
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(result.settings?.gapExcludedClasses).toEqual(['1а', '1б']);
   });
 
@@ -715,9 +717,30 @@ describe('parseExportData', () => {
     const json = JSON.stringify(data);
 
     const result = parseExportData(json);
-    expect(result.version).toBe('3.8');
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     // acknowledgedConflictKeys is optional — absent in old data is fine
     expect(result.scheduleVersions[0].acknowledgedConflictKeys).toBeUndefined();
+  });
+
+  it('adds empty weekly-removal state through the 3.8→3.9 migration', () => {
+    const data = {
+      version: '3.8',
+      exportedAt: new Date().toISOString(),
+      teachers: [],
+      rooms: [],
+      classes: [],
+      groups: [],
+      lessonRequirements: [],
+      scheduleVersions: [
+        { id: '1', name: 'week', type: 'weekly', createdAt: new Date(), schedule: {}, substitutions: [] },
+      ],
+    };
+
+    const result = parseExportData(JSON.stringify(data));
+
+    expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
+    expect(result.scheduleVersions[0].removedLessons).toEqual([]);
+    expect(result.scheduleVersions[0].sickLeaves).toEqual([]);
   });
 });
 
