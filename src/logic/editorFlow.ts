@@ -90,16 +90,37 @@ export interface RoomDialogData {
   lessonNum: LessonNumber;
   bulkCells?: CellRef[];
   forceOverride?: boolean;
+  fromReplacement?: boolean;
+  replacementSource?: CellRef & { lessonIndex: number };
 }
 
 export interface ReplacementDialogData {
   day: Day;
   lessonNum: LessonNumber;
-  lessonIndex: number;
+  lessonIndex: number | null;
   currentLesson?: {
     subject: string;
     teacher: string;
     group?: string;
+  };
+}
+
+export function createReplacementRoomDialog(
+  replacement: ReplacementDialogData,
+  className: string
+): RoomDialogData {
+  return {
+    day: replacement.day,
+    lessonNum: replacement.lessonNum,
+    fromReplacement: true,
+    ...(replacement.lessonIndex === null ? {} : {
+      replacementSource: {
+        className,
+        day: replacement.day,
+        lessonNum: replacement.lessonNum,
+        lessonIndex: replacement.lessonIndex,
+      },
+    }),
   };
 }
 

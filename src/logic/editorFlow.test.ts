@@ -5,6 +5,7 @@ import {
   getCopiedLesson,
   getInteractionRequirement,
   getMovingLesson,
+  createReplacementRoomDialog,
   reduceEditorDialog,
   reduceEditorInteraction,
   supportsForcePlacement,
@@ -130,5 +131,24 @@ describe('reduceEditorDialog', () => {
       data: { day: 'Пн', lessonNum: 1, forceOverride: true },
     });
     expect(reduceEditorDialog(room, { type: 'CLOSE' })).toEqual({ type: 'none' });
+  });
+});
+
+describe('createReplacementRoomDialog', () => {
+  it('keeps the occupied lesson as a deferred replacement source', () => {
+    expect(createReplacementRoomDialog({ day: 'Вт', lessonNum: 2, lessonIndex: 0 }, '5а')).toEqual({
+      day: 'Вт',
+      lessonNum: 2,
+      fromReplacement: true,
+      replacementSource: { className: '5а', day: 'Вт', lessonNum: 2, lessonIndex: 0 },
+    });
+  });
+
+  it('opens an empty-cell replacement without a removal source', () => {
+    expect(createReplacementRoomDialog({ day: 'Ср', lessonNum: 3, lessonIndex: null }, '5а')).toEqual({
+      day: 'Ср',
+      lessonNum: 3,
+      fromReplacement: true,
+    });
   });
 });

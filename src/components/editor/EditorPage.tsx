@@ -10,11 +10,14 @@ import { createVersion, updateVersionSchedule, updateVersionMetadata } from '@/d
 import { exportToJson, saveJsonFile } from '@/db/import-export';
 import {
   createScheduledLesson,
+  createReplacementRoomDialog,
   findRequirementForScheduledLesson,
   getAssigningLesson,
   getAvailableRooms,
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
+  LESSON_LIST_RECONCILIATION_ENABLED,
+  shouldShowLessonListCleanupPrompt,
   getCopiedLesson,
   getMovingLesson,
   getSlotLessons,
@@ -155,16 +158,21 @@ export function EditorPage() {
     ? editorDialog.dialog.data
     : null;
   const cleanupPlan = useMemo(
-    () => findLessonListCleanupPlan(schedule, requirements, temporaryLessons),
+    () => LESSON_LIST_RECONCILIATION_ENABLED
+      ? findLessonListCleanupPlan(schedule, requirements, temporaryLessons)
+      : { removals: [], missingCount: 0, excessCount: 0 },
     [schedule, requirements, temporaryLessons]
   );
   const cleanupSignature = useMemo(
     () => getLessonListCleanupSignature(cleanupPlan),
     [cleanupPlan]
   );
-  const shouldShowCleanupPrompt = !isReadOnlyYear
-    && cleanupPlan.removals.length > 0
-    && cleanupSignature !== dismissedCleanupSignature;
+  const shouldShowCleanupPrompt = shouldShowLessonListCleanupPrompt(
+    cleanupPlan,
+    isReadOnlyYear,
+    cleanupSignature,
+    dismissedCleanupSignature
+  );
 
   useEffect(() => {
     setCleanupDeletionIds(new Set());
@@ -233,6 +241,10 @@ export function EditorPage() {
         }
         clearCellSelection();
       } else if (currentClass) {
+        if (roomDialogData.replacementSource) {
+          removeLesson(roomDialogData.replacementSource);
+        }
+
         // Single cell assignment
         const opts = {
           originalTeacher: substitutionRef.current?.originalTeacher,
@@ -254,7 +266,7 @@ export function EditorPage() {
       editorDialog.close();
       selectLesson(null);
     },
-    [selectedLesson, roomDialogData, currentClass, assignLesson, editorDialog, selectLesson, clearCellSelection]
+    [selectedLesson, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection]
   );
 
   // Clear partner file and restore saved partner class schedules
@@ -327,7 +339,8 @@ export function EditorPage() {
     try {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
-      await saveJsonFile(json, `timetable-${date}.json`);
+      const saved = await saveJsonFile(json, `timetable-${date}.json`);
+      if (!saved) return;
       markJsonSaved();
       showToast('Файл скачан', 'success');
     } catch (err) {
@@ -456,10 +469,12 @@ export function EditorPage() {
 
   // Open replacement picker
   const handleOpenReplace = useCallback(() => {
-    if (!contextMenu.cellRef || contextMenu.lessonIndex === null) return;
+    if (!contextMenu.cellRef) return;
     const { className, day, lessonNum } = contextMenu.cellRef;
     const lessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
-    const currentLessonData = lessons[contextMenu.lessonIndex];
+    const currentLessonData = contextMenu.lessonIndex === null
+      ? undefined
+      : lessons[contextMenu.lessonIndex];
 
     editorDialog.openReplacement({
       day,
@@ -588,22 +603,12 @@ export function EditorPage() {
     (lesson: LessonRequirement) => {
       if (!replacementDialogData || !currentClass) return;
 
-      // Remove the old lesson first
-      removeLesson({
-        className: currentClass,
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-        lessonIndex: replacementDialogData.lessonIndex,
-      });
-
-      // Select the new lesson and open room picker
+      // Defer removing the old lesson until a room is confirmed. Closing the
+      // picker must leave both occupied and empty target cells unchanged.
       selectLesson(lesson);
-      editorDialog.openRoom({
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-      });
+      editorDialog.openRoom(createReplacementRoomDialog(replacementDialogData, currentClass));
     },
-    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
+    [replacementDialogData, currentClass, selectLesson, editorDialog]
   );
 
   // Handle substitute teacher selection from replacement panel
@@ -615,14 +620,6 @@ export function EditorPage() {
       substitutionRef.current = {
         originalTeacher: replacementDialogData.currentLesson?.teacher ?? '',
       };
-
-      // Remove old lesson
-      removeLesson({
-        className: currentClass,
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-        lessonIndex: replacementDialogData.lessonIndex,
-      });
 
       // Create synthetic requirement for the substitute teacher
       const group = replacementDialogData.currentLesson?.group;
@@ -638,12 +635,9 @@ export function EditorPage() {
 
       // Select and open room picker (same flow as handleReplacementSelect)
       selectLesson(syntheticReq);
-      editorDialog.openRoom({
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-      });
+      editorDialog.openRoom(createReplacementRoomDialog(replacementDialogData, currentClass));
     },
-    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
+    [replacementDialogData, currentClass, selectLesson, editorDialog]
   );
 
   // Handle union (профсоюз) substitute teacher selection — same flow but marks isUnionSubstitution
@@ -655,13 +649,6 @@ export function EditorPage() {
         originalTeacher: replacementDialogData.currentLesson?.teacher ?? '',
         isUnionSubstitution: true,
       };
-
-      removeLesson({
-        className: currentClass,
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-        lessonIndex: replacementDialogData.lessonIndex,
-      });
 
       const group = replacementDialogData.currentLesson?.group;
       const syntheticReq: LessonRequirement = {
@@ -675,12 +662,9 @@ export function EditorPage() {
       };
 
       selectLesson(syntheticReq);
-      editorDialog.openRoom({
-        day: replacementDialogData.day,
-        lessonNum: replacementDialogData.lessonNum,
-      });
+      editorDialog.openRoom(createReplacementRoomDialog(replacementDialogData, currentClass));
     },
-    [replacementDialogData, currentClass, removeLesson, selectLesson, editorDialog]
+    [replacementDialogData, currentClass, selectLesson, editorDialog]
   );
 
   // Handle partner select (Z35-4 / Z39-3): open AddTemporaryLessonModal with pre-filled teacher + subject
@@ -807,7 +791,6 @@ export function EditorPage() {
             className={currentClass}
             day={replacementDialogData.day}
             lessonNum={replacementDialogData.lessonNum}
-            lessonIndex={replacementDialogData.lessonIndex}
             currentLesson={replacementDialogData.currentLesson}
             onSelect={handleReplacementSelect}
             onSubstituteSelect={handleSubstituteSelect}
@@ -825,6 +808,11 @@ export function EditorPage() {
         y={contextMenu.position?.y ?? 0}
         onClose={closeContextMenu}
       >
+        {contextMenu.cellRef && contextMenu.lessonIndex === null && (
+          <ContextMenuItem onClick={handleOpenReplace}>
+            Заменить
+          </ContextMenuItem>
+        )}
         {contextMenu.lessonIndex !== null && (
           <>
             <ContextMenuItem onClick={handleCopyLesson}>
@@ -860,7 +848,10 @@ export function EditorPage() {
       {roomDialogData && (
         <RoomPicker
           isOpen={true}
-          onClose={editorDialog.close}
+          onClose={() => {
+            editorDialog.close();
+            if (roomDialogData.fromReplacement) cancelInteraction();
+          }}
           onSelect={handleRoomSelect}
           day={roomDialogData.day}
           lessonNum={roomDialogData.lessonNum}

@@ -12,7 +12,7 @@ import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
-import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability } from '@/logic';
+import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability, runIndependentSaveTasks, type NamedSaveTask } from '@/logic';
 import { buildTeacherScheduleMap, buildRoomScheduleMap } from '@/logic/exportMaps';
 import type { ScheduleEntry } from '@/logic/exportMaps';
 import { downloadJson, exportToJson, saveJsonStringToFolder } from '@/db';
@@ -440,9 +440,17 @@ export function ExportPage() {
     if (canvases.length === 0) { showToast('Нет изменений для скачивания', 'info'); return; }
 
     if (dirHandle) {
-      await Promise.all(canvases.map(([canvas, filename]) => saveCanvasPngToFolder(canvas, filename, dirHandle)));
+      const results = await Promise.allSettled(
+        canvases.map(([canvas, filename]) => saveCanvasPngToFolder(canvas, filename, dirHandle))
+      );
+      const failed = canvases.filter((_, index) => results[index].status === 'rejected');
+      if (failed.length > 0) {
+        await Promise.all(failed.map(([canvas, filename]) => downloadCanvasAsPng(canvas, filename)));
+        showToast('Часть файлов не удалось записать в папку — они скачаны обычным способом', 'warning');
+        return;
+      }
     } else {
-      canvases.forEach(([canvas, filename]) => downloadCanvasAsPng(canvas, filename));
+      await Promise.all(canvases.map(([canvas, filename]) => downloadCanvasAsPng(canvas, filename)));
     }
     showToast('Изображения скачаны', 'success');
   }, [buildTelegramCanvases, showToast]);
@@ -486,15 +494,25 @@ export function ExportPage() {
       }
     }
 
-    // 1. Save PNG images to telegram folder (or download directly if no folder is available)
-    await saveCanvases(telegramDir);
+    // 1. Save PNG images to telegram folder (or download directly if no folder is available).
+    try {
+      await saveCanvases(telegramDir);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Не удалось сохранить изображения', 'error');
+      return;
+    }
 
-    // 2. Save замены image(s) to deputy folder (weekly mode only)
+    // Optional autosaves run independently: one unavailable folder must not
+    // prevent the remaining JSON/image destinations from being updated.
+    const autosaveTasks: NamedSaveTask[] = [];
+
+    // 2. Save замены image(s) to deputy folder (weekly mode only).
     const deputyDir = folderHandles['deputy'];
     const hasDeputyEntries = budgetReplacementEntries.length > 0 || unionReplacementEntries.length > 0;
     if (deputyDir && versionType === 'weekly' && hasDeputyEntries) {
-      const deputyDirVerified = await ensurePermission(deputyDir);
-      if (deputyDirVerified) {
+      autosaveTasks.push({ label: 'картинки замен', run: async () => {
+        const deputyDirVerified = await ensurePermission(deputyDir);
+        if (!deputyDirVerified) throw new Error('Нет доступа к папке замен');
         const dayIndex = DAYS.indexOf(selectedDay);
         const titleStr = formatDayFullWithDate(selectedDay, mondayDate ?? undefined, dayIndex);
         const now = new Date();
@@ -507,25 +525,27 @@ export function ExportPage() {
           const canvas = buildReplacementsImage(unionReplacementEntries, titleStr, 'Профсоюз');
           await saveCanvasPngToFolder(canvas, `${ts}_replacements_union_${selectedDay}.png`, deputyDirVerified);
         }
-      }
+      }});
     }
 
-    // 3. Save full JSON export to rshp_json folder
+    // 3. Save full JSON export to rshp_json folder.
     const rshpDir = folderHandles['rshp_json'];
     if (rshpDir) {
-      const rshpDirVerified = await ensurePermission(rshpDir);
-      if (rshpDirVerified) {
+      autosaveTasks.push({ label: 'JSON расписания', run: async () => {
+        const rshpDirVerified = await ensurePermission(rshpDir);
+        if (!rshpDirVerified) throw new Error('Нет доступа к папке JSON');
         const json = await exportToJson();
         const date = new Date().toISOString().slice(0, 10);
         await saveJsonStringToFolder(json, `timetable-${date}.json`, rshpDirVerified);
-      }
+      }});
     }
 
-    // 4. Save occupancy JSON to occupancy_json folder
+    // 4. Save occupancy JSON to occupancy_json folder.
     const occupancyDir = folderHandles['occupancy_json'];
     if (occupancyDir) {
-      const occupancyDirVerified = await ensurePermission(occupancyDir);
-      if (occupancyDirVerified) {
+      autosaveTasks.push({ label: 'JSON занятости', run: async () => {
+        const occupancyDirVerified = await ensurePermission(occupancyDir);
+        if (!occupancyDirVerified) throw new Error('Нет доступа к папке занятости');
         const file = generatePartnerAvailability(schedule, {
           name: versionName,
           type: versionType,
@@ -534,7 +554,12 @@ export function ExportPage() {
         const json = JSON.stringify(file, null, 2);
         const safeName = (versionName || 'расписание').replace(/[/\\:*?"<>|]/g, '-');
         await saveJsonStringToFolder(json, `занятость-${safeName}.json`, occupancyDirVerified);
-      }
+      }});
+    }
+
+    const failedAutosaves = await runIndependentSaveTasks(autosaveTasks);
+    if (failedAutosaves.length > 0) {
+      showToast(`Не удалось обновить: ${failedAutosaves.join(', ')}`, 'warning');
     }
   }, [
     selectedDay, baseTemplateSchedule, fsFolderSupported, folderHandle, folderHandles,
@@ -560,7 +585,7 @@ export function ExportPage() {
         return;
       }
     }
-    downloadCanvasAsPng(canvas, filename);
+    await downloadCanvasAsPng(canvas, filename);
     showToast('Замены скачаны', 'success');
   }, [selectedDay, mondayDate, fsFolderSupported, folderHandle, ensurePermission, showToast]);
 
