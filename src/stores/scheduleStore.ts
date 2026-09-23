@@ -16,6 +16,9 @@ import type {
   LessonStatus,
   HistoryEntry,
   HistoryActionType,
+  RemovedLesson,
+  RemovedLessonReason,
+  SickLeave,
 } from '@/types';
 import { describeAction } from '@/types';
 import { generateId } from '@/utils/generateId';
@@ -57,11 +60,15 @@ interface ScheduleState {
   // Per-lesson statuses (completed) — weekly schedules only
   lessonStatuses: Record<string, LessonStatus>;
 
+  // Weekly removal tracking (persisted per version)
+  removedLessons: RemovedLesson[];
+  sickLeaves: SickLeave[];
+
   /**
    * Acknowledged conflict keys for the current version.
    * Persisted to IndexedDB on save; restored on load.
    * Cleared for a slot when a lesson is assigned to or removed from that slot.
-   * Does NOT clear on: undo/redo (history restores schedule only), room changes.
+   * Does NOT clear on: undo/redo, room changes.
    */
   acknowledgedConflictKeys: string[];
 
@@ -71,6 +78,8 @@ interface ScheduleState {
     day: Day;
     lessonNum: LessonNumber;
     lesson: ScheduledLesson;
+    /** Consume this explicit panel entry when returning a removed lesson. */
+    removedLessonId?: string;
   }) => void;
 
   removeLesson: (params: {
@@ -78,7 +87,14 @@ interface ScheduleState {
     day: Day;
     lessonNum: LessonNumber;
     lessonIndex: number;
-  }) => void;
+  }) => string | null;
+
+  removeLessonTemporarily: (params: {
+    className: string;
+    day: Day;
+    lessonNum: LessonNumber;
+    lessonIndex: number;
+  }) => string | null;
 
   removeLessons: (params: {
     className: string;
@@ -115,6 +131,9 @@ interface ScheduleState {
   setLessonStatus: (id: string, status: LessonStatus) => void;
   clearLessonStatus: (id: string) => void;
 
+  // Actions - Weekly illness markers
+  setSickLeave: (teacher: string, day: Day, isSick: boolean) => void;
+
   // Actions - History
   undo: () => void;
   redo: () => void;
@@ -150,6 +169,8 @@ interface ScheduleState {
     substitutions?: Substitution[];
     temporaryLessons?: LessonRequirement[];
     lessonStatuses?: Record<string, LessonStatus>;
+    removedLessons?: RemovedLesson[];
+    sickLeaves?: SickLeave[];
     acknowledgedConflictKeys?: string[];
     baseTemplateId?: string;
     baseTemplateSchedule?: Schedule;
@@ -174,7 +195,9 @@ function createHistoryEntry(
   actionType: HistoryActionType,
   description: string,
   schedule: Schedule,
-  substitutions: Substitution[]
+  substitutions: Substitution[],
+  removedLessons: RemovedLesson[] = [],
+  sickLeaves: SickLeave[] = [],
 ): HistoryEntry {
   return {
     id: generateId(),
@@ -183,7 +206,69 @@ function createHistoryEntry(
     description,
     schedule: cloneSchedule(schedule),
     substitutions: substitutions.map(s => ({ ...s })),
+    removedLessons: removedLessons.map(item => ({
+      ...item,
+      requirement: { ...item.requirement },
+      lesson: { ...item.lesson },
+    })),
+    sickLeaves: sickLeaves.map(item => ({ ...item })),
   };
+}
+
+function getRequirementSnapshot(
+  temporaryLessons: LessonRequirement[],
+  className: string,
+  lesson: ScheduledLesson,
+): LessonRequirement {
+  const dataRequirements = useDataStore.getState().lessonRequirements ?? [];
+  const requirement = [...dataRequirements, ...temporaryLessons].find(item => item.id === lesson.requirementId);
+  if (requirement) return { ...requirement };
+
+  return {
+    id: lesson.requirementId,
+    type: lesson.group ? 'group' : 'class',
+    classOrGroup: lesson.group ?? className,
+    className: lesson.group ? className : undefined,
+    subject: lesson.subject,
+    teacher: lesson.teacher,
+    teacher2: lesson.teacher2,
+    countPerWeek: 1,
+  };
+}
+
+function isLessonTeacher(lesson: ScheduledLesson, teacher: string): boolean {
+  return lesson.teacher === teacher || lesson.teacher2 === teacher;
+}
+
+function makeRemovedLesson(
+  state: Pick<ScheduleState, 'temporaryLessons'>,
+  params: { className: string; day: Day; lessonNum: LessonNumber },
+  lesson: ScheduledLesson,
+  reason: RemovedLessonReason,
+): RemovedLesson {
+  return {
+    id: generateId(),
+    reason,
+    className: params.className,
+    day: params.day,
+    lessonNum: params.lessonNum,
+    requirement: getRequirementSnapshot(state.temporaryLessons, params.className, lesson),
+    lesson: { ...lesson },
+  };
+}
+
+function getAutomaticRemovalReason(
+  state: Pick<ScheduleState, 'versionType' | 'sickLeaves'>,
+  lesson: ScheduledLesson,
+  day: Day,
+): RemovedLessonReason {
+  if (
+    state.versionType === 'weekly' &&
+    state.sickLeaves.some(mark => mark.day === day && isLessonTeacher(lesson, mark.teacher))
+  ) {
+    return 'sick';
+  }
+  return 'withdrawn';
 }
 
 export const useScheduleStore = create<ScheduleState>()(
@@ -202,12 +287,14 @@ export const useScheduleStore = create<ScheduleState>()(
     substitutions: [],
     temporaryLessons: [],
     lessonStatuses: {},
+    removedLessons: [],
+    sickLeaves: [],
     acknowledgedConflictKeys: [],
     baseTemplateId: null,
     baseTemplateSchedule: null,
 
     // Assign a lesson to a slot
-    assignLesson: ({ className, day, lessonNum, lesson }) => {
+    assignLesson: ({ className, day, lessonNum, lesson, removedLessonId }) => {
       if (useDataStore.getState().isReadOnlyYear) return;
       const state = get();
 
@@ -215,6 +302,9 @@ export const useScheduleStore = create<ScheduleState>()(
       const newHistory = truncateHistory(state.history, state.historyIndex);
 
       const newSchedule = addLessonToSlot(state.schedule, className, day, lessonNum, lesson);
+      const newRemovedLessons = removedLessonId
+        ? state.removedLessons.filter(item => item.id !== removedLessonId)
+        : state.removedLessons;
 
       const description = describeAction('assign', {
         subject: lesson.subject,
@@ -223,12 +313,15 @@ export const useScheduleStore = create<ScheduleState>()(
         lessonNum,
       });
 
-      newHistory.push(createHistoryEntry('assign', description, newSchedule, state.substitutions));
+      newHistory.push(createHistoryEntry(
+        'assign', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+      ));
 
       set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
+        removedLessons: newRemovedLessons,
         isDirty: true,
         jsonIsDirty: true,
       });
@@ -236,16 +329,25 @@ export const useScheduleStore = create<ScheduleState>()(
 
     // Remove a lesson from a slot
     removeLesson: ({ className, day, lessonNum, lessonIndex }) => {
-      if (useDataStore.getState().isReadOnlyYear) return;
+      if (useDataStore.getState().isReadOnlyYear) return null;
       const state = get();
       const lessons = state.schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
       const lesson = lessons[lessonIndex];
 
-      if (!lesson) return;
+      if (!lesson) return null;
 
       const newHistory = truncateHistory(state.history, state.historyIndex);
 
       const newSchedule = removeLessonFromSlot(state.schedule, className, day, lessonNum, lessonIndex);
+      const removed = state.versionType === 'weekly'
+        ? makeRemovedLesson(
+          state,
+          { className, day, lessonNum },
+          lesson,
+          getAutomaticRemovalReason(state, lesson, day),
+        )
+        : null;
+      const newRemovedLessons = removed ? [...state.removedLessons, removed] : state.removedLessons;
 
       const description = describeAction('remove', {
         subject: lesson.subject,
@@ -254,15 +356,46 @@ export const useScheduleStore = create<ScheduleState>()(
         lessonNum,
       });
 
-      newHistory.push(createHistoryEntry('remove', description, newSchedule, state.substitutions));
+      newHistory.push(createHistoryEntry(
+        'remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+      ));
 
       set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
+        removedLessons: newRemovedLessons,
         isDirty: true,
         jsonIsDirty: true,
       });
+      return removed?.id ?? null;
+    },
+
+    removeLessonTemporarily: ({ className, day, lessonNum, lessonIndex }) => {
+      if (useDataStore.getState().isReadOnlyYear) return null;
+      const state = get();
+      if (state.versionType !== 'weekly') return null;
+      const lesson = state.schedule[className]?.[day]?.[lessonNum]?.lessons?.[lessonIndex];
+      if (!lesson) return null;
+
+      const newSchedule = removeLessonFromSlot(state.schedule, className, day, lessonNum, lessonIndex);
+      const removed = makeRemovedLesson(state, { className, day, lessonNum }, lesson, 'temporary');
+      const newRemovedLessons = [...state.removedLessons, removed];
+      const newHistory = truncateHistory(state.history, state.historyIndex);
+      const description = describeAction('temporary_remove', { subject: lesson.subject, className, day, lessonNum });
+      newHistory.push(createHistoryEntry(
+        'temporary_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+      ));
+
+      set({
+        schedule: newSchedule,
+        removedLessons: newRemovedLessons,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        isDirty: true,
+        jsonIsDirty: true,
+      });
+      return removed.id;
     },
 
     // Remove multiple lessons at once
@@ -272,13 +405,26 @@ export const useScheduleStore = create<ScheduleState>()(
 
       const state = get();
       let newSchedule = state.schedule;
+      const additions: RemovedLesson[] = [];
 
       // Sort by lessonIndex descending to avoid index shifting issues
       const sortedItems = [...items].sort((a, b) => b.lessonIndex - a.lessonIndex);
 
       for (const { className, day, lessonNum, lessonIndex } of sortedItems) {
+        const lesson = newSchedule[className]?.[day]?.[lessonNum]?.lessons?.[lessonIndex];
+        if (lesson && state.versionType === 'weekly') {
+          additions.push(makeRemovedLesson(
+            state,
+            { className, day, lessonNum },
+            lesson,
+            getAutomaticRemovalReason(state, lesson, day),
+          ));
+        }
         newSchedule = removeLessonFromSlot(newSchedule, className, day, lessonNum, lessonIndex);
       }
+      const newRemovedLessons = additions.length > 0
+        ? [...state.removedLessons, ...additions]
+        : state.removedLessons;
 
       const newHistory = truncateHistory(state.history, state.historyIndex);
 
@@ -288,12 +434,15 @@ export const useScheduleStore = create<ScheduleState>()(
         className: uniqueClasses.join(', '),
       });
 
-      newHistory.push(createHistoryEntry('multi_remove', description, newSchedule, state.substitutions));
+      newHistory.push(createHistoryEntry(
+        'multi_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+      ));
 
       set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
+        removedLessons: newRemovedLessons,
         isDirty: true,
         jsonIsDirty: true,
       });
@@ -340,7 +489,9 @@ export const useScheduleStore = create<ScheduleState>()(
         room: newRoom,
       });
 
-      newHistory.push(createHistoryEntry('change_room', description, newSchedule, state.substitutions));
+      newHistory.push(createHistoryEntry(
+        'change_room', description, newSchedule, state.substitutions, state.removedLessons, state.sickLeaves
+      ));
 
       set({
         schedule: newSchedule,
@@ -355,10 +506,20 @@ export const useScheduleStore = create<ScheduleState>()(
     replaceLesson: ({ className, day, lessonNum, lessonIndex, newLesson }) => {
       if (useDataStore.getState().isReadOnlyYear) return;
       const state = get();
+      const oldLesson = state.schedule[className]?.[day]?.[lessonNum]?.lessons?.[lessonIndex];
 
       // Remove old and add new
       let newSchedule = removeLessonFromSlot(state.schedule, className, day, lessonNum, lessonIndex);
       newSchedule = addLessonToSlot(newSchedule, className, day, lessonNum, newLesson);
+      const removed = state.versionType === 'weekly' && oldLesson
+        ? makeRemovedLesson(
+          state,
+          { className, day, lessonNum },
+          oldLesson,
+          getAutomaticRemovalReason(state, oldLesson, day),
+        )
+        : null;
+      const newRemovedLessons = removed ? [...state.removedLessons, removed] : state.removedLessons;
 
       const newHistory = truncateHistory(state.history, state.historyIndex);
 
@@ -369,12 +530,15 @@ export const useScheduleStore = create<ScheduleState>()(
         lessonNum,
       });
 
-      newHistory.push(createHistoryEntry('substitute', description, newSchedule, state.substitutions));
+      newHistory.push(createHistoryEntry(
+        'substitute', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+      ));
 
       set({
         schedule: newSchedule,
         history: newHistory,
         historyIndex: newHistory.length - 1,
+        removedLessons: newRemovedLessons,
         isDirty: true,
         jsonIsDirty: true,
       });
@@ -420,6 +584,9 @@ export const useScheduleStore = create<ScheduleState>()(
         const index = state.temporaryLessons.findIndex(l => l.id === id);
         if (index !== -1) {
           state.temporaryLessons.splice(index, 1);
+          state.removedLessons = state.removedLessons.filter(item =>
+            item.requirement.id !== id && item.lesson.requirementId !== id
+          );
           state.isDirty = true;
           state.jsonIsDirty = true;
         }
@@ -446,6 +613,40 @@ export const useScheduleStore = create<ScheduleState>()(
       });
     },
 
+    setSickLeave: (teacher, day, isSick) => {
+      if (useDataStore.getState().isReadOnlyYear) return;
+      const state = get();
+      if (state.versionType !== 'weekly') return;
+
+      const alreadyMarked = state.sickLeaves.some(item => item.teacher === teacher && item.day === day);
+      if (alreadyMarked === isSick) return;
+
+      const newSickLeaves = isSick
+        ? [...state.sickLeaves, { teacher, day }]
+        : state.sickLeaves.filter(item => !(item.teacher === teacher && item.day === day));
+      const newRemovedLessons = isSick
+        ? state.removedLessons
+        : state.removedLessons.map(item =>
+          item.reason === 'sick' && item.day === day && isLessonTeacher(item.lesson, teacher)
+            ? { ...item, reason: 'withdrawn' as const }
+            : item
+        );
+      const newHistory = truncateHistory(state.history, state.historyIndex);
+      const description = describeAction('sick_leave', { teacher, day });
+      newHistory.push(createHistoryEntry(
+        'sick_leave', description, state.schedule, state.substitutions, newRemovedLessons, newSickLeaves
+      ));
+
+      set({
+        sickLeaves: newSickLeaves,
+        removedLessons: newRemovedLessons,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        isDirty: true,
+        jsonIsDirty: true,
+      });
+    },
+
     // Undo - go back one step in history
     undo: () => {
       if (useDataStore.getState().isReadOnlyYear) return;
@@ -458,6 +659,8 @@ export const useScheduleStore = create<ScheduleState>()(
       set({
         schedule: cloneSchedule(entry.schedule),
         substitutions: entry.substitutions.map(s => ({ ...s })),
+        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
+        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
         historyIndex: newIndex,
         isDirty: true,
         jsonIsDirty: true,
@@ -476,6 +679,8 @@ export const useScheduleStore = create<ScheduleState>()(
       set({
         schedule: cloneSchedule(entry.schedule),
         substitutions: entry.substitutions.map(s => ({ ...s })),
+        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
+        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
         historyIndex: newIndex,
         isDirty: true,
         jsonIsDirty: true,
@@ -493,6 +698,8 @@ export const useScheduleStore = create<ScheduleState>()(
       set({
         schedule: cloneSchedule(entry.schedule),
         substitutions: entry.substitutions.map(s => ({ ...s })),
+        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
+        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
         historyIndex: 0,
         isDirty: true,
         jsonIsDirty: true,
@@ -510,6 +717,8 @@ export const useScheduleStore = create<ScheduleState>()(
       set({
         schedule: cloneSchedule(entry.schedule),
         substitutions: entry.substitutions.map(s => ({ ...s })),
+        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
+        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
         historyIndex: index,
         isDirty: true,
         jsonIsDirty: true,
@@ -525,7 +734,9 @@ export const useScheduleStore = create<ScheduleState>()(
         'import',
         'Сохранено',
         state.schedule,
-        state.substitutions
+        state.substitutions,
+        state.removedLessons,
+        state.sickLeaves,
       );
 
       set({
@@ -551,7 +762,7 @@ export const useScheduleStore = create<ScheduleState>()(
     // Create new empty schedule
     newSchedule: (type, mondayDate, baseTemplateId, baseTemplateSchedule, daysPerWeek, name) => {
       if (useDataStore.getState().isReadOnlyYear) return;
-      const initialEntry = createHistoryEntry('import', 'Начало', {}, []);
+      const initialEntry = createHistoryEntry('import', 'Начало', {}, [], [], []);
       set({
         schedule: {},
         versionId: null,
@@ -566,6 +777,8 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: [],
         temporaryLessons: [],
         lessonStatuses: {},
+        removedLessons: [],
+        sickLeaves: [],
         acknowledgedConflictKeys: [],
         baseTemplateId: baseTemplateId ?? null,
         baseTemplateSchedule: baseTemplateSchedule ? cloneSchedule(baseTemplateSchedule) : null,
@@ -573,12 +786,14 @@ export const useScheduleStore = create<ScheduleState>()(
     },
 
     // Load existing schedule
-    loadSchedule: ({ schedule, versionId, versionType, versionName, mondayDate, versionDaysPerWeek, substitutions, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, baseTemplateId, baseTemplateSchedule }) => {
+    loadSchedule: ({ schedule, versionId, versionType, versionName, mondayDate, versionDaysPerWeek, substitutions, temporaryLessons, lessonStatuses, removedLessons, sickLeaves, acknowledgedConflictKeys, baseTemplateId, baseTemplateSchedule }) => {
       const initialEntry = createHistoryEntry(
         'import',
         'Загружено',
         schedule,
-        substitutions ?? []
+        substitutions ?? [],
+        removedLessons ?? [],
+        sickLeaves ?? [],
       );
 
       set({
@@ -595,6 +810,8 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions: substitutions ?? [],
         temporaryLessons: temporaryLessons ?? [],
         lessonStatuses: lessonStatuses ?? {},
+        removedLessons: removedLessons ?? [],
+        sickLeaves: sickLeaves ?? [],
         acknowledgedConflictKeys: acknowledgedConflictKeys ?? [],
         baseTemplateId: baseTemplateId ?? null,
         baseTemplateSchedule: baseTemplateSchedule ? cloneSchedule(baseTemplateSchedule) : null,

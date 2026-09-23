@@ -122,7 +122,10 @@ export function App() {
       const s = useScheduleStore.getState();
       const name = s.versionName || `Расписание ${new Date().toLocaleDateString('ru-RU')}`;
       if (s.versionId) {
-        await updateVersionSchedule(s.versionId, s.schedule, undefined, s.temporaryLessons, s.lessonStatuses, s.acknowledgedConflictKeys);
+        await updateVersionSchedule(
+          s.versionId, s.schedule, undefined, s.temporaryLessons, s.lessonStatuses,
+          s.acknowledgedConflictKeys, s.removedLessons, s.sickLeaves
+        );
         await updateVersionMetadata(s.versionId, { name });
         s.markSaved(s.versionId, name);
       } else {
@@ -132,6 +135,8 @@ export function App() {
           schedule: s.schedule,
           temporaryLessons: s.temporaryLessons,
           lessonStatuses: s.lessonStatuses,
+          removedLessons: s.removedLessons,
+          sickLeaves: s.sickLeaves,
           acknowledgedConflictKeys: s.acknowledgedConflictKeys,
           mondayDate: s.mondayDate ?? undefined,
           daysPerWeek: s.versionDaysPerWeek ?? undefined,

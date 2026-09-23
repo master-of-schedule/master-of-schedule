@@ -8,10 +8,14 @@ import { useScheduleStore } from './scheduleStore';
 import type { ScheduledLesson, Day, LessonNumber, LessonRequirement } from '@/types';
 
 const mockIsReadOnly = { value: false };
+const mockRequirements: { value: LessonRequirement[] } = { value: [] };
 
 vi.mock('./dataStore', () => ({
   useDataStore: {
-    getState: () => ({ isReadOnlyYear: mockIsReadOnly.value }),
+    getState: () => ({
+      isReadOnlyYear: mockIsReadOnly.value,
+      lessonRequirements: mockRequirements.value,
+    }),
   },
 }));
 
@@ -81,9 +85,12 @@ beforeEach(() => {
     substitutions: [],
     temporaryLessons: [],
     lessonStatuses: {},
+    removedLessons: [],
+    sickLeaves: [],
     baseTemplateId: null,
     baseTemplateSchedule: null,
   });
+  mockRequirements.value = [];
 });
 
 // ── truncateHistory behavior (REF-8) ─────────────────────────────────────────
@@ -647,5 +654,156 @@ describe('restorePartnerClassLessons', () => {
     const scheduleBefore = useScheduleStore.getState().schedule;
     useScheduleStore.getState().restorePartnerClassLessons({});
     expect(useScheduleStore.getState().schedule).toBe(scheduleBefore); // same reference
+  });
+});
+
+// ── weekly removal categories (Z49-10) ───────────────────────────────────────
+
+function loadWeeklyLesson(overrides: Partial<ScheduledLesson> = {}) {
+  const requirement: LessonRequirement = {
+    id: 'req1',
+    type: 'class',
+    classOrGroup: '5а',
+    subject: 'Математика',
+    teacher: 'Иванова Т.С.',
+    countPerWeek: 2,
+  };
+  mockRequirements.value = [requirement];
+  useScheduleStore.getState().loadSchedule({
+    schedule: {
+      '5а': {
+        'Пн': {
+          1: { lessons: [makeLesson(overrides)] },
+        },
+      },
+    },
+    versionId: 'week-1',
+    versionType: 'weekly',
+    versionName: 'Неделя',
+    substitutions: [],
+    removedLessons: [],
+    sickLeaves: [],
+  });
+  return requirement;
+}
+
+describe('weekly removal categories', () => {
+  it('records an ordinary removal and restores the category through undo/redo', () => {
+    loadWeeklyLesson();
+
+    useScheduleStore.getState().removeLesson({ className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 });
+    let state = useScheduleStore.getState();
+    expect(state.removedLessons).toHaveLength(1);
+    expect(state.removedLessons[0]).toMatchObject({
+      reason: 'withdrawn',
+      className: '5а',
+      day: DAY,
+      lessonNum: NUM,
+      requirement: { id: 'req1' },
+      lesson: { id: 'l1' },
+    });
+    expect(state.schedule['5а'][DAY]?.[NUM]?.lessons).toEqual([]);
+
+    state.undo();
+    state = useScheduleStore.getState();
+    expect(state.removedLessons).toEqual([]);
+    expect(state.schedule['5а'][DAY]?.[NUM]?.lessons).toHaveLength(1);
+
+    state.redo();
+    state = useScheduleStore.getState();
+    expect(state.removedLessons[0].reason).toBe('withdrawn');
+    expect(state.schedule['5а'][DAY]?.[NUM]?.lessons).toEqual([]);
+  });
+
+  it('classifies a removal as sick and converts it to withdrawn when the mark is cleared', () => {
+    loadWeeklyLesson();
+    const store = useScheduleStore.getState();
+
+    store.setSickLeave('Иванова Т.С.', DAY, true);
+    useScheduleStore.getState().removeLesson({ className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 });
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('sick');
+
+    useScheduleStore.getState().setSickLeave('Иванова Т.С.', DAY, false);
+    let state = useScheduleStore.getState();
+    expect(state.sickLeaves).toEqual([]);
+    expect(state.removedLessons[0].reason).toBe('withdrawn');
+    expect(state.schedule['5а'][DAY]?.[NUM]?.lessons).toEqual([]);
+
+    state.undo();
+    state = useScheduleStore.getState();
+    expect(state.sickLeaves).toEqual([{ teacher: 'Иванова Т.С.', day: DAY }]);
+    expect(state.removedLessons[0].reason).toBe('sick');
+  });
+
+  it('uses the explicit temporary reason even during a sick day', () => {
+    loadWeeklyLesson();
+    useScheduleStore.getState().setSickLeave('Иванова Т.С.', DAY, true);
+
+    useScheduleStore.getState().removeLessonTemporarily({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('temporary');
+  });
+
+  it('consumes only the explicitly returned removal occurrence', () => {
+    const requirement = loadWeeklyLesson();
+    const firstId = useScheduleStore.getState().removeLessonTemporarily({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+    expect(firstId).toBeTruthy();
+
+    useScheduleStore.setState(state => ({
+      removedLessons: [
+        ...state.removedLessons,
+        { ...state.removedLessons[0], id: 'ordinary', reason: 'withdrawn' as const },
+      ],
+    }));
+
+    useScheduleStore.getState().assignLesson({
+      className: '5а',
+      day: 'Вт',
+      lessonNum: 2,
+      lesson: makeLesson({ id: 'returned', requirementId: requirement.id }),
+      removedLessonId: firstId!,
+    });
+
+    const state = useScheduleStore.getState();
+    expect(state.removedLessons.map(item => item.id)).toEqual(['ordinary']);
+    expect(state.schedule['5а']['Вт']?.[2]?.lessons).toHaveLength(1);
+  });
+
+  it('does not create removal records outside weekly versions', () => {
+    loadWeeklyLesson();
+    useScheduleStore.setState({ versionType: 'technical' });
+
+    useScheduleStore.getState().removeLesson({ className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 });
+
+    expect(useScheduleStore.getState().removedLessons).toEqual([]);
+  });
+
+  it('classifies every lesson in a bulk removal independently', () => {
+    loadWeeklyLesson();
+    useScheduleStore.setState(state => ({
+      schedule: {
+        ...state.schedule,
+        '5а': {
+          ...state.schedule['5а'],
+          'Пн': {
+            ...state.schedule['5а']['Пн'],
+            1: { lessons: [makeLesson({ id: 'l1' }), makeLesson({ id: 'l2' })] },
+          },
+        },
+      },
+    }));
+
+    useScheduleStore.getState().removeLessons([
+      { className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0 },
+      { className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 1 },
+    ]);
+
+    const state = useScheduleStore.getState();
+    expect(state.removedLessons).toHaveLength(2);
+    expect(state.removedLessons.every(item => item.reason === 'withdrawn')).toBe(true);
   });
 });

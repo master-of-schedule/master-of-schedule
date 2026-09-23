@@ -85,6 +85,7 @@ export function EditorPage() {
     historyIndex, historyLength, schedule, versionId, versionType, versionName,
     isDirty, jsonIsDirty, markSaved, markJsonSaved, temporaryLessons,
     lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek,
+    removedLessons, sickLeaves,
   } = useScheduleStore(useShallow((s) => ({
     assignLesson: s.assignLesson,
     removeLesson: s.removeLesson,
@@ -104,6 +105,8 @@ export function EditorPage() {
     markJsonSaved: s.markJsonSaved,
     temporaryLessons: s.temporaryLessons,
     lessonStatuses: s.lessonStatuses,
+    removedLessons: s.removedLessons,
+    sickLeaves: s.sickLeaves,
     acknowledgedConflictKeys: s.acknowledgedConflictKeys,
     mondayDate: s.mondayDate,
     versionDaysPerWeek: s.versionDaysPerWeek,
@@ -309,7 +312,10 @@ export function EditorPage() {
 
       if (versionId) {
         // Update existing version
-        await updateVersionSchedule(versionId, schedule, undefined, temporaryLessons, lessonStatuses, acknowledgedConflictKeys);
+        await updateVersionSchedule(
+          versionId, schedule, undefined, temporaryLessons, lessonStatuses,
+          acknowledgedConflictKeys, removedLessons, sickLeaves
+        );
         await updateVersionMetadata(versionId, { name });
         markSaved(versionId, name);
       } else {
@@ -320,6 +326,8 @@ export function EditorPage() {
           schedule,
           temporaryLessons,
           lessonStatuses,
+          removedLessons,
+          sickLeaves,
           acknowledgedConflictKeys,
           mondayDate: mondayDate ?? undefined,
           daysPerWeek: versionDaysPerWeek ?? undefined,
@@ -333,7 +341,7 @@ export function EditorPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek, markSaved, showToast]);
+  }, [isSaving, versionId, versionName, versionType, schedule, temporaryLessons, lessonStatuses, removedLessons, sickLeaves, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek, markSaved, showToast]);
 
   const handleSaveJson = useCallback(async () => {
     try {
