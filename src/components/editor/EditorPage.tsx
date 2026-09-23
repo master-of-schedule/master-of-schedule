@@ -16,6 +16,8 @@ import {
   getAvailableRooms,
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
+  LESSON_LIST_RECONCILIATION_ENABLED,
+  shouldShowLessonListCleanupPrompt,
   getCopiedLesson,
   getMovingLesson,
   getSlotLessons,
@@ -156,16 +158,21 @@ export function EditorPage() {
     ? editorDialog.dialog.data
     : null;
   const cleanupPlan = useMemo(
-    () => findLessonListCleanupPlan(schedule, requirements, temporaryLessons),
+    () => LESSON_LIST_RECONCILIATION_ENABLED
+      ? findLessonListCleanupPlan(schedule, requirements, temporaryLessons)
+      : { removals: [], missingCount: 0, excessCount: 0 },
     [schedule, requirements, temporaryLessons]
   );
   const cleanupSignature = useMemo(
     () => getLessonListCleanupSignature(cleanupPlan),
     [cleanupPlan]
   );
-  const shouldShowCleanupPrompt = !isReadOnlyYear
-    && cleanupPlan.removals.length > 0
-    && cleanupSignature !== dismissedCleanupSignature;
+  const shouldShowCleanupPrompt = shouldShowLessonListCleanupPrompt(
+    cleanupPlan,
+    isReadOnlyYear,
+    cleanupSignature,
+    dismissedCleanupSignature
+  );
 
   useEffect(() => {
     setCleanupDeletionIds(new Set());

@@ -3,6 +3,7 @@ import type { LessonRequirement, Schedule, ScheduledLesson } from '@/types';
 import {
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
+  shouldShowLessonListCleanupPrompt,
 } from './lessonListCleanup';
 
 const makeRequirement = (overrides: Partial<LessonRequirement> = {}): LessonRequirement => ({
@@ -171,4 +172,29 @@ describe('findLessonListCleanupPlan', () => {
     expect(getLessonListCleanupSignature(plan)).toBe('10а|Пн|1|0|lesson-1|missing');
   });
 
+});
+
+describe('shouldShowLessonListCleanupPrompt', () => {
+  const plan = {
+    removals: [{
+      className: '10а',
+      day: 'Пн' as const,
+      lessonNum: 1 as const,
+      lessonIndex: 0,
+      lesson: makeLesson(),
+      reason: 'missing' as const,
+    }],
+    missingCount: 1,
+    excessCount: 0,
+  };
+
+  it('keeps reconciliation hidden while the comfort-version flag is disabled', () => {
+    expect(shouldShowLessonListCleanupPrompt(plan, false, 'changed', null)).toBe(false);
+  });
+
+  it('retains the original display rules for a future re-enable', () => {
+    expect(shouldShowLessonListCleanupPrompt(plan, false, 'changed', null, true)).toBe(true);
+    expect(shouldShowLessonListCleanupPrompt(plan, true, 'changed', null, true)).toBe(false);
+    expect(shouldShowLessonListCleanupPrompt(plan, false, 'changed', 'changed', true)).toBe(false);
+  });
 });

@@ -92,6 +92,8 @@ export type { ClassProgress } from './counting';
 export {
   findLessonListCleanupPlan,
   getLessonListCleanupSignature,
+  LESSON_LIST_RECONCILIATION_ENABLED,
+  shouldShowLessonListCleanupPrompt,
 } from './lessonListCleanup';
 export type {
   LessonListCleanupPlan,
