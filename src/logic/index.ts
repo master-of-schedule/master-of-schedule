@@ -122,6 +122,9 @@ export {
 } from './export-image';
 export type { ClassesImageData, TeacherImageData, TeacherChangeDetail, ReplacementEntry } from './export-image';
 
+export { runIndependentSaveTasks } from './saveReliability';
+export type { NamedSaveTask } from './saveReliability';
+
 // Availability
 export {
   getOccupiedRooms,

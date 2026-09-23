@@ -353,7 +353,8 @@ export function StartPage() {
     try {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
-      await saveJsonFile(json, `timetable-${date}.json`);
+      const saved = await saveJsonFile(json, `timetable-${date}.json`);
+      if (!saved) return;
       markJsonSaved();
       showToast('Файл скачан', 'success');
     } catch (err) {
