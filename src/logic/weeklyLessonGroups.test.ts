@@ -51,6 +51,7 @@ describe('buildWeeklyLessonGroups', () => {
     expect(result.temporary.map(item => item.requirement.id)).toEqual(['math']);
     expect(result.withdrawn.map(item => item.requirement.id)).toEqual(['bio']);
     expect(result.sick.map(item => item.requirement.id)).toEqual(['alg']);
+    expect(result.completed).toEqual([]);
   });
 
   it('treats old unclassified remainder as withdrawn without duplicating explicit records', () => {
@@ -83,7 +84,20 @@ describe('buildWeeklyLessonGroups', () => {
       temporary: [],
       withdrawn: [],
       sick: [],
+      completed: [],
     });
+  });
+
+  it('keeps a conducted occurrence out of every removal group', () => {
+    const math = requirement('math', 'Математика');
+    const result = buildWeeklyLessonGroups(
+      [{ requirement: math, remaining: 1 }],
+      [{ ...removed('done', math, 'completed'), previousReason: 'withdrawn' }],
+      '5а',
+    );
+
+    expect(result.withdrawn).toEqual([]);
+    expect(result.completed[0]).toMatchObject({ remaining: 1, removalIds: ['done'] });
   });
 
   it('keeps group lessons from the same subject separate', () => {

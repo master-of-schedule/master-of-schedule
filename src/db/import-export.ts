@@ -20,11 +20,12 @@ import { replaceAllData, getAllData } from './data';
 import { getAllVersions, getVersion } from './versions';
 import { inferRoomShortName } from '@/utils/roomUtils';
 import { getRequirementClassName } from '@/utils/classNames';
+import { migrateLegacyLessonStatuses } from '@/logic/weeklyLessonState';
 import { generateId } from '@/utils/generateId';
 
 // ============ JSON Export/Import ============
 
-export const CURRENT_SCHEMA_VERSION = '3.9';
+export const CURRENT_SCHEMA_VERSION = '3.10';
 
 export interface ExportData {
   version: string;
@@ -128,6 +129,24 @@ const migrations: Record<string, (data: ExportData) => ExportData> = {
       sickLeaves: v.sickLeaves ?? [],
     })),
   }),
+  '3.9': (data) => ({
+    ...data,
+    version: '3.10',
+    scheduleVersions: (data.scheduleVersions ?? []).map(version => {
+      let sequence = 0;
+      return {
+        ...version,
+        removedLessons: migrateLegacyLessonStatuses(
+          data.lessonRequirements ?? [],
+          version.temporaryLessons ?? [],
+          version.removedLessons ?? [],
+          version.lessonStatuses,
+          () => `migrated-completed-${version.id}-${++sequence}`,
+        ),
+        lessonStatuses: undefined,
+      };
+    }),
+  }),
 };
 
 /**
@@ -205,7 +224,14 @@ export async function exportToJson(): Promise<string> {
   for (const v of versions) {
     const full = await getVersion(v.id);
     if (full) {
-      fullVersions.push(full);
+      const removedLessons = migrateLegacyLessonStatuses(
+        data.lessonRequirements,
+        full.temporaryLessons ?? [],
+        full.removedLessons ?? [],
+        full.lessonStatuses,
+        generateId,
+      );
+      fullVersions.push({ ...full, removedLessons, lessonStatuses: undefined });
     }
   }
 

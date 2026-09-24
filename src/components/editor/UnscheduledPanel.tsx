@@ -3,7 +3,7 @@
  */
 
 import { useMemo, useCallback, useState } from 'react';
-import type { LessonRequirement, UnscheduledLesson } from '@/types';
+import type { LessonRequirement, RestorableLessonReason, UnscheduledLesson } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore } from '@/stores';
 import {
   computeMergedTemps,
@@ -22,12 +22,27 @@ interface UnscheduledPanelProps {
   className: string;
 }
 
+type WeeklyRowKind = 'mustReturn' | 'withdrawn' | 'sick' | 'completed';
+
 interface ContextMenuState {
   isOpen: boolean;
   x: number;
   y: number;
-  targetId: string | null;
+  requirement: LessonRequirement | null;
+  removalIds: string[];
+  remaining: number;
+  kind: Exclude<WeeklyRowKind, 'sick'> | null;
 }
+
+const CLOSED_CONTEXT_MENU: ContextMenuState = {
+  isOpen: false,
+  x: 0,
+  y: 0,
+  requirement: null,
+  removalIds: [],
+  remaining: 0,
+  kind: null,
+};
 
 export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const schedule = useScheduleStore((state) => state.schedule);
@@ -36,84 +51,39 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const removedLessons = useScheduleStore((state) => state.removedLessons);
   const removeTemporaryLesson = useScheduleStore((state) => state.removeTemporaryLesson);
   const versionType = useScheduleStore((state) => state.versionType);
-  const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
-  const setLessonStatus = useScheduleStore((state) => state.setLessonStatus);
-  const clearLessonStatus = useScheduleStore((state) => state.clearLessonStatus);
+  const markLessonsCompleted = useScheduleStore((state) => state.markLessonsCompleted);
+  const clearCompletedLessons = useScheduleStore((state) => state.clearCompletedLessons);
   const interaction = useUIStore((state) => state.interaction);
   const selectedLesson = getAssigningLesson(interaction);
   const selectedRemovedLessonIds = getAssigningRemovedLessonIds(interaction);
   const selectLesson = useUIStore((state) => state.selectLesson);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [ctxMenu, setCtxMenu] = useState<ContextMenuState>({ isOpen: false, x: 0, y: 0, targetId: null });
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(CLOSED_CONTEXT_MENU);
 
-  // Merge global requirements with temporary lessons for correct counting
   const mergedRequirements = useMemo(
     () => mergeWithTemporaryLessons(lessonRequirements, temporaryLessons),
     [lessonRequirements, temporaryLessons]
   );
 
-  // Track which requirement IDs came from temporary lessons
   const temporaryIds = useMemo(
-    () => new Set(temporaryLessons.map(l => l.id)),
+    () => new Set(temporaryLessons.map(lesson => lesson.id)),
     [temporaryLessons]
   );
 
-  // Get unscheduled lessons for this class, then annotate which entries have
-  // temporary lessons merged into them so the "×" button appears on the correct row.
   const { unscheduled, mergedTempsByEntryId } = useMemo(() => {
     const list = getUnscheduledLessons(mergedRequirements, schedule, className);
     return computeMergedTemps(list, temporaryLessons, className);
   }, [mergedRequirements, schedule, className, temporaryLessons]);
 
-  // Remaining count after subtracting "Проведено" coverage — a status only
-  // fully covers a requirement when this reaches 0 (it may need 3+ lessons
-  // per week while a single "Проведено" mark covers just 1 or 2).
-  const effectiveRemainingById = useMemo(() => {
-    const statusAware = getUnscheduledLessons(mergedRequirements, schedule, className, lessonStatuses);
-    return new Map(statusAware.map(item => [item.requirement.id, item.remaining]));
-  }, [mergedRequirements, schedule, className, lessonStatuses]);
-
-  const statusAwareUnscheduled = useMemo(
-    () => getUnscheduledLessons(mergedRequirements, schedule, className, lessonStatuses),
-    [mergedRequirements, schedule, className, lessonStatuses]
-  );
-
-  const hasCompletedStatus = useCallback(
-    (id: string) => lessonStatuses[id] === 'completed' || lessonStatuses[id] === 'completed2',
-    [lessonStatuses]
-  );
-
-  const isFullyCovered = useCallback(
-    (id: string) => hasCompletedStatus(id) && (effectiveRemainingById.get(id) ?? 0) === 0,
-    [hasCompletedStatus, effectiveRemainingById]
-  );
-
-  // Filter out fully-covered lessons from the main, assignable list
-  const visibleLessons = useMemo(
-    () => unscheduled.filter(item => !isFullyCovered(item.requirement.id)),
-    [unscheduled, isFullyCovered]
-  );
-
-  // Fully-covered lessons shown at bottom with a ✓N badge
-  const completedLessons = useMemo(
-    () => unscheduled.filter(item => item.remaining > 0 && isFullyCovered(item.requirement.id)),
-    [unscheduled, isFullyCovered]
-  );
-
   const weeklyGroups = useMemo(
-    () => buildWeeklyLessonGroups(statusAwareUnscheduled, removedLessons, className),
-    [statusAwareUnscheduled, removedLessons, className]
+    () => buildWeeklyLessonGroups(unscheduled, removedLessons, className),
+    [unscheduled, removedLessons, className]
   );
 
-  // Handle lesson click
   const handleLessonClick = useCallback(
     (requirement: LessonRequirement, removedLessonIds: string[] = []) => {
-      // Toggle selection
-      if (
-        selectedLesson?.id === requirement.id &&
-        selectedRemovedLessonIds[0] === removedLessonIds[0]
-      ) {
+      if (selectedLesson?.id === requirement.id && selectedRemovedLessonIds[0] === removedLessonIds[0]) {
         selectLesson(null);
       } else {
         selectLesson(requirement, removedLessonIds);
@@ -122,86 +92,85 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     [selectedLesson, selectedRemovedLessonIds, selectLesson]
   );
 
-  // Handle removing a temporary lesson
   const handleRemoveTemporary = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
-      if (selectedLesson?.id === id) {
-        selectLesson(null);
-      }
+    (event: React.MouseEvent, id: string) => {
+      event.stopPropagation();
+      if (selectedLesson?.id === id) selectLesson(null);
       removeTemporaryLesson(id);
     },
     [removeTemporaryLesson, selectedLesson, selectLesson]
   );
 
-  // Context menu handlers
   const handleContextMenu = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      if (versionType !== 'weekly') return;
-      e.preventDefault();
-      e.stopPropagation();
-      setCtxMenu({ isOpen: true, x: e.clientX, y: e.clientY, targetId: id });
+    (
+      event: React.MouseEvent,
+      requirement: LessonRequirement,
+      removalIds: string[],
+      remaining: number,
+      kind: Exclude<WeeklyRowKind, 'sick'>,
+    ) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setCtxMenu({ isOpen: true, x: event.clientX, y: event.clientY, requirement, removalIds, remaining, kind });
     },
-    [versionType]
+    []
   );
 
-  const closeContextMenu = useCallback(() => {
-    setCtxMenu({ isOpen: false, x: 0, y: 0, targetId: null });
-  }, []);
+  const closeContextMenu = useCallback(() => setCtxMenu(CLOSED_CONTEXT_MENU), []);
 
   const handleMarkCompleted = useCallback((count: 1 | 2) => {
-    if (ctxMenu.targetId) {
-      setLessonStatus(ctxMenu.targetId, count === 2 ? 'completed2' : 'completed');
+    if (ctxMenu.requirement && ctxMenu.kind && ctxMenu.kind !== 'completed') {
+      const implicitReason: RestorableLessonReason = ctxMenu.kind === 'mustReturn' ? 'temporary' : 'withdrawn';
+      markLessonsCompleted({
+        requirement: ctxMenu.requirement,
+        className,
+        removalIds: ctxMenu.removalIds,
+        count: Math.min(count, ctxMenu.remaining),
+        implicitReason,
+      });
     }
     closeContextMenu();
-  }, [ctxMenu.targetId, setLessonStatus, closeContextMenu]);
+  }, [ctxMenu, className, markLessonsCompleted, closeContextMenu]);
 
-  const handleClearStatus = useCallback(() => {
-    if (ctxMenu.targetId) {
-      clearLessonStatus(ctxMenu.targetId);
+  const handleClearCompleted = useCallback(() => {
+    if (ctxMenu.requirement && ctxMenu.removalIds.length > 0) {
+      clearCompletedLessons({ requirement: ctxMenu.requirement, className, removalIds: ctxMenu.removalIds });
     }
     closeContextMenu();
-  }, [ctxMenu.targetId, clearLessonStatus, closeContextMenu]);
+  }, [ctxMenu, className, clearCompletedLessons, closeContextMenu]);
 
-  // Group by subject for better organization
   const groupedLessons = useMemo(() => {
     const groups = new Map<string, UnscheduledLesson[]>();
-
-    for (const item of visibleLessons) {
-      const key = item.requirement.subject;
-      const existing = groups.get(key) ?? [];
+    for (const item of unscheduled) {
+      const existing = groups.get(item.requirement.subject) ?? [];
       existing.push(item);
-      groups.set(key, existing);
+      groups.set(item.requirement.subject, existing);
     }
-
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ru'));
-  }, [visibleLessons]);
+  }, [unscheduled]);
 
   const showAddButton = versionType !== 'template';
   const isWeekly = versionType === 'weekly';
-  const targetStatus = ctxMenu.targetId ? lessonStatuses[ctxMenu.targetId] : undefined;
-  const weeklyCount = weeklyGroups.temporary.length + weeklyGroups.withdrawn.length + weeklyGroups.sick.length;
+  const weeklyCount = weeklyGroups.temporary.length + weeklyGroups.withdrawn.length +
+    weeklyGroups.sick.length + weeklyGroups.completed.length;
 
-  const renderWeeklyGroup = (
-    title: string,
-    items: typeof weeklyGroups.temporary,
-    kind: 'mustReturn' | 'withdrawn' | 'sick',
-  ) => {
+  const renderWeeklyGroup = (title: string, items: typeof weeklyGroups.temporary, kind: WeeklyRowKind) => {
     if (items.length === 0) return null;
     const isSick = kind === 'sick';
+    const isCompleted = kind === 'completed';
 
     return (
       <section className={styles.removalGroup} aria-label={title}>
         <h4 className={styles.removalGroupTitle}>{title}</h4>
         {items.map((item) => {
-          const isSelected = !isSick && selectedLesson?.id === item.requirement.id &&
+          const isSelected = !isSick && !isCompleted && selectedLesson?.id === item.requirement.id &&
             selectedRemovedLessonIds[0] === item.removalIds[0];
-          const isSubstitution = item.requirement.type === 'group';
+          const isGroup = item.requirement.type === 'group';
           const isTemporary = temporaryIds.has(item.requirement.id);
           const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
           const classNames = [
             styles.lesson,
-            styles[kind],
+            isCompleted ? styles.conducted : styles[kind],
             isSelected ? styles.selected : '',
             isTemporary || mergedTemp ? styles.temporary : '',
           ].filter(Boolean).join(' ');
@@ -209,39 +178,49 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
             <>
               <span className={styles.subject}>
                 {item.requirement.subject}
-                {isSubstitution && (
-                  <span className={styles.groupIndex}>
-                    ({extractGroupIndex(item.requirement.classOrGroup)})
-                  </span>
-                )}
+                {isGroup && <span className={styles.groupIndex}>({extractGroupIndex(item.requirement.classOrGroup)})</span>}
               </span>
               <span className={styles.teacher}>{item.requirement.teacher}</span>
-              <span className={styles.lessonCount}>{item.remaining}</span>
-              {!isSick && (isTemporary || mergedTemp) && (
+              {isCompleted
+                ? <span className={styles.conductedBadge}>✓{item.remaining}</span>
+                : <span className={styles.lessonCount}>{item.remaining}</span>}
+              {!isSick && !isCompleted && (isTemporary || mergedTemp) && (
                 <button
                   className={styles.removeButton}
-                  onClick={(e) => handleRemoveTemporary(e, mergedTemp?.id ?? item.requirement.id)}
+                  onClick={(event) => handleRemoveTemporary(event, mergedTemp?.id ?? item.requirement.id)}
                   title="Удалить временное занятие"
-                >
-                  ×
-                </button>
+                >×</button>
               )}
             </>
           );
 
-          return isSick ? (
-            <div key={`${kind}-${item.requirement.id}`} className={classNames} aria-disabled="true">
-              {content}
-            </div>
-          ) : (
-            <button
+          if (isSick) {
+            return <div key={`${kind}-${item.requirement.id}`} className={classNames} aria-disabled="true">{content}</div>;
+          }
+          if (isCompleted) {
+            return (
+              <div
+                key={`${kind}-${item.requirement.id}`}
+                className={classNames}
+                onContextMenu={(event) => handleContextMenu(event, item.requirement, item.removalIds, item.remaining, kind)}
+              >{content}</div>
+            );
+          }
+          return (
+            <div
               key={`${kind}-${item.requirement.id}`}
               className={classNames}
+              role="button"
+              tabIndex={0}
               onClick={() => handleLessonClick(item.requirement, item.removalIds)}
-              onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
-            >
-              {content}
-            </button>
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleLessonClick(item.requirement, item.removalIds);
+                }
+              }}
+              onContextMenu={(event) => handleContextMenu(event, item.requirement, item.removalIds, item.remaining, kind)}
+            >{content}</div>
           );
         })}
       </section>
@@ -253,18 +232,12 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
       <div className={styles.header}>
         <h3 className={styles.title}>Занятия</h3>
         {showAddButton && (
-          <button
-            className={styles.addButton}
-            onClick={() => setIsAddModalOpen(true)}
-            title="Добавить временное занятие"
-          >
-            +
-          </button>
+          <button className={styles.addButton} onClick={() => setIsAddModalOpen(true)} title="Добавить временное занятие">+</button>
         )}
       </div>
 
       <div className={styles.list}>
-        {(isWeekly ? weeklyCount === 0 : visibleLessons.length === 0) && completedLessons.length === 0 ? (
+        {(isWeekly ? weeklyCount === 0 : unscheduled.length === 0) ? (
           <div className={styles.empty}>
             Все занятия расставлены
             {showAddButton && (
@@ -280,88 +253,53 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
                 {renderWeeklyGroup('Временно удалённые — нужно вернуть', weeklyGroups.temporary, 'mustReturn')}
                 {renderWeeklyGroup('Снятые', weeklyGroups.withdrawn, 'withdrawn')}
                 {renderWeeklyGroup('Снятые по болезни', weeklyGroups.sick, 'sick')}
+                {renderWeeklyGroup('Проведено', weeklyGroups.completed, 'completed')}
               </>
             ) : groupedLessons.map(([subject, items]) => (
               <div key={subject} className={styles.group}>
                 {items.map((item) => {
                   const isSelected = selectedLesson?.id === item.requirement.id;
-                  const isSubstitution = item.requirement.type === 'group';
+                  const isGroup = item.requirement.type === 'group';
                   const isTemporary = temporaryIds.has(item.requirement.id);
                   const mergedTemp = mergedTempsByEntryId.get(item.requirement.id);
-                  const isPartiallyCovered = hasCompletedStatus(item.requirement.id);
-                  const conductedCount = lessonStatuses[item.requirement.id] === 'completed2' ? 2 : 1;
-                  const remaining = effectiveRemainingById.get(item.requirement.id) ?? item.remaining;
-
                   return (
                     <button
                       key={item.requirement.id}
                       className={`${styles.lesson} ${isSelected ? styles.selected : ''} ${isTemporary || mergedTemp ? styles.temporary : ''}`}
                       onClick={() => handleLessonClick(item.requirement)}
-                      onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
                     >
                       <span className={styles.subject}>
                         {item.requirement.subject}
-                        {isSubstitution && (
-                          <span className={styles.groupIndex}>
-                            ({extractGroupIndex(item.requirement.classOrGroup)})
-                          </span>
-                        )}
+                        {isGroup && <span className={styles.groupIndex}>({extractGroupIndex(item.requirement.classOrGroup)})</span>}
                       </span>
                       <span className={styles.teacher}>{item.requirement.teacher}</span>
-                      {isPartiallyCovered && <span className={styles.conductedBadge}>✓{conductedCount}</span>}
-                      <span className={styles.lessonCount}>{remaining}</span>
+                      <span className={styles.lessonCount}>{item.remaining}</span>
                       {(isTemporary || mergedTemp) && (
                         <button
                           className={styles.removeButton}
-                          onClick={(e) => handleRemoveTemporary(e, mergedTemp?.id ?? item.requirement.id)}
+                          onClick={(event) => handleRemoveTemporary(event, mergedTemp?.id ?? item.requirement.id)}
                           title="Удалить временное занятие"
-                        >
-                          ×
-                        </button>
+                        >×</button>
                       )}
                     </button>
                   );
                 })}
               </div>
             ))}
-            {completedLessons.length > 0 && (
-              <h4 className={styles.removalGroupTitle}>Проведено</h4>
-            )}
-            {completedLessons.map((item) => {
-              const conductedCount = lessonStatuses[item.requirement.id] === 'completed2' ? 2 : 1;
-              const isSubstitution = item.requirement.type === 'group';
-              return (
-                <button
-                  key={item.requirement.id}
-                  className={`${styles.lesson} ${styles.conducted}`}
-                  onContextMenu={(e) => handleContextMenu(e, item.requirement.id)}
-                  onClick={() => {}}
-                >
-                  <span className={styles.subject}>
-                    {item.requirement.subject}
-                    {isSubstitution && (
-                      <span className={styles.groupIndex}>
-                        ({extractGroupIndex(item.requirement.classOrGroup)})
-                      </span>
-                    )}
-                  </span>
-                  <span className={styles.teacher}>{item.requirement.teacher}</span>
-                  <span className={styles.conductedBadge}>✓{conductedCount}</span>
-                </button>
-              );
-            })}
           </>
         )}
       </div>
 
       {isWeekly && (
         <ContextMenu isOpen={ctxMenu.isOpen} x={ctxMenu.x} y={ctxMenu.y} onClose={closeContextMenu}>
-          {targetStatus === 'completed' || targetStatus === 'completed2' ? (
-            <ContextMenuItem onClick={handleClearStatus}>Снять отметку</ContextMenuItem>
+          {ctxMenu.kind === 'completed' ? (
+            <ContextMenuItem onClick={handleClearCompleted}>Снять отметку</ContextMenuItem>
           ) : (
             <>
               <ContextMenuItem onClick={() => handleMarkCompleted(1)}>Проведено (1 занятие)</ContextMenuItem>
-              <ContextMenuItem onClick={() => handleMarkCompleted(2)}>Проведено (2 занятия)</ContextMenuItem>
+              {ctxMenu.remaining > 1 && (
+                <ContextMenuItem onClick={() => handleMarkCompleted(2)}>Проведено (2 занятия)</ContextMenuItem>
+              )}
             </>
           )}
           <ContextMenuItem onClick={closeContextMenu}>Отмена</ContextMenuItem>

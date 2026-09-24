@@ -133,6 +133,16 @@ export {
 } from './weeklyLessonGroups';
 export type { WeeklyLessonGroupItem, WeeklyLessonGroups } from './weeklyLessonGroups';
 
+export {
+  completeLessonOccurrences,
+  restoreCompletedOccurrences,
+  reclassifySickDayOccurrences,
+  getCompletedCounts,
+  migrateLegacyLessonStatuses,
+  getOffGridLessonKey,
+  getRequirementClassName,
+} from './weeklyLessonState';
+
 // Availability
 export {
   getOccupiedRooms,

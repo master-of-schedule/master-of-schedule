@@ -17,6 +17,7 @@ export interface WeeklyLessonGroups {
   temporary: WeeklyLessonGroupItem[];
   withdrawn: WeeklyLessonGroupItem[];
   sick: WeeklyLessonGroupItem[];
+  completed: WeeklyLessonGroupItem[];
 }
 
 function requirementKey(requirement: LessonRequirement): string {
@@ -69,7 +70,7 @@ export function buildWeeklyLessonGroups(
   removedLessons: RemovedLesson[],
   className: string,
 ): WeeklyLessonGroups {
-  const groups: WeeklyLessonGroups = { temporary: [], withdrawn: [], sick: [] };
+  const groups: WeeklyLessonGroups = { temporary: [], withdrawn: [], sick: [], completed: [] };
   const explicitCounts = new Map<string, number>();
 
   for (const removed of removedLessons) {
@@ -90,6 +91,7 @@ export function buildWeeklyLessonGroups(
   groups.temporary.sort(compareItems);
   groups.withdrawn.sort(compareItems);
   groups.sick.sort(compareItems);
+  groups.completed.sort(compareItems);
   return groups;
 }
 
@@ -103,5 +105,5 @@ export function getClassesWithTemporaryRemovals(removedLessons: RemovedLesson[])
 }
 
 export function isAssignableRemovalReason(reason: RemovedLessonReason): boolean {
-  return reason !== 'sick';
+  return reason !== 'sick' && reason !== 'completed';
 }

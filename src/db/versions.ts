@@ -7,6 +7,7 @@ import { db, updateSettings } from './database';
 import type { Version, VersionType, VersionListItem, Schedule, Substitution, LessonRequirement, LessonStatus, RemovedLesson, SickLeave } from '@/types';
 import { generateId } from '@/utils/generateId';
 import { forEachSlot } from '@/logic/traversal';
+import { migrateLegacyLessonStatuses } from '@/logic/weeklyLessonState';
 
 /**
  * Create a new version
@@ -251,6 +252,14 @@ export async function duplicateVersion(
   const templateId = newType === 'weekly' && source.type === 'template'
     ? sourceId
     : baseTemplateId;
+  const requirements = await db.lessonRequirements.toArray();
+  const removedLessons = migrateLegacyLessonStatuses(
+    requirements,
+    source.temporaryLessons ?? [],
+    source.removedLessons ?? [],
+    source.lessonStatuses,
+    generateId,
+  );
 
   // Acknowledged conflicts are not inherited: the new version starts fresh,
   // requiring the user to acknowledge any ban violations on first open.
@@ -260,7 +269,7 @@ export async function duplicateVersion(
     schedule: JSON.parse(JSON.stringify(source.schedule)), // Deep clone
     substitutions: source.substitutions.map(s => ({ ...s })),
     temporaryLessons: source.temporaryLessons?.map(l => ({ ...l })),
-    removedLessons: source.removedLessons?.map(item => ({
+    removedLessons: removedLessons.map(item => ({
       ...item,
       requirement: { ...item.requirement },
       lesson: { ...item.lesson },
