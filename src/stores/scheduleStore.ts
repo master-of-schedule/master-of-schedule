@@ -18,6 +18,7 @@ import type {
   HistoryActionType,
   RemovedLesson,
   RemovedLessonReason,
+  RestorableLessonReason,
   SickLeave,
 } from '@/types';
 import { describeAction } from '@/types';
@@ -27,6 +28,13 @@ import {
   removeLessonFromSlot,
   updateLessonRoom,
   cloneSchedule,
+  completeLessonOccurrences,
+  restoreCompletedOccurrences,
+  reclassifySickDayOccurrences,
+  migrateLegacyLessonStatuses,
+  buildWeeklyLessonGroups,
+  getUnscheduledLessons,
+  getOffGridLessonKey,
 } from '@/logic';
 
 interface ScheduleState {
@@ -57,7 +65,7 @@ interface ScheduleState {
   // Temporary extra lessons (per-version, not in master requirements)
   temporaryLessons: LessonRequirement[];
 
-  // Per-lesson statuses (completed) — weekly schedules only
+  // Legacy pre-3.10 statuses. Values are migrated to removedLessons on load.
   lessonStatuses: Record<string, LessonStatus>;
 
   // Weekly removal tracking (persisted per version)
@@ -127,9 +135,19 @@ interface ScheduleState {
   addTemporaryLesson: (lesson: LessonRequirement) => void;
   removeTemporaryLesson: (id: string) => void;
 
-  // Actions - Lesson statuses
-  setLessonStatus: (id: string, status: LessonStatus) => void;
-  clearLessonStatus: (id: string) => void;
+  // Actions - occurrence-level conducted state
+  markLessonsCompleted: (params: {
+    requirement: LessonRequirement;
+    className: string;
+    removalIds: string[];
+    count: number;
+    implicitReason: RestorableLessonReason;
+  }) => void;
+  clearCompletedLessons: (params: {
+    requirement: LessonRequirement;
+    className: string;
+    removalIds: string[];
+  }) => void;
 
   // Actions - Weekly illness markers
   setSickLeave: (teacher: string, day: Day, isSick: boolean) => void;
@@ -303,8 +321,9 @@ export const useScheduleStore = create<ScheduleState>()(
 
       const newSchedule = addLessonToSlot(state.schedule, className, day, lessonNum, lesson);
       const consumedRemovalId = removedLessonIds?.find(id =>
-        state.removedLessons.some(item => item.id === id)
+        state.removedLessons.some(item => item.id === id && item.reason !== 'completed' && item.reason !== 'sick')
       );
+      if (removedLessonIds && removedLessonIds.length > 0 && !consumedRemovalId) return;
       const newRemovedLessons = consumedRemovalId
         ? state.removedLessons.filter(item => item.id !== consumedRemovalId)
         : state.removedLessons;
@@ -596,23 +615,65 @@ export const useScheduleStore = create<ScheduleState>()(
       });
     },
 
-    // Set lesson status (completed)
-    setLessonStatus: (id, status) => {
+    markLessonsCompleted: ({ requirement, className, removalIds, count, implicitReason }) => {
       if (useDataStore.getState().isReadOnlyYear) return;
-      set((state) => {
-        state.lessonStatuses[id] = status;
-        state.isDirty = true;
-        state.jsonIsDirty = true;
+      const state = get();
+      if (state.versionType !== 'weekly' || count <= 0) return;
+
+      const unscheduled = getUnscheduledLessons([requirement], state.schedule, className);
+      const groups = buildWeeklyLessonGroups(unscheduled, state.removedLessons, className);
+      const source = implicitReason === 'temporary' ? groups.temporary : groups.withdrawn;
+      const targetKey = getOffGridLessonKey(requirement, className);
+      const available = source.find(item =>
+        getOffGridLessonKey(item.requirement, className) === targetKey
+      )?.remaining ?? 0;
+      const transitionCount = Math.min(count, available);
+      if (transitionCount <= 0) return;
+
+      const newRemovedLessons = completeLessonOccurrences(
+        state.removedLessons,
+        { requirement, className, removalIds, count: transitionCount, implicitReason },
+        generateId,
+      );
+      const newHistory = truncateHistory(state.history, state.historyIndex);
+      newHistory.push(createHistoryEntry(
+        'complete',
+        describeAction('complete', { subject: requirement.subject, className, count: transitionCount }),
+        state.schedule,
+        state.substitutions,
+        newRemovedLessons,
+        state.sickLeaves,
+      ));
+      set({
+        removedLessons: newRemovedLessons,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
-    // Clear lesson status (back to normal)
-    clearLessonStatus: (id) => {
-      if (useDataStore.getState().isReadOnlyYear) return;
-      set((state) => {
-        delete state.lessonStatuses[id];
-        state.isDirty = true;
-        state.jsonIsDirty = true;
+    clearCompletedLessons: ({ requirement, className, removalIds }) => {
+      if (useDataStore.getState().isReadOnlyYear || removalIds.length === 0) return;
+      const state = get();
+      if (state.versionType !== 'weekly') return;
+
+      const newRemovedLessons = restoreCompletedOccurrences(state.removedLessons, removalIds);
+      const newHistory = truncateHistory(state.history, state.historyIndex);
+      newHistory.push(createHistoryEntry(
+        'clear_complete',
+        describeAction('clear_complete', { subject: requirement.subject, className }),
+        state.schedule,
+        state.substitutions,
+        newRemovedLessons,
+        state.sickLeaves,
+      ));
+      set({
+        removedLessons: newRemovedLessons,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        isDirty: true,
+        jsonIsDirty: true,
       });
     },
 
@@ -627,13 +688,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const newSickLeaves = isSick
         ? [...state.sickLeaves, { teacher, day }]
         : state.sickLeaves.filter(item => !(item.teacher === teacher && item.day === day));
-      const newRemovedLessons = isSick
-        ? state.removedLessons
-        : state.removedLessons.map(item =>
-          item.reason === 'sick' && item.day === day && isLessonTeacher(item.lesson, teacher)
-            ? { ...item, reason: 'withdrawn' as const }
-            : item
-        );
+      const newRemovedLessons = reclassifySickDayOccurrences(state.removedLessons, teacher, day, isSick);
       const newHistory = truncateHistory(state.history, state.historyIndex);
       const description = describeAction('sick_leave', { teacher, day });
       newHistory.push(createHistoryEntry(
@@ -790,12 +845,19 @@ export const useScheduleStore = create<ScheduleState>()(
 
     // Load existing schedule
     loadSchedule: ({ schedule, versionId, versionType, versionName, mondayDate, versionDaysPerWeek, substitutions, temporaryLessons, lessonStatuses, removedLessons, sickLeaves, acknowledgedConflictKeys, baseTemplateId, baseTemplateSchedule }) => {
+      const migratedRemovedLessons = migrateLegacyLessonStatuses(
+        useDataStore.getState().lessonRequirements,
+        temporaryLessons ?? [],
+        removedLessons ?? [],
+        lessonStatuses,
+        generateId,
+      );
       const initialEntry = createHistoryEntry(
         'import',
         'Загружено',
         schedule,
         substitutions ?? [],
-        removedLessons ?? [],
+        migratedRemovedLessons,
         sickLeaves ?? [],
       );
 
@@ -812,8 +874,8 @@ export const useScheduleStore = create<ScheduleState>()(
         historyIndex: 0,
         substitutions: substitutions ?? [],
         temporaryLessons: temporaryLessons ?? [],
-        lessonStatuses: lessonStatuses ?? {},
-        removedLessons: removedLessons ?? [],
+        lessonStatuses: {},
+        removedLessons: migratedRemovedLessons,
         sickLeaves: sickLeaves ?? [],
         acknowledgedConflictKeys: acknowledgedConflictKeys ?? [],
         baseTemplateId: baseTemplateId ?? null,

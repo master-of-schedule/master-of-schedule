@@ -37,7 +37,7 @@ export interface Version {
   substitutions: Substitution[];
   /** Temporary extra lessons for this version only (not in master requirements) */
   temporaryLessons?: LessonRequirement[];
-  /** Per-lesson statuses: 'completed'/'completed2' — held elsewhere, hidden from the unscheduled panel */
+  /** @deprecated Pre-3.10 requirement-wide statuses; migrated into removedLessons on load/import. */
   lessonStatuses?: Record<string, LessonStatus>;
   /** Removed weekly lesson occurrences, grouped by the reason they left the grid. */
   removedLessons?: RemovedLesson[];
