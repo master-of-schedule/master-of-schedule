@@ -69,9 +69,17 @@ export function buildWeeklyLessonGroups(
   unscheduled: UnscheduledLesson[],
   removedLessons: RemovedLesson[],
   className: string,
+  temporaryLessons: LessonRequirement[] = [],
 ): WeeklyLessonGroups {
   const groups: WeeklyLessonGroups = { temporary: [], withdrawn: [], sick: [], completed: [] };
   const explicitCounts = new Map<string, number>();
+  const temporaryCounts = new Map<string, number>();
+
+  for (const temporary of temporaryLessons) {
+    if (!belongsToClass(temporary, className)) continue;
+    const key = requirementKey(temporary);
+    temporaryCounts.set(key, (temporaryCounts.get(key) ?? 0) + temporary.countPerWeek);
+  }
 
   for (const removed of removedLessons) {
     if (removed.className !== className || !belongsToClass(removed.requirement, className)) continue;
@@ -83,9 +91,10 @@ export function buildWeeklyLessonGroups(
   for (const item of unscheduled) {
     const key = requirementKey(item.requirement);
     const unclassified = Math.max(0, item.remaining - (explicitCounts.get(key) ?? 0));
-    if (unclassified > 0) {
-      pushOccurrence(groups.withdrawn, item.requirement, undefined, unclassified);
-    }
+    const temporaryCount = Math.min(unclassified, temporaryCounts.get(key) ?? 0);
+    const withdrawnCount = unclassified - temporaryCount;
+    if (temporaryCount > 0) pushOccurrence(groups.temporary, item.requirement, undefined, temporaryCount);
+    if (withdrawnCount > 0) pushOccurrence(groups.withdrawn, item.requirement, undefined, withdrawnCount);
   }
 
   groups.temporary.sort(compareItems);

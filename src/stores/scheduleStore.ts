@@ -276,7 +276,7 @@ function makeRemovedLesson(
 }
 
 function getAutomaticRemovalReason(
-  state: Pick<ScheduleState, 'versionType' | 'sickLeaves'>,
+  state: Pick<ScheduleState, 'versionType' | 'sickLeaves' | 'temporaryLessons'>,
   lesson: ScheduledLesson,
   day: Day,
 ): RemovedLessonReason {
@@ -285,6 +285,9 @@ function getAutomaticRemovalReason(
     state.sickLeaves.some(mark => mark.day === day && isLessonTeacher(lesson, mark.teacher))
   ) {
     return 'sick';
+  }
+  if (state.temporaryLessons.some(item => item.id === lesson.requirementId)) {
+    return 'temporary';
   }
   return 'withdrawn';
 }
@@ -621,7 +624,12 @@ export const useScheduleStore = create<ScheduleState>()(
       if (state.versionType !== 'weekly' || count <= 0) return;
 
       const unscheduled = getUnscheduledLessons([requirement], state.schedule, className);
-      const groups = buildWeeklyLessonGroups(unscheduled, state.removedLessons, className);
+      const groups = buildWeeklyLessonGroups(
+        unscheduled,
+        state.removedLessons,
+        className,
+        state.temporaryLessons,
+      );
       const source = implicitReason === 'temporary' ? groups.temporary : groups.withdrawn;
       const targetKey = getOffGridLessonKey(requirement, className);
       const available = source.find(item =>
