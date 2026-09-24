@@ -769,6 +769,42 @@ describe('weekly removal categories', () => {
     expect(useScheduleStore.getState().removedLessons[0].reason).toBe('temporary');
   });
 
+  it('keeps a plus-added lesson in the must-return state after ordinary removal', () => {
+    const temporary = loadWeeklyLesson({ requirementId: 'temp-1' });
+    useScheduleStore.setState({
+      temporaryLessons: [{ ...temporary, id: 'temp-1', countPerWeek: 1 }],
+    });
+
+    useScheduleStore.getState().removeLesson({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+
+    expect(useScheduleStore.getState().removedLessons[0]).toMatchObject({
+      reason: 'temporary',
+      requirement: { id: 'temp-1' },
+    });
+  });
+
+  it('can mark an unplaced plus-added occurrence as conducted', () => {
+    const temporary: LessonRequirement = {
+      id: 'temp-1', type: 'class', classOrGroup: '5а', subject: 'Физика',
+      teacher: 'Иванова Т.С.', countPerWeek: 1,
+    };
+    mockRequirements.value = [];
+    useScheduleStore.getState().loadSchedule({
+      schedule: {}, versionId: 'week-1', versionType: 'weekly', versionName: 'Неделя',
+      temporaryLessons: [temporary], removedLessons: [],
+    });
+
+    useScheduleStore.getState().markLessonsCompleted({
+      requirement: temporary, className: '5а', removalIds: [], count: 1, implicitReason: 'temporary',
+    });
+
+    expect(useScheduleStore.getState().removedLessons[0]).toMatchObject({
+      reason: 'completed', previousReason: 'temporary', requirement: { id: 'temp-1' },
+    });
+  });
+
   it('moves a withdrawn occurrence to conducted instead of keeping both states', () => {
     const requirement = loadWeeklyLesson();
     const removalId = useScheduleStore.getState().removeLesson({

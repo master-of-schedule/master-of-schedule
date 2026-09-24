@@ -66,6 +66,33 @@ describe('buildWeeklyLessonGroups', () => {
     expect(result.withdrawn[0]).toMatchObject({ remaining: 2, removalIds: [] });
   });
 
+  it('puts a lesson added through plus into the must-return group', () => {
+    const temporary = { ...requirement('temp', 'Физика'), countPerWeek: 1 };
+    const result = buildWeeklyLessonGroups(
+      [{ requirement: temporary, remaining: 1 }],
+      [],
+      '5а',
+      [temporary],
+    );
+
+    expect(result.temporary[0]).toMatchObject({ remaining: 1, removalIds: [] });
+    expect(result.withdrawn).toEqual([]);
+  });
+
+  it('separates a merged plus lesson from the ordinary remainder', () => {
+    const original = requirement('base', 'Математика');
+    const temporary = { ...original, id: 'temp', countPerWeek: 1 };
+    const result = buildWeeklyLessonGroups(
+      [{ requirement: original, remaining: 2 }],
+      [],
+      '5а',
+      [temporary],
+    );
+
+    expect(result.temporary[0]).toMatchObject({ requirement: { id: 'base' }, remaining: 1 });
+    expect(result.withdrawn[0]).toMatchObject({ requirement: { id: 'base' }, remaining: 1 });
+  });
+
   it('aggregates occurrences of the same lesson and sorts each group alphabetically', () => {
     const math = requirement('math', 'Математика');
     const algebra = requirement('alg', 'Алгебра');
