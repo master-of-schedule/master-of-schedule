@@ -77,8 +77,8 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   }, [mergedRequirements, schedule, className, temporaryLessons]);
 
   const weeklyGroups = useMemo(
-    () => buildWeeklyLessonGroups(unscheduled, removedLessons, className),
-    [unscheduled, removedLessons, className]
+    () => buildWeeklyLessonGroups(unscheduled, removedLessons, className, temporaryLessons),
+    [unscheduled, removedLessons, className, temporaryLessons]
   );
 
   const handleLessonClick = useCallback(
