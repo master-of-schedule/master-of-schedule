@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useScheduleStore } from './scheduleStore';
-import type { ScheduledLesson, Day, LessonNumber, LessonRequirement } from '@/types';
+import type { ScheduledLesson, Day, LessonNumber, LessonRequirement, RemovedLesson } from '@/types';
 
 const mockIsReadOnly = { value: false };
 const mockRequirements: { value: LessonRequirement[] } = { value: [] };
@@ -19,7 +19,10 @@ vi.mock('./dataStore', () => ({
   },
 }));
 
-vi.mock('@/logic', () => ({
+vi.mock('@/logic', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/logic')>();
+  return {
+  ...actual,
   addLessonToSlot: vi.fn((schedule, className, day, lessonNum, lesson) => ({
     ...schedule,
     [className]: {
@@ -47,7 +50,8 @@ vi.mock('@/logic', () => ({
   }),
   updateLessonRoom: vi.fn((schedule) => schedule),
   cloneSchedule: vi.fn((s) => JSON.parse(JSON.stringify(s))),
-}));
+  };
+});
 
 vi.mock('@/types', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/types')>();
@@ -551,25 +555,44 @@ describe('acknowledgeConflict / clearConflictAcks — Z32-3', () => {
   });
 });
 
-describe('lessonStatuses — conducted count', () => {
+describe('occurrence-level conducted state', () => {
   beforeEach(() => {
     useScheduleStore.getState().newSchedule('weekly');
   });
 
-  it('setLessonStatus stores completed2 status for two-period conducted', () => {
-    useScheduleStore.getState().setLessonStatus('req1', 'completed2');
-    expect(useScheduleStore.getState().lessonStatuses['req1']).toBe('completed2');
-  });
+  it('marks and clears a concrete occurrence through undo/redo history', () => {
+    const requirement: LessonRequirement = {
+      id: 'req1', type: 'class', classOrGroup: '5а', subject: 'Математика',
+      teacher: 'Учитель', countPerWeek: 1,
+    };
+    const removed: RemovedLesson = {
+      id: 'removed-1', reason: 'withdrawn', className: '5а', day: DAY, lessonNum: NUM,
+      requirement, lesson: makeLesson({ requirementId: 'req1', teacher: 'Учитель' }),
+    };
+    useScheduleStore.getState().loadSchedule({
+      schedule: {},
+      versionId: 'week-1',
+      versionType: 'weekly',
+      versionName: 'Неделя',
+      removedLessons: [removed],
+    });
 
-  it('clearLessonStatus removes conducted status', () => {
-    useScheduleStore.getState().setLessonStatus('req1', 'completed2');
-    useScheduleStore.getState().clearLessonStatus('req1');
-    expect(useScheduleStore.getState().lessonStatuses['req1']).toBeUndefined();
-  });
+    useScheduleStore.getState().markLessonsCompleted({
+      requirement, className: '5а', removalIds: ['removed-1'], count: 1, implicitReason: 'withdrawn',
+    });
+    expect(useScheduleStore.getState().removedLessons[0]).toMatchObject({
+      reason: 'completed', previousReason: 'withdrawn',
+    });
 
-  it('single-period conducted uses completed status', () => {
-    useScheduleStore.getState().setLessonStatus('req1', 'completed');
-    expect(useScheduleStore.getState().lessonStatuses['req1']).toBe('completed');
+    useScheduleStore.getState().undo();
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('withdrawn');
+    useScheduleStore.getState().redo();
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('completed');
+
+    useScheduleStore.getState().clearCompletedLessons({
+      requirement, className: '5а', removalIds: ['removed-1'],
+    });
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('withdrawn');
   });
 });
 
@@ -744,6 +767,98 @@ describe('weekly removal categories', () => {
     });
 
     expect(useScheduleStore.getState().removedLessons[0].reason).toBe('temporary');
+  });
+
+  it('moves a withdrawn occurrence to conducted instead of keeping both states', () => {
+    const requirement = loadWeeklyLesson();
+    const removalId = useScheduleStore.getState().removeLesson({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+
+    useScheduleStore.getState().markLessonsCompleted({
+      requirement,
+      className: '5а',
+      removalIds: [removalId!],
+      count: 1,
+      implicitReason: 'withdrawn',
+    });
+
+    const state = useScheduleStore.getState();
+    expect(state.removedLessons).toHaveLength(1);
+    expect(state.removedLessons[0]).toMatchObject({
+      id: removalId,
+      reason: 'completed',
+      previousReason: 'withdrawn',
+    });
+  });
+
+  it('clamps a conducted transition to the number of available occurrences', () => {
+    const requirement = loadWeeklyLesson();
+    requirement.countPerWeek = 1;
+    const removalId = useScheduleStore.getState().removeLesson({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+
+    useScheduleStore.getState().markLessonsCompleted({
+      requirement,
+      className: '5а',
+      removalIds: [removalId!],
+      count: 2,
+      implicitReason: 'withdrawn',
+    });
+
+    const state = useScheduleStore.getState();
+    expect(state.removedLessons).toHaveLength(1);
+    expect(state.removedLessons[0].reason).toBe('completed');
+  });
+
+  it('migrates a legacy conducted status when loading a weekly schedule', () => {
+    const requirement = loadWeeklyLesson();
+
+    useScheduleStore.getState().loadSchedule({
+      schedule: {},
+      versionId: 'legacy-week',
+      versionType: 'weekly',
+      versionName: 'Старая неделя',
+      lessonStatuses: { [requirement.id]: 'completed2' },
+      removedLessons: [],
+    });
+
+    const state = useScheduleStore.getState();
+    expect(state.lessonStatuses).toEqual({});
+    expect(state.removedLessons).toHaveLength(2);
+    expect(state.removedLessons.every(item => item.reason === 'completed')).toBe(true);
+    expect(state.history[0].removedLessons).toHaveLength(2);
+  });
+
+  it('does not return a conducted or sick occurrence to the grid', () => {
+    const requirement = loadWeeklyLesson();
+    const removalId = useScheduleStore.getState().removeLesson({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+    useScheduleStore.getState().markLessonsCompleted({
+      requirement, className: '5а', removalIds: [removalId!], count: 1, implicitReason: 'withdrawn',
+    });
+
+    useScheduleStore.getState().assignLesson({
+      className: '5а', day: 'Вт', lessonNum: 2,
+      lesson: makeLesson({ id: 'should-not-consume' }),
+      removedLessonIds: [removalId!],
+    });
+
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('completed');
+    expect(useScheduleStore.getState().schedule['5а']['Вт']).toBeUndefined();
+  });
+
+  it('reclassifies an already withdrawn occurrence when sick leave is added', () => {
+    loadWeeklyLesson();
+    useScheduleStore.getState().removeLesson({
+      className: '5а', day: DAY, lessonNum: NUM, lessonIndex: 0,
+    });
+
+    useScheduleStore.getState().setSickLeave('Иванова Т.С.', DAY, true);
+
+    expect(useScheduleStore.getState().removedLessons[0].reason).toBe('sick');
   });
 
   it('consumes only the explicitly returned removal occurrence', () => {

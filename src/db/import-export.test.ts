@@ -625,7 +625,7 @@ describe('parseExportData', () => {
   });
 
   it('should compare schema versions numerically when rejecting newer files', () => {
-    const data = createExportData({ version: '3.10' });
+    const data = createExportData({ version: '3.11' });
     const json = JSON.stringify(data);
     expect(() => parseExportData(json)).toThrow('более новой версии');
   });
@@ -741,6 +741,35 @@ describe('parseExportData', () => {
     expect(result.version).toBe(CURRENT_SCHEMA_VERSION);
     expect(result.scheduleVersions[0].removedLessons).toEqual([]);
     expect(result.scheduleVersions[0].sickLeaves).toEqual([]);
+  });
+
+  it('migrates requirement-wide conducted status to concrete occurrences in 3.10', () => {
+    const requirement = {
+      id: 'req-1',
+      type: 'class' as const,
+      classOrGroup: '5а',
+      subject: 'Математика',
+      teacher: 'Учитель',
+      countPerWeek: 2,
+    };
+    const data = {
+      version: '3.9',
+      exportedAt: new Date().toISOString(),
+      teachers: [], rooms: [], classes: [], groups: [],
+      lessonRequirements: [requirement],
+      scheduleVersions: [{
+        id: 'week-1', name: 'Неделя', type: 'weekly' as const, createdAt: new Date(),
+        schedule: {}, substitutions: [], removedLessons: [], sickLeaves: [],
+        lessonStatuses: { 'req-1': 'completed2' as const },
+      }],
+    };
+
+    const result = parseExportData(JSON.stringify(data));
+
+    expect(result.version).toBe('3.10');
+    expect(result.scheduleVersions[0].lessonStatuses).toBeUndefined();
+    expect(result.scheduleVersions[0].removedLessons).toHaveLength(2);
+    expect(result.scheduleVersions[0].removedLessons?.every(item => item.reason === 'completed')).toBe(true);
   });
 });
 

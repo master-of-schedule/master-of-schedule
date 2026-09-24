@@ -1,8 +1,9 @@
 import type { Day, LessonNumber } from './constants';
 import type { LessonRequirement, ScheduledLesson } from './schedule';
 
-/** Why one concrete lesson occurrence was removed from a weekly schedule. */
-export type RemovedLessonReason = 'temporary' | 'withdrawn' | 'sick';
+/** Mutually exclusive off-grid state of one weekly lesson occurrence. */
+export type RemovedLessonReason = 'temporary' | 'withdrawn' | 'sick' | 'completed';
+export type RestorableLessonReason = Exclude<RemovedLessonReason, 'completed'>;
 
 /**
  * Persisted snapshot of one removed weekly lesson occurrence.
@@ -13,9 +14,12 @@ export type RemovedLessonReason = 'temporary' | 'withdrawn' | 'sick';
 export interface RemovedLesson {
   id: string;
   reason: RemovedLessonReason;
+  /** State restored when a completed mark is cleared. */
+  previousReason?: RestorableLessonReason;
   className: string;
-  day: Day;
-  lessonNum: LessonNumber;
+  /** Original slot, absent for a legacy unplaced occurrence materialized as completed. */
+  day?: Day;
+  lessonNum?: LessonNumber;
   requirement: LessonRequirement;
   lesson: ScheduledLesson;
 }

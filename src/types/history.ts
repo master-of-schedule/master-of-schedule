@@ -13,6 +13,8 @@ export type HistoryActionType =
   | 'assign'
   | 'remove'
   | 'temporary_remove'
+  | 'complete'
+  | 'clear_complete'
   | 'sick_leave'
   | 'change_room'
   | 'substitute'
@@ -62,6 +64,10 @@ export function describeAction(
       return `Удалено: ${details.subject} ${details.className} ${details.day}-${details.lessonNum}`;
     case 'temporary_remove':
       return `Временно удалено: ${details.subject} ${details.className} ${details.day}-${details.lessonNum}`;
+    case 'complete':
+      return `Проведено: ${details.subject} ${details.className}`;
+    case 'clear_complete':
+      return `Снята отметка «Проведено»: ${details.subject} ${details.className}`;
     case 'sick_leave':
       return `Больничный: ${details.teacher} ${details.day}`;
     case 'change_room':

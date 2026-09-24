@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'react';
 import { useDataStore, useScheduleStore, useUIStore } from '@/stores';
-import { getAvailableLessonsForSlot } from '@/logic';
+import { getAvailableLessonsForSlot, getCompletedCounts, getOffGridLessonKey } from '@/logic';
 import { extractGroupIndex } from '@/utils/formatLesson';
 import type { Day, LessonNumber, LessonRequirement, Teacher } from '@/types';
 import styles from './ReplacementPanel.module.css';
@@ -59,15 +59,28 @@ export function LessonSelectionList({
   onPartnerSelect,
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
-  const lessonStatuses = useScheduleStore((state) => state.lessonStatuses);
+  const removedLessons = useScheduleStore((state) => state.removedLessons);
   const teachers = useDataStore((state) => state.teachers);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
   const setHighlightedMovableTeacher = useUIStore((state) => state.setHighlightedMovableTeacher);
 
-  // Exclude requirements marked as conducted from replacement search
+  // Completed occurrences reduce the available count but do not suppress the
+  // whole requirement when other occurrences still need placement.
   const activeRequirements = useMemo(
-    () => lessonRequirements.filter(r => lessonStatuses[r.id] !== 'completed' && lessonStatuses[r.id] !== 'completed2'),
-    [lessonRequirements, lessonStatuses]
+    () => {
+      const completedCounts = getCompletedCounts(removedLessons);
+      return lessonRequirements
+        .map(requirement => ({
+          ...requirement,
+          countPerWeek: Math.max(
+            0,
+            requirement.countPerWeek -
+              (completedCounts.get(getOffGridLessonKey(requirement, className)) ?? 0)
+          ),
+        }))
+        .filter(requirement => requirement.countPerWeek > 0);
+    },
+    [lessonRequirements, removedLessons, className]
   );
 
   const availableLessons = useMemo(() => {
