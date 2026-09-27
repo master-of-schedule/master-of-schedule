@@ -24,7 +24,7 @@ describe('saveJsonFile', () => {
     tauriWindow.__TAURI_INTERNALS__ = {};
     tauri.save.mockResolvedValue(null);
 
-    await expect(saveJsonFile('{}', 'schedule.json')).resolves.toBe(false);
+    await expect(saveJsonFile('{}', 'schedule.json')).resolves.toBe('cancelled');
     expect(tauri.writeTextFile).not.toHaveBeenCalled();
   });
 
@@ -33,16 +33,16 @@ describe('saveJsonFile', () => {
     tauri.save.mockResolvedValue('/tmp/schedule.json');
     tauri.writeTextFile.mockResolvedValue(undefined);
 
-    await expect(saveJsonFile('{"ok":true}', 'schedule.json')).resolves.toBe(true);
+    await expect(saveJsonFile('{"ok":true}', 'schedule.json')).resolves.toBe('saved');
     expect(tauri.writeTextFile).toHaveBeenCalledWith('/tmp/schedule.json', '{"ok":true}');
   });
 
-  it('reports success after starting a browser download', async () => {
+  it('reports only that the browser download was started', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
 
-    await expect(saveJsonFile('{}', 'schedule.json')).resolves.toBe(true);
+    await expect(saveJsonFile('{}', 'schedule.json')).resolves.toBe('download-started');
     expect(click).toHaveBeenCalledOnce();
   });
 });

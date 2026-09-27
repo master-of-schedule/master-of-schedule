@@ -9,13 +9,14 @@ import type { Day, LessonNumber, CellStatusInfo } from '@/types';
 import { useScheduleStore, useUIStore, useDataStore, usePartnerStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import {
+  canUseForcePlacement,
+  canUseRegularPlacementTarget,
   getAssigningLesson,
   getCellStatus,
   getCopiedLesson,
   getInteractionRequirement,
   getMovingLesson,
   getSlotLessons,
-  supportsForcePlacement,
 } from '@/logic';
 import { formatDayWithDate } from '@/utils/dateFormat';
 import styles from './ScheduleGrid.module.css';
@@ -153,12 +154,16 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
       clearHighlightedMovableTeacher();
 
       if (movingLesson) {
-        // Moving a lesson — forward to EditorPage which opens room picker
-        onAssignLesson?.(day, lessonNum);
+        // Ordinary clicks move only to an allowed cell. Alt+click is the
+        // explicit override path for every forbidden status.
+        const status = getCellStatusForLesson(day, lessonNum);
+        if (canUseRegularPlacementTarget(status)) {
+          onAssignLesson?.(day, lessonNum);
+        }
       } else if (selectedLesson || copiedLesson) {
         // If a lesson is selected or copied, try to assign/paste it
         const status = getCellStatusForLesson(day, lessonNum);
-        if (status.status === 'available' && onAssignLesson) {
+        if (canUseRegularPlacementTarget(status) && onAssignLesson) {
           onAssignLesson(day, lessonNum);
         }
       } else {
@@ -245,11 +250,10 @@ export function ScheduleGrid({ className, onAssignLesson, onQuickAssign, onNavig
 
   const handleAltClick = useCallback(
     (day: Day, lessonNum: LessonNumber) => {
-      if (!supportsForcePlacement(versionType)) return;
-      if (!selectedLesson) return;
+      if (!canUseForcePlacement(versionType, interaction)) return;
       onForceAssign?.(day, lessonNum);
     },
-    [versionType, selectedLesson, onForceAssign]
+    [versionType, interaction, onForceAssign]
   );
 
   const gridClassNames = styles.grid;

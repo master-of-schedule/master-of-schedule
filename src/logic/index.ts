@@ -15,6 +15,8 @@ export {
   getMovingLesson,
   getInteractionRequirement,
   createReplacementRoomDialog,
+  canUseForcePlacement,
+  canUseRegularPlacementTarget,
   supportsForcePlacement,
 } from './editorFlow';
 export type {

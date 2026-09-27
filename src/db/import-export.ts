@@ -317,7 +317,9 @@ export async function importFromJson(jsonString: string): Promise<void> {
  * In browser: triggers <a download> to the default downloads folder.
  * In Tauri desktop: opens a native "Save as" dialog so the user can choose destination.
  */
-export async function saveJsonFile(data: string, defaultFilename: string): Promise<boolean> {
+export type SaveJsonResult = 'saved' | 'cancelled' | 'download-started';
+
+export async function saveJsonFile(data: string, defaultFilename: string): Promise<SaveJsonResult> {
   if ('__TAURI_INTERNALS__' in window) {
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
@@ -327,12 +329,14 @@ export async function saveJsonFile(data: string, defaultFilename: string): Promi
     });
     if (path) {
       await writeTextFile(path, data);
-      return true;
+      return 'saved';
     }
-    return false;
+    return 'cancelled';
   }
   downloadJson(data, defaultFilename);
-  return true;
+  // Browsers do not expose whether the user completed or cancelled the
+  // download. Report only what the application can truthfully confirm.
+  return 'download-started';
 }
 
 /** @deprecated Use saveJsonFile instead */
