@@ -139,7 +139,7 @@ export function EditorPage() {
 
   // Contextual hint based on current editor state
   const hintText = useMemo(() => {
-    if (movingLesson) return 'Кликните по ячейке, куда переместить занятие. Esc — отмена';
+    if (movingLesson) return 'Кликните по свободной ячейке, куда переместить занятие. Alt+клик — поставить в обход ограничений. Esc — отмена';
     if (absentTeacher) return 'Отметьте уроки, требующие замены';
     if (copiedLesson) return 'Нажмите на ячейку для вставки (можно вставлять несколько раз). Esc — выйти из режима копирования';
     if (selectedLesson && selectedCells.length > 0) return `Занятие «${selectedLesson.subject}» выбрано. «Назначить» поставит его во все выделенные ячейки (${selectedCells.length}).`;
@@ -352,10 +352,13 @@ export function EditorPage() {
     try {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
-      const saved = await saveJsonFile(json, `timetable-${date}.json`);
-      if (!saved) return;
+      const result = await saveJsonFile(json, `timetable-${date}.json`);
+      if (result === 'cancelled') return;
       markJsonSaved();
-      showToast('Файл скачан', 'success');
+      showToast(
+        result === 'saved' ? 'Файл сохранён' : 'Окно сохранения открыто в браузере',
+        result === 'saved' ? 'success' : 'info'
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка экспорта';
       showToast(msg, 'error');
@@ -463,10 +466,14 @@ export function EditorPage() {
 
   const handleForceAssign = useCallback(
     (day: Day, lessonNum: LessonNumber) => {
+      if (movingLesson) {
+        editorDialog.openMoveRoom({ day, lessonNum, forceOverride: true });
+        return;
+      }
       if (!selectedLesson) return;
       editorDialog.openRoom({ day, lessonNum, forceOverride: true });
     },
-    [selectedLesson, editorDialog]
+    [movingLesson, selectedLesson, editorDialog]
   );
 
   // Context menu handlers
@@ -609,6 +616,7 @@ export function EditorPage() {
       const lesson = createScheduledLesson(movingLesson.requirement, room.shortName, {
         originalTeacher: movingLesson.originalTeacher,
         isSubstitution: movingLesson.isSubstitution,
+        forceOverride: moveRoomDialogData.forceOverride,
       });
       assignLesson({
         className: currentClass,
@@ -924,6 +932,7 @@ export function EditorPage() {
           preferredRoom={teachers[movingLesson.teacher]?.defaultRoom}
           studentCount={currentClassStudentCount}
           targetClassName={currentClass ?? undefined}
+          allowUnavailable={moveRoomDialogData.forceOverride}
         />
       )}
 

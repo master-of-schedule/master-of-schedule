@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { LessonRequirement } from '@/types';
 import {
+  canUseForcePlacement,
+  canUseRegularPlacementTarget,
   getAssigningLesson,
   getAssigningRemovedLessonIds,
   getCopiedLesson,
@@ -20,6 +22,19 @@ describe('supportsForcePlacement', () => {
     expect(supportsForcePlacement('technical')).toBe(true);
     expect(supportsForcePlacement('weekly')).toBe(true);
     expect(supportsForcePlacement('template')).toBe(true);
+  });
+});
+
+describe('placement click policy', () => {
+  it('rejects teacher bans and other forbidden cells for ordinary clicks', () => {
+    expect(canUseRegularPlacementTarget({ status: 'available' })).toBe(true);
+    expect(canUseRegularPlacementTarget({ status: 'teacher_banned' })).toBe(false);
+    expect(canUseRegularPlacementTarget({
+      status: 'teacher_busy',
+      conflictClass: '6а',
+      conflictSubject: 'Физика',
+    })).toBe(false);
+    expect(canUseRegularPlacementTarget({ status: 'class_occupied' })).toBe(false);
   });
 });
 
@@ -47,6 +62,18 @@ const movingLesson: MovingLessonData = {
   ...copiedLesson,
   teacher: requirement.teacher,
 };
+
+describe('canUseForcePlacement', () => {
+  it('allows Alt placement while assigning or moving, including a pink target', () => {
+    expect(canUseForcePlacement('weekly', { type: 'assigning', lesson: requirement })).toBe(true);
+    expect(canUseForcePlacement('weekly', { type: 'moving', lesson: movingLesson })).toBe(true);
+  });
+
+  it('does not turn Alt into a force action outside placement flows', () => {
+    expect(canUseForcePlacement('weekly', { type: 'idle' })).toBe(false);
+    expect(canUseForcePlacement('weekly', { type: 'copying', lesson: copiedLesson })).toBe(false);
+  });
+});
 
 describe('reduceEditorInteraction', () => {
   it('replaces the active mode when a new flow starts', () => {
@@ -142,6 +169,21 @@ describe('reduceEditorDialog', () => {
       data: { day: 'Пн', lessonNum: 1, forceOverride: true },
     });
     expect(reduceEditorDialog(room, { type: 'CLOSE' })).toEqual({ type: 'none' });
+  });
+
+  it('keeps force override on a move room dialog', () => {
+    const moveRoom = reduceEditorDialog(
+      { type: 'none' },
+      {
+        type: 'OPEN_MOVE_ROOM',
+        data: { day: 'Пн', lessonNum: 1, forceOverride: true },
+      }
+    );
+
+    expect(moveRoom).toEqual({
+      type: 'moveRoom',
+      data: { day: 'Пн', lessonNum: 1, forceOverride: true },
+    });
   });
 });
 

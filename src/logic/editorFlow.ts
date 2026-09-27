@@ -1,4 +1,5 @@
 import type {
+  CellStatusInfo,
   CellRef,
   Day,
   LessonNumber,
@@ -8,6 +9,10 @@ import type {
 
 export function supportsForcePlacement(versionType: VersionType): boolean {
   return versionType === 'technical' || versionType === 'weekly' || versionType === 'template';
+}
+
+export function canUseRegularPlacementTarget(status: CellStatusInfo): boolean {
+  return status.status === 'available';
 }
 
 export interface CopiedLessonData {
@@ -36,6 +41,14 @@ export type EditorInteractionEvent =
   | { type: 'START_COPY'; lesson: CopiedLessonData }
   | { type: 'START_MOVE'; lesson: MovingLessonData }
   | { type: 'CANCEL' };
+
+export function canUseForcePlacement(
+  versionType: VersionType,
+  interaction: EditorInteraction
+): boolean {
+  return supportsForcePlacement(versionType)
+    && (interaction.type === 'assigning' || interaction.type === 'moving');
+}
 
 export function reduceEditorInteraction(
   _state: EditorInteraction,
@@ -144,6 +157,7 @@ export interface ChangeRoomDialogData {
 export interface MoveRoomDialogData {
   day: Day;
   lessonNum: LessonNumber;
+  forceOverride?: boolean;
 }
 
 export type EditorDialog =
