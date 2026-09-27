@@ -53,8 +53,9 @@ export function SettingsPage() {
 
   const handleDownloadSnapshot = useCallback(async (snapshot: YearSnapshot) => {
     try {
-      const saved = await saveJsonFile(snapshot.data, `год-${snapshot.yearLabel}.json`);
-      if (saved) showToast('Архив скачан', 'success');
+      const result = await saveJsonFile(snapshot.data, `год-${snapshot.yearLabel}.json`);
+      if (result === 'saved') showToast('Архив сохранён', 'success');
+      if (result === 'download-started') showToast('Окно сохранения открыто в браузере', 'info');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Не удалось сохранить архив', 'error');
     }

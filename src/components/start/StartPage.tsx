@@ -366,10 +366,13 @@ export function StartPage() {
     try {
       const json = await exportToJson();
       const date = new Date().toISOString().slice(0, 10);
-      const saved = await saveJsonFile(json, `timetable-${date}.json`);
-      if (!saved) return;
+      const result = await saveJsonFile(json, `timetable-${date}.json`);
+      if (result === 'cancelled') return;
       markJsonSaved();
-      showToast('Файл скачан', 'success');
+      showToast(
+        result === 'saved' ? 'Файл сохранён' : 'Окно сохранения открыто в браузере',
+        result === 'saved' ? 'success' : 'info'
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка экспорта';
       setImportError(msg);
