@@ -4012,7 +4012,7 @@ dependencies = [
 
 [[package]]
 name = "timetable-editor"
-version = "3.42.0"
+version = "3.42.1"
 dependencies = [
  "serde",
  "serde_json",

@@ -9,6 +9,7 @@ import {
   getInteractionRequirement,
   getMovingLesson,
   createReplacementRoomDialog,
+  createPendingPartnerMerge,
   reduceEditorDialog,
   reduceEditorInteraction,
   supportsForcePlacement,
@@ -183,6 +184,19 @@ describe('reduceEditorDialog', () => {
     expect(moveRoom).toEqual({
       type: 'moveRoom',
       data: { day: 'Пн', lessonNum: 1, forceOverride: true },
+    });
+  });
+});
+
+describe('partner merge handoff', () => {
+  it('keeps the source slot after the temporary-lesson modal closes', () => {
+    const pending = createPendingPartnerMerge(
+      { sourceDay: 'Чт', sourceLessonNum: 4, partnerLessonIndex: 1 },
+      requirement,
+    );
+
+    expect(pending).toEqual({
+      sourceDay: 'Чт', sourceLessonNum: 4, partnerLessonIndex: 1, requirement,
     });
   });
 });
