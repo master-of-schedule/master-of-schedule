@@ -15,6 +15,8 @@
 **[master-of-schedule.github.io](https://master-of-schedule.github.io)**
 </div>
 
+**Авторы:** Минухин В., Минухин Д., Клаудиа, Codex.
+
 ---
 
 ## Что это такое
