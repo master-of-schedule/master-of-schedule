@@ -14,6 +14,7 @@ import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import { DatalistInput } from '@/components/common/DatalistInput';
 import { Button } from '@/components/common/Button';
+import { requirementsHaveSameIdentity } from '@/logic';
 
 interface AddTemporaryLessonModalProps {
   isOpen: boolean;
@@ -156,6 +157,16 @@ function AddTemporaryLessonModalContent({
     const trimmedGroup = groupSuffix.trim();
     const isGroup = trimmedGroup.length > 0;
     const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+    const candidate: LessonRequirement = {
+      id: 'candidate',
+      type: isGroup ? 'group' : 'class',
+      classOrGroup,
+      ...(isGroup ? { className } : {}),
+      subject: trimmedSubject,
+      teacher: trimmedTeacher,
+      ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}),
+      countPerWeek: count,
+    };
 
     // Check for new subject first
     const subjectSet = new Set(existingSubjects);
@@ -170,11 +181,7 @@ function AddTemporaryLessonModalContent({
 
     // Check for duplicate
     const allLessons = [...lessonRequirements, ...temporaryLessons];
-    const duplicate = allLessons.find(
-      r => r.subject === trimmedSubject &&
-           r.teacher === trimmedTeacher &&
-           r.classOrGroup === classOrGroup
-    );
+    const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
     if (duplicate) {
       setConfirmState({
         type: 'duplicate',
@@ -184,7 +191,7 @@ function AddTemporaryLessonModalContent({
     }
 
     doAddLesson();
-  }, [canSave, className, subject, teacher, groupSuffix, existingSubjects, lessonRequirements, temporaryLessons, doAddLesson]);
+  }, [canSave, className, subject, teacher, teacher2, count, groupSuffix, existingSubjects, lessonRequirements, temporaryLessons, doAddLesson]);
 
   // Handle confirm actions
   const handleConfirm = useCallback(() => {
@@ -198,13 +205,14 @@ function AddTemporaryLessonModalContent({
       const trimmedGroup = groupSuffix.trim();
       const isGroup = trimmedGroup.length > 0;
       const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+      const candidate: LessonRequirement = {
+        id: 'candidate', type: isGroup ? 'group' : 'class', classOrGroup,
+        ...(isGroup ? { className } : {}), subject: trimmedSubject, teacher: trimmedTeacher,
+        ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}), countPerWeek: count,
+      };
 
       const allLessons = [...lessonRequirements, ...temporaryLessons];
-      const duplicate = allLessons.find(
-        r => r.subject === trimmedSubject &&
-             r.teacher === trimmedTeacher &&
-             r.classOrGroup === classOrGroup
-      );
+      const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
       if (duplicate) {
         setConfirmState({
           type: 'duplicate',
@@ -217,7 +225,7 @@ function AddTemporaryLessonModalContent({
       // duplicate confirmed
       doAddLesson();
     }
-  }, [confirmState, subject, teacher, groupSuffix, className, lessonRequirements, temporaryLessons, addCustomSubject, doAddLesson]);
+  }, [confirmState, subject, teacher, teacher2, count, groupSuffix, className, lessonRequirements, temporaryLessons, addCustomSubject, doAddLesson]);
 
   const handleSkipNewSubject = useCallback(() => {
     // Don't add the subject, but still check for duplicate
@@ -226,13 +234,14 @@ function AddTemporaryLessonModalContent({
     const trimmedGroup = groupSuffix.trim();
     const isGroup = trimmedGroup.length > 0;
     const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+    const candidate: LessonRequirement = {
+      id: 'candidate', type: isGroup ? 'group' : 'class', classOrGroup,
+      ...(isGroup ? { className } : {}), subject: trimmedSubject, teacher: trimmedTeacher,
+      ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}), countPerWeek: count,
+    };
 
     const allLessons = [...lessonRequirements, ...temporaryLessons];
-    const duplicate = allLessons.find(
-      r => r.subject === trimmedSubject &&
-           r.teacher === trimmedTeacher &&
-           r.classOrGroup === classOrGroup
-    );
+    const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
     if (duplicate) {
       setConfirmState({
         type: 'duplicate',
@@ -241,7 +250,7 @@ function AddTemporaryLessonModalContent({
       return;
     }
     doAddLesson();
-  }, [subject, teacher, groupSuffix, className, lessonRequirements, temporaryLessons, doAddLesson]);
+  }, [subject, teacher, teacher2, count, groupSuffix, className, lessonRequirements, temporaryLessons, doAddLesson]);
 
   // Reset form when modal opens
   const handleClose = useCallback(() => {

@@ -4,7 +4,6 @@ import type {
   RemovedLessonReason,
   UnscheduledLesson,
 } from '@/types';
-import { getLessonKey } from './counting';
 
 export interface WeeklyLessonGroupItem {
   requirement: LessonRequirement;
@@ -21,11 +20,7 @@ export interface WeeklyLessonGroups {
 }
 
 function requirementKey(requirement: LessonRequirement): string {
-  return `${requirement.classOrGroup}|${getLessonKey({
-    subject: requirement.subject,
-    teacher: requirement.teacher,
-    group: requirement.type === 'group' ? requirement.classOrGroup : undefined,
-  })}`;
+  return requirement.id;
 }
 
 function belongsToClass(requirement: LessonRequirement, className: string): boolean {
