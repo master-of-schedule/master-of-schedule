@@ -17,6 +17,7 @@ interface LessonSelectionListProps {
   currentLesson?: {
     subject: string;
     teacher: string;
+    teacher2?: string;
     group?: string;
   };
   onSelect: (lesson: LessonRequirement) => void;
@@ -60,6 +61,7 @@ export function LessonSelectionList({
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const removedLessons = useScheduleStore((state) => state.removedLessons);
+  const sickLeaves = useScheduleStore((state) => state.sickLeaves);
   const teachers = useDataStore((state) => state.teachers);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
   const setHighlightedMovableTeacher = useUIStore((state) => state.setHighlightedMovableTeacher);
@@ -85,6 +87,7 @@ export function LessonSelectionList({
 
   const availableLessons = useMemo(() => {
     if (!isOpen) return { unscheduled: [], movable: [] };
+    const sickTeachers = new Set(sickLeaves.filter(mark => mark.day === day).map(mark => mark.teacher));
     return getAvailableLessonsForSlot(
       activeRequirements,
       schedule,
@@ -92,9 +95,10 @@ export function LessonSelectionList({
       className,
       day,
       lessonNum,
-      currentLesson
+      currentLesson,
+      sickTeachers,
     );
-  }, [isOpen, activeRequirements, schedule, teachers, className, day, lessonNum, currentLesson]);
+  }, [isOpen, activeRequirements, schedule, teachers, className, day, lessonNum, currentLesson, sickLeaves]);
 
   // Extract unique teacher names from movable lessons
   const movableTeachers = useMemo(() => {

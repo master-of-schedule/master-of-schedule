@@ -515,6 +515,7 @@ export function EditorPage() {
       currentLesson: currentLessonData ? {
         subject: currentLessonData.subject,
         teacher: currentLessonData.teacher,
+        teacher2: currentLessonData.teacher2,
         group: currentLessonData.group,
       } : undefined,
     });
