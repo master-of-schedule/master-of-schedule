@@ -11,6 +11,7 @@ import { exportToJson, saveJsonFile } from '@/db/import-export';
 import {
   createScheduledLesson,
   createReplacementRoomDialog,
+  createPendingPartnerMerge,
   findRequirementForScheduledLesson,
   getAssigningLesson,
   getAssigningRemovedLessonIds,
@@ -193,7 +194,7 @@ export function EditorPage() {
     sourceLessonNum: LessonNumber;
     partnerLessonIndex: number;
   } | null>(null);
-  const [pendingPartnerLesson, setPendingPartnerLesson] = useState<LessonRequirement | null>(null);
+  const [pendingPartnerMerge, setPendingPartnerMerge] = useState<ReturnType<typeof createPendingPartnerMerge> | null>(null);
 
   // Paste warning state (replaces window.confirm/alert to avoid React crash)
   const [pasteWarning, setPasteWarning] = useState<{
@@ -236,16 +237,16 @@ export function EditorPage() {
     (room: Room) => {
       if (!selectedLesson || !roomDialogData) return;
 
-      if (pendingPartnerLesson && partnerModal && currentClass) {
+      if (pendingPartnerMerge && currentClass) {
         mergePartnerLesson({
           className: currentClass,
-          day: partnerModal.sourceDay,
-          lessonNum: partnerModal.sourceLessonNum,
-          partnerLessonIndex: partnerModal.partnerLessonIndex,
-          requirement: pendingPartnerLesson,
+          day: pendingPartnerMerge.sourceDay,
+          lessonNum: pendingPartnerMerge.sourceLessonNum,
+          partnerLessonIndex: pendingPartnerMerge.partnerLessonIndex,
+          requirement: pendingPartnerMerge.requirement,
           room: room.shortName,
         });
-        setPendingPartnerLesson(null);
+        setPendingPartnerMerge(null);
         setPartnerModal(null);
         editorDialog.close();
         selectLesson(null);
@@ -292,7 +293,7 @@ export function EditorPage() {
       editorDialog.close();
       selectLesson(null);
     },
-    [selectedLesson, selectedRemovedLessonIds, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection, pendingPartnerLesson, partnerModal, mergePartnerLesson]
+    [selectedLesson, selectedRemovedLessonIds, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection, pendingPartnerMerge, mergePartnerLesson]
   );
 
   // Clear partner file and restore saved partner class schedules
@@ -736,9 +737,8 @@ export function EditorPage() {
   // Keep the draft pending until a room is confirmed; cancellation changes nothing.
   const handlePartnerMergeSaved = useCallback((lesson: LessonRequirement) => {
     if (!partnerModal || !currentClass) return;
-    const { sourceDay, sourceLessonNum } = partnerModal;
-
-    setPendingPartnerLesson(lesson);
+    const { sourceDay, sourceLessonNum, partnerLessonIndex } = partnerModal;
+    setPendingPartnerMerge(createPendingPartnerMerge({ sourceDay, sourceLessonNum, partnerLessonIndex }, lesson));
     selectLesson(lesson);
     editorDialog.openRoom({ day: sourceDay, lessonNum: sourceLessonNum });
   }, [partnerModal, currentClass, selectLesson, editorDialog]);
@@ -899,8 +899,8 @@ export function EditorPage() {
         <RoomPicker
           isOpen={true}
           onClose={() => {
-            if (pendingPartnerLesson) {
-              setPendingPartnerLesson(null);
+            if (pendingPartnerMerge) {
+              setPendingPartnerMerge(null);
               setPartnerModal(null);
             }
             editorDialog.close();

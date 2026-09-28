@@ -127,6 +127,24 @@ export interface ReplacementDialogData {
   };
 }
 
+export interface PartnerMergeSource {
+  sourceDay: Day;
+  sourceLessonNum: LessonNumber;
+  partnerLessonIndex: number;
+}
+
+export interface PendingPartnerMerge extends PartnerMergeSource {
+  requirement: LessonRequirement;
+}
+
+/** Snapshot source coordinates before the temporary-lesson modal closes. */
+export function createPendingPartnerMerge(
+  source: PartnerMergeSource,
+  requirement: LessonRequirement,
+): PendingPartnerMerge {
+  return { ...source, requirement };
+}
+
 export function createReplacementRoomDialog(
   replacement: ReplacementDialogData,
   className: string
