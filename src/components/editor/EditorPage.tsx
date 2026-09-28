@@ -21,7 +21,6 @@ import {
   shouldShowLessonListCleanupPrompt,
   getCopiedLesson,
   getMovingLesson,
-  getSlotLessons,
   getUnscheduledLessons,
   isRoomAvailable,
   mergeWithTemporaryLessons,
@@ -87,7 +86,7 @@ export function EditorPage() {
     historyIndex, historyLength, schedule, versionId, versionType, versionName,
     isDirty, jsonIsDirty, markSaved, markJsonSaved, temporaryLessons,
     lessonStatuses, acknowledgedConflictKeys, mondayDate, versionDaysPerWeek,
-    removedLessons, sickLeaves,
+    removedLessons, sickLeaves, mergePartnerLesson,
   } = useScheduleStore(useShallow((s) => ({
     assignLesson: s.assignLesson,
     removeLesson: s.removeLesson,
@@ -110,6 +109,7 @@ export function EditorPage() {
     lessonStatuses: s.lessonStatuses,
     removedLessons: s.removedLessons,
     sickLeaves: s.sickLeaves,
+    mergePartnerLesson: s.mergePartnerLesson,
     acknowledgedConflictKeys: s.acknowledgedConflictKeys,
     mondayDate: s.mondayDate,
     versionDaysPerWeek: s.versionDaysPerWeek,
@@ -191,7 +191,9 @@ export function EditorPage() {
     /** Source slot — used on confirm to remove original group lessons and open room picker */
     sourceDay: Day;
     sourceLessonNum: LessonNumber;
+    partnerLessonIndex: number;
   } | null>(null);
+  const [pendingPartnerLesson, setPendingPartnerLesson] = useState<LessonRequirement | null>(null);
 
   // Paste warning state (replaces window.confirm/alert to avoid React crash)
   const [pasteWarning, setPasteWarning] = useState<{
@@ -234,6 +236,22 @@ export function EditorPage() {
     (room: Room) => {
       if (!selectedLesson || !roomDialogData) return;
 
+      if (pendingPartnerLesson && partnerModal && currentClass) {
+        mergePartnerLesson({
+          className: currentClass,
+          day: partnerModal.sourceDay,
+          lessonNum: partnerModal.sourceLessonNum,
+          partnerLessonIndex: partnerModal.partnerLessonIndex,
+          requirement: pendingPartnerLesson,
+          room: room.shortName,
+        });
+        setPendingPartnerLesson(null);
+        setPartnerModal(null);
+        editorDialog.close();
+        selectLesson(null);
+        return;
+      }
+
       // Bulk assignment mode
       if (roomDialogData.bulkCells && roomDialogData.bulkCells.length > 0) {
         for (const cell of roomDialogData.bulkCells) {
@@ -274,7 +292,7 @@ export function EditorPage() {
       editorDialog.close();
       selectLesson(null);
     },
-    [selectedLesson, selectedRemovedLessonIds, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection]
+    [selectedLesson, selectedRemovedLessonIds, roomDialogData, currentClass, assignLesson, removeLesson, editorDialog, selectLesson, clearCellSelection, pendingPartnerLesson, partnerModal, mergePartnerLesson]
   );
 
   // Clear partner file and restore saved partner class schedules
@@ -703,35 +721,27 @@ export function EditorPage() {
   );
 
   // Handle partner select (Z35-4 / Z39-3): open AddTemporaryLessonModal with pre-filled teacher + subject
-  const handlePartnerSelect = useCallback((teacher: string, subject: string) => {
+  const handlePartnerSelect = useCallback((teacher: string, subject: string, partnerLessonIndex: number) => {
     if (!replacementDialogData) return;
     setPartnerModal({
       teacher,
       subject,
       sourceDay: replacementDialogData.day,
       sourceLessonNum: replacementDialogData.lessonNum,
+      partnerLessonIndex,
     });
     editorDialog.close();
   }, [replacementDialogData, editorDialog]);
 
-  // Handle partner merge saved (Z39-3): remove original group lessons + auto-open room picker
+  // Keep the draft pending until a room is confirmed; cancellation changes nothing.
   const handlePartnerMergeSaved = useCallback((lesson: LessonRequirement) => {
     if (!partnerModal || !currentClass) return;
     const { sourceDay, sourceLessonNum } = partnerModal;
 
-    // Remove all original lessons at the source slot
-    const originals = getSlotLessons(schedule, currentClass, sourceDay, sourceLessonNum);
-    if (originals.length > 0) {
-      removeLessons(
-        originals.map((_, i) => ({ className: currentClass, day: sourceDay, lessonNum: sourceLessonNum, lessonIndex: i }))
-          .reverse()
-      );
-    }
-
-    // Select the new merged lesson and open room picker at the same slot
+    setPendingPartnerLesson(lesson);
     selectLesson(lesson);
     editorDialog.openRoom({ day: sourceDay, lessonNum: sourceLessonNum });
-  }, [partnerModal, currentClass, schedule, removeLessons, selectLesson, editorDialog]);
+  }, [partnerModal, currentClass, selectLesson, editorDialog]);
 
   // Handle bulk assign - open room picker for all selected cells
   const handleBulkAssign = useCallback(() => {
@@ -889,6 +899,10 @@ export function EditorPage() {
         <RoomPicker
           isOpen={true}
           onClose={() => {
+            if (pendingPartnerLesson) {
+              setPendingPartnerLesson(null);
+              setPartnerModal(null);
+            }
             editorDialog.close();
             if (roomDialogData.fromReplacement) cancelInteraction();
           }}
@@ -946,6 +960,7 @@ export function EditorPage() {
           initialTeacher={partnerModal?.teacher}
           initialSubject={partnerModal?.subject}
           onSaved={handlePartnerMergeSaved}
+          deferCommit
         />
       )}
 

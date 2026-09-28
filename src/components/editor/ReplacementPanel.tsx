@@ -15,6 +15,7 @@ interface PartnerTeacher {
   name: string;
   subject: string;
   room: string;
+  lessonIndex: number;
 }
 
 interface ReplacementPanelProps {
@@ -31,7 +32,7 @@ interface ReplacementPanelProps {
   onSubstituteSelect: (teacher: Teacher) => void;
   onUnionSubstituteSelect: (teacher: Teacher) => void;
   /** Called when user clicks a co-teacher (partner) in the same slot */
-  onPartnerSelect?: (teacher: string, subject: string) => void;
+  onPartnerSelect?: (teacher: string, subject: string, lessonIndex: number) => void;
   onClose: () => void;
 }
 
@@ -75,8 +76,9 @@ export function ReplacementPanel({
     if (!currentLesson || !onPartnerSelect) return [];
     const lessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
     return lessons
-      .filter(l => ![l.teacher, l.teacher2].some(name => !!name && (excludedTeachers.includes(name) || sickTeachers.has(name))))
-      .map(l => ({ name: l.teacher, subject: l.subject, room: l.room }));
+      .map((lesson, lessonIndex) => ({ lesson, lessonIndex }))
+      .filter(({ lesson }) => ![lesson.teacher, lesson.teacher2].some(name => !!name && (excludedTeachers.includes(name) || sickTeachers.has(name))))
+      .map(({ lesson, lessonIndex }) => ({ name: lesson.teacher, subject: lesson.subject, room: lesson.room, lessonIndex }));
   }, [schedule, className, day, lessonNum, currentLesson, onPartnerSelect, excludedTeachers, sickTeachers]);
 
   return (

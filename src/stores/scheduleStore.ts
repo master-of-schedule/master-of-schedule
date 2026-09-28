@@ -133,7 +133,12 @@ interface ScheduleState {
 
   // Actions - Temporary lessons
   addTemporaryLesson: (lesson: LessonRequirement) => void;
+  updateTemporaryLesson: (lesson: LessonRequirement) => void;
   removeTemporaryLesson: (id: string) => void;
+  mergePartnerLesson: (params: {
+    className: string; day: Day; lessonNum: LessonNumber; partnerLessonIndex: number;
+    requirement: LessonRequirement; room: string;
+  }) => void;
 
   // Actions - occurrence-level conducted state
   markLessonsCompleted: (params: {
@@ -216,6 +221,7 @@ function createHistoryEntry(
   substitutions: Substitution[],
   removedLessons: RemovedLesson[] = [],
   sickLeaves: SickLeave[] = [],
+  temporaryLessons: LessonRequirement[] = [],
 ): HistoryEntry {
   return {
     id: generateId(),
@@ -230,6 +236,17 @@ function createHistoryEntry(
       lesson: { ...item.lesson },
     })),
     sickLeaves: sickLeaves.map(item => ({ ...item })),
+    temporaryLessons: temporaryLessons.map(item => ({ ...item })),
+  };
+}
+
+function historyState(entry: HistoryEntry) {
+  return {
+    schedule: cloneSchedule(entry.schedule),
+    substitutions: entry.substitutions.map(item => ({ ...item })),
+    removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
+    sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
+    temporaryLessons: entry.temporaryLessons?.map(item => ({ ...item })) ?? [],
   };
 }
 
@@ -339,7 +356,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
 
       newHistory.push(createHistoryEntry(
-        'assign', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+        'assign', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -382,7 +399,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
 
       newHistory.push(createHistoryEntry(
-        'remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+        'remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -409,7 +426,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const newHistory = truncateHistory(state.history, state.historyIndex);
       const description = describeAction('temporary_remove', { subject: lesson.subject, className, day, lessonNum });
       newHistory.push(createHistoryEntry(
-        'temporary_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+        'temporary_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -460,7 +477,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
 
       newHistory.push(createHistoryEntry(
-        'multi_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+        'multi_remove', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -515,7 +532,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
 
       newHistory.push(createHistoryEntry(
-        'change_room', description, newSchedule, state.substitutions, state.removedLessons, state.sickLeaves
+        'change_room', description, newSchedule, state.substitutions, state.removedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -556,7 +573,7 @@ export const useScheduleStore = create<ScheduleState>()(
       });
 
       newHistory.push(createHistoryEntry(
-        'substitute', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves
+        'substitute', description, newSchedule, state.substitutions, newRemovedLessons, state.sickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -595,27 +612,85 @@ export const useScheduleStore = create<ScheduleState>()(
     // Add a temporary lesson (per-version extra)
     addTemporaryLesson: (lesson) => {
       if (useDataStore.getState().isReadOnlyYear) return;
-      set((state) => {
-        state.temporaryLessons.push(lesson);
-        state.isDirty = true;
-        state.jsonIsDirty = true;
-      });
+      const state = get();
+      const temporaryLessons = [...state.temporaryLessons, { ...lesson }];
+      const history = truncateHistory(state.history, state.historyIndex);
+      history.push(createHistoryEntry('temporary_add', describeAction('temporary_add', {
+        subject: lesson.subject, className: lesson.className ?? lesson.classOrGroup,
+      }), state.schedule, state.substitutions, state.removedLessons, state.sickLeaves, temporaryLessons));
+      set({ temporaryLessons, history, historyIndex: history.length - 1, isDirty: true, jsonIsDirty: true });
+    },
+
+    updateTemporaryLesson: (lesson) => {
+      if (useDataStore.getState().isReadOnlyYear) return;
+      const state = get();
+      if (!state.temporaryLessons.some(item => item.id === lesson.id)) return;
+      const temporaryLessons = state.temporaryLessons.map(item => item.id === lesson.id ? { ...lesson } : item);
+      const updateScheduled = (schedule: Schedule): Schedule => {
+        const copy = cloneSchedule(schedule);
+        for (const classSchedule of Object.values(copy)) for (const daySchedule of Object.values(classSchedule)) {
+          for (const slot of Object.values(daySchedule ?? {})) for (const placed of slot?.lessons ?? []) {
+            if (placed.requirementId === lesson.id) Object.assign(placed, {
+              subject: lesson.subject, teacher: lesson.teacher, teacher2: lesson.teacher2,
+              group: lesson.type === 'group' ? lesson.classOrGroup : undefined,
+            });
+          }
+        }
+        return copy;
+      };
+      const schedule = updateScheduled(state.schedule);
+      const removedLessons = state.removedLessons.map(item =>
+        item.requirement.id === lesson.id || item.lesson.requirementId === lesson.id
+          ? { ...item, requirement: { ...lesson }, lesson: { ...item.lesson, subject: lesson.subject, teacher: lesson.teacher, teacher2: lesson.teacher2, group: lesson.type === 'group' ? lesson.classOrGroup : undefined } }
+          : item
+      );
+      const history = truncateHistory(state.history, state.historyIndex);
+      history.push(createHistoryEntry('temporary_edit', describeAction('temporary_edit', {
+        subject: lesson.subject, className: lesson.className ?? lesson.classOrGroup,
+      }), schedule, state.substitutions, removedLessons, state.sickLeaves, temporaryLessons));
+      set({ schedule, removedLessons, temporaryLessons, history, historyIndex: history.length - 1, isDirty: true, jsonIsDirty: true });
     },
 
     // Remove a temporary lesson
     removeTemporaryLesson: (id) => {
       if (useDataStore.getState().isReadOnlyYear) return;
-      set((state) => {
-        const index = state.temporaryLessons.findIndex(l => l.id === id);
-        if (index !== -1) {
-          state.temporaryLessons.splice(index, 1);
-          state.removedLessons = state.removedLessons.filter(item =>
-            item.requirement.id !== id && item.lesson.requirementId !== id
-          );
-          state.isDirty = true;
-          state.jsonIsDirty = true;
-        }
+      const state = get();
+      const lesson = state.temporaryLessons.find(item => item.id === id);
+      if (!lesson) return;
+      const temporaryLessons = state.temporaryLessons.filter(item => item.id !== id);
+      const removedLessons = state.removedLessons.filter(item => item.requirement.id !== id && item.lesson.requirementId !== id);
+      const history = truncateHistory(state.history, state.historyIndex);
+      history.push(createHistoryEntry('temporary_delete', describeAction('temporary_delete', {
+        subject: lesson.subject, className: lesson.className ?? lesson.classOrGroup,
+      }), state.schedule, state.substitutions, removedLessons, state.sickLeaves, temporaryLessons));
+      set({ temporaryLessons, removedLessons, history, historyIndex: history.length - 1, isDirty: true, jsonIsDirty: true });
+    },
+
+    mergePartnerLesson: ({ className, day, lessonNum, partnerLessonIndex, requirement, room }) => {
+      if (useDataStore.getState().isReadOnlyYear) return;
+      const state = get();
+      const originals = state.schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
+      if (!originals[partnerLessonIndex]) return;
+      const schedule = cloneSchedule(state.schedule);
+      schedule[className][day]![lessonNum] = { lessons: [{
+        id: generateId(), requirementId: requirement.id, subject: requirement.subject,
+        teacher: requirement.teacher, teacher2: requirement.teacher2, room,
+        group: requirement.type === 'group' ? requirement.classOrGroup : undefined,
+      }] };
+      const additions = originals.map((original, index) => {
+        const reason = getAutomaticRemovalReason(state, original, day);
+        const removed = makeRemovedLesson(state, { className, day, lessonNum }, original, reason);
+        return index === partnerLessonIndex
+          ? { ...removed, reason: 'completed' as const, previousReason: reason as RestorableLessonReason }
+          : removed;
       });
+      const removedLessons = [...state.removedLessons, ...additions];
+      const temporaryLessons = [...state.temporaryLessons, { ...requirement }];
+      const history = truncateHistory(state.history, state.historyIndex);
+      history.push(createHistoryEntry('partner_merge', describeAction('partner_merge', {
+        subject: requirement.subject, className,
+      }), schedule, state.substitutions, removedLessons, state.sickLeaves, temporaryLessons));
+      set({ schedule, removedLessons, temporaryLessons, history, historyIndex: history.length - 1, isDirty: true, jsonIsDirty: true });
     },
 
     markLessonsCompleted: ({ requirement, className, removalIds, count, implicitReason }) => {
@@ -651,6 +726,7 @@ export const useScheduleStore = create<ScheduleState>()(
         state.substitutions,
         newRemovedLessons,
         state.sickLeaves,
+        state.temporaryLessons,
       ));
       set({
         removedLessons: newRemovedLessons,
@@ -675,6 +751,7 @@ export const useScheduleStore = create<ScheduleState>()(
         state.substitutions,
         newRemovedLessons,
         state.sickLeaves,
+        state.temporaryLessons,
       ));
       set({
         removedLessons: newRemovedLessons,
@@ -700,7 +777,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const newHistory = truncateHistory(state.history, state.historyIndex);
       const description = describeAction('sick_leave', { teacher, day });
       newHistory.push(createHistoryEntry(
-        'sick_leave', description, state.schedule, state.substitutions, newRemovedLessons, newSickLeaves
+        'sick_leave', description, state.schedule, state.substitutions, newRemovedLessons, newSickLeaves, state.temporaryLessons
       ));
 
       set({
@@ -723,10 +800,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const entry = state.history[newIndex];
 
       set({
-        schedule: cloneSchedule(entry.schedule),
-        substitutions: entry.substitutions.map(s => ({ ...s })),
-        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
-        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
+        ...historyState(entry),
         historyIndex: newIndex,
         isDirty: true,
         jsonIsDirty: true,
@@ -743,10 +817,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const entry = state.history[newIndex];
 
       set({
-        schedule: cloneSchedule(entry.schedule),
-        substitutions: entry.substitutions.map(s => ({ ...s })),
-        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
-        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
+        ...historyState(entry),
         historyIndex: newIndex,
         isDirty: true,
         jsonIsDirty: true,
@@ -762,10 +833,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const entry = state.history[0];
 
       set({
-        schedule: cloneSchedule(entry.schedule),
-        substitutions: entry.substitutions.map(s => ({ ...s })),
-        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
-        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
+        ...historyState(entry),
         historyIndex: 0,
         isDirty: true,
         jsonIsDirty: true,
@@ -781,10 +849,7 @@ export const useScheduleStore = create<ScheduleState>()(
       const entry = state.history[index];
 
       set({
-        schedule: cloneSchedule(entry.schedule),
-        substitutions: entry.substitutions.map(s => ({ ...s })),
-        removedLessons: entry.removedLessons?.map(item => ({ ...item, requirement: { ...item.requirement }, lesson: { ...item.lesson } })) ?? [],
-        sickLeaves: entry.sickLeaves?.map(item => ({ ...item })) ?? [],
+        ...historyState(entry),
         historyIndex: index,
         isDirty: true,
         jsonIsDirty: true,
@@ -803,6 +868,7 @@ export const useScheduleStore = create<ScheduleState>()(
         state.substitutions,
         state.removedLessons,
         state.sickLeaves,
+        state.temporaryLessons,
       );
 
       set({
@@ -828,7 +894,7 @@ export const useScheduleStore = create<ScheduleState>()(
     // Create new empty schedule
     newSchedule: (type, mondayDate, baseTemplateId, baseTemplateSchedule, daysPerWeek, name) => {
       if (useDataStore.getState().isReadOnlyYear) return;
-      const initialEntry = createHistoryEntry('import', 'Начало', {}, [], [], []);
+      const initialEntry = createHistoryEntry('import', 'Начало', {}, [], [], [], []);
       set({
         schedule: {},
         versionId: null,
@@ -867,6 +933,7 @@ export const useScheduleStore = create<ScheduleState>()(
         substitutions ?? [],
         migratedRemovedLessons,
         sickLeaves ?? [],
+        temporaryLessons ?? [],
       );
 
       set({

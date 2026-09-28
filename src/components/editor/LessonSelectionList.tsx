@@ -36,9 +36,9 @@ interface LessonSelectionListProps {
   /** Callback when a union teacher is selected */
   onUnionSubstituteSelect?: (teacher: Teacher) => void;
   /** Co-teachers already teaching in the same slot (group partners) */
-  partnerTeachers?: { name: string; subject: string; room: string }[];
+  partnerTeachers?: { name: string; subject: string; room: string; lessonIndex: number }[];
   /** Callback when a partner teacher is clicked — opens AddTemporaryLessonModal with pre-filled data */
-  onPartnerSelect?: (teacher: string, subject: string) => void;
+  onPartnerSelect?: (teacher: string, subject: string, lessonIndex: number) => void;
 }
 
 export function LessonSelectionList({
@@ -208,7 +208,7 @@ export function LessonSelectionList({
               <button
                 key={partner.name}
                 className={`${styles.item} ${styles.substituteItem}`}
-                onClick={() => onPartnerSelect(partner.name, partner.subject)}
+                onClick={() => onPartnerSelect(partner.name, partner.subject, partner.lessonIndex)}
                 title="Создать занятие с этим учителем"
               >
                 <span className={styles.subject}>{partner.subject} {partner.name}</span>

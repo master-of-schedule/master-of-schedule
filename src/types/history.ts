@@ -5,6 +5,7 @@
 import type { Schedule } from './schedule';
 import type { Substitution } from './substitutions';
 import type { RemovedLesson, SickLeave } from './removedLessons';
+import type { LessonRequirement } from './schedule';
 
 /**
  * Action types that can be recorded in history
@@ -19,6 +20,10 @@ export type HistoryActionType =
   | 'change_room'
   | 'substitute'
   | 'multi_remove'
+  | 'temporary_add'
+  | 'temporary_edit'
+  | 'temporary_delete'
+  | 'partner_merge'
   | 'import';
 
 /**
@@ -40,6 +45,8 @@ export interface HistoryEntry {
   removedLessons?: RemovedLesson[];
   /** Weekly teacher/day illness marks after this action. */
   sickLeaves?: SickLeave[];
+  /** Per-version requirements after this action. */
+  temporaryLessons?: LessonRequirement[];
 }
 
 /**
@@ -78,6 +85,14 @@ export function describeAction(
       return details.className
         ? `Удалено: ${details.count} занятий (${details.className})`
         : `Удалено: ${details.count} занятий`;
+    case 'temporary_add':
+      return `Добавлено временное занятие: ${details.subject} ${details.className}`;
+    case 'temporary_edit':
+      return `Изменено временное занятие: ${details.subject} ${details.className}`;
+    case 'temporary_delete':
+      return `Удалено временное занятие: ${details.subject} ${details.className}`;
+    case 'partner_merge':
+      return `Объединено с напарником: ${details.subject} ${details.className}`;
     case 'import':
       return `Импорт расписания`;
     default:
