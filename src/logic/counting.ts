@@ -13,6 +13,7 @@ import type {
   LessonStatus,
 } from '@/types';
 import { forEachSlot } from './traversal';
+import { getRequirementIdentityKey, getScheduledLessonIdentityKey } from './lessonIdentity';
 
 /**
  * How many of a requirement's weekly occurrences a status already covers
@@ -32,12 +33,14 @@ function getStatusCoverage(status: LessonStatus | undefined): number {
 export function getLessonKey(lesson: {
   subject: string;
   teacher: string;
+  teacher2?: string;
   group?: string;
 }): string {
+  const teachers = lesson.teacher2 ? `${lesson.teacher}|${lesson.teacher2}` : lesson.teacher;
   if (lesson.group) {
-    return `${lesson.subject}|${lesson.teacher}|${lesson.group}`;
+    return `${lesson.subject}|${teachers}|${lesson.group}`;
   }
-  return `${lesson.subject}|${lesson.teacher}`;
+  return `${lesson.subject}|${teachers}`;
 }
 
 /**
@@ -81,33 +84,49 @@ export function getUnscheduledLessons(
   className: string,
   lessonStatuses?: Record<string, LessonStatus>
 ): UnscheduledLesson[] {
-  const scheduledCounts = getScheduledCounts(schedule, className);
-  const unscheduled: UnscheduledLesson[] = [];
-
-  for (const req of requirements) {
-    // Skip requirements for other classes
-    if (req.type === 'class' && req.classOrGroup !== className) continue;
-    if (req.type === 'group' && req.className !== className) continue;
-
-    const key = getLessonKey({
-      subject: req.subject,
-      teacher: req.teacher,
-      group: req.type === 'group' ? req.classOrGroup : undefined,
-    });
-
-    const scheduled = scheduledCounts.get(key) ?? 0;
-    const covered = getStatusCoverage(lessonStatuses?.[req.id]);
-    const remaining = Math.max(0, req.countPerWeek - scheduled - covered);
-
-    if (remaining > 0) {
-      unscheduled.push({
-        requirement: req,
-        remaining,
-      });
+  const relevant = requirements.filter(req => req.type === 'class'
+    ? req.classOrGroup === className
+    : req.className === className);
+  const lessons: ScheduledLesson[] = [];
+  const classSchedule = schedule[className];
+  if (classSchedule) {
+    for (const daySchedule of Object.values(classSchedule)) {
+      for (const slot of Object.values(daySchedule ?? {})) lessons.push(...(slot?.lessons ?? []));
     }
   }
 
-  return unscheduled;
+  const byIdentity = new Map<string, LessonRequirement[]>();
+  for (const req of relevant) {
+    const key = getRequirementIdentityKey(req);
+    byIdentity.set(key, [...(byIdentity.get(key) ?? []), req]);
+  }
+
+  const allocated = new Map<string, number>();
+  for (const [key, reqs] of byIdentity) {
+    const matching = lessons.filter(lesson => getScheduledLessonIdentityKey(className, lesson) === key);
+    let budget = matching.length;
+
+    // Preserve exact IDs first. A second pass absorbs legacy rows that used a merged/base ID.
+    for (const req of reqs) {
+      const exact = matching.filter(lesson => lesson.requirementId === req.id).length;
+      const amount = Math.min(exact, req.countPerWeek, budget);
+      allocated.set(req.id, amount);
+      budget -= amount;
+    }
+    for (const req of reqs) {
+      if (budget <= 0) break;
+      const capacity = req.countPerWeek - (allocated.get(req.id) ?? 0);
+      const amount = Math.min(capacity, budget);
+      allocated.set(req.id, (allocated.get(req.id) ?? 0) + amount);
+      budget -= amount;
+    }
+  }
+
+  return relevant.flatMap(req => {
+    const covered = getStatusCoverage(lessonStatuses?.[req.id]);
+    const remaining = Math.max(0, req.countPerWeek - (allocated.get(req.id) ?? 0) - covered);
+    return remaining > 0 ? [{ requirement: req, remaining }] : [];
+  });
 }
 
 /**
@@ -205,34 +224,7 @@ export function mergeWithTemporaryLessons(
   temporaryLessons: LessonRequirement[]
 ): LessonRequirement[] {
   if (temporaryLessons.length === 0) return requirements;
-
-  const merged = requirements.map(r => ({ ...r }));
-
-  for (const temp of temporaryLessons) {
-    const tempKey = getLessonKey({
-      subject: temp.subject,
-      teacher: temp.teacher,
-      group: temp.type === 'group' ? temp.classOrGroup : undefined,
-    });
-
-    const existing = merged.find(r => {
-      if (r.classOrGroup !== temp.classOrGroup) return false;
-      const rKey = getLessonKey({
-        subject: r.subject,
-        teacher: r.teacher,
-        group: r.type === 'group' ? r.classOrGroup : undefined,
-      });
-      return rKey === tempKey;
-    });
-
-    if (existing) {
-      existing.countPerWeek += temp.countPerWeek;
-    } else {
-      merged.push({ ...temp });
-    }
-  }
-
-  return merged;
+  return [...requirements, ...temporaryLessons];
 }
 
 /**

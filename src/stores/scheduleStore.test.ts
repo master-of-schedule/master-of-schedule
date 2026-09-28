@@ -993,4 +993,53 @@ describe('weekly removal categories', () => {
     expect(state.removedLessons).toHaveLength(2);
     expect(state.removedLessons.every(item => item.reason === 'withdrawn')).toBe(true);
   });
+
+  it('edits a temporary lesson everywhere and undo restores the full snapshot', () => {
+    const temporary: LessonRequirement = {
+      id: 'temp-1', type: 'class', classOrGroup: '5а', subject: 'Проект',
+      teacher: 'Учитель 1', countPerWeek: 1,
+    };
+    useScheduleStore.getState().loadSchedule({
+      schedule: { '5а': { Пн: { 1: { lessons: [makeLesson({ requirementId: 'temp-1', subject: 'Проект', teacher: 'Учитель 1' })] } } } },
+      versionId: 'weekly', versionType: 'weekly', versionName: 'Неделя', temporaryLessons: [temporary],
+    });
+    const edited = { ...temporary, subject: 'Новый проект', teacher: 'Учитель 2', compensationType: 'budget' as const };
+    useScheduleStore.getState().updateTemporaryLesson(edited);
+
+    expect(useScheduleStore.getState().temporaryLessons[0]).toMatchObject(edited);
+    expect(useScheduleStore.getState().schedule['5а'].Пн?.[1]?.lessons[0]).toMatchObject({ subject: 'Новый проект', teacher: 'Учитель 2' });
+    useScheduleStore.getState().undo();
+    expect(useScheduleStore.getState().temporaryLessons[0]).toMatchObject(temporary);
+    expect(useScheduleStore.getState().schedule['5а'].Пн?.[1]?.lessons[0]).toMatchObject({ subject: 'Проект', teacher: 'Учитель 1' });
+    useScheduleStore.getState().redo();
+    expect(useScheduleStore.getState().temporaryLessons[0]).toMatchObject(edited);
+  });
+
+  it('commits a partner merge atomically and marks only the selected partner completed', () => {
+    const first = makeLesson({ id: 'first', requirementId: 'req-first', teacher: 'Учитель 1' });
+    const partner = makeLesson({ id: 'partner', requirementId: 'req-partner', teacher: 'Учитель 2' });
+    useScheduleStore.getState().loadSchedule({
+      schedule: { '5а': { Пн: { 1: { lessons: [first, partner] } } } },
+      versionId: 'weekly', versionType: 'weekly', versionName: 'Неделя',
+    });
+    const merged: LessonRequirement = {
+      id: 'temp-merged', type: 'class', classOrGroup: '5а', subject: 'Объединённое',
+      teacher: 'Учитель 2', countPerWeek: 1,
+    };
+    useScheduleStore.getState().mergePartnerLesson({
+      className: '5а', day: 'Пн', lessonNum: 1, partnerLessonIndex: 1, requirement: merged, room: '301',
+    });
+
+    let state = useScheduleStore.getState();
+    expect(state.schedule['5а'].Пн?.[1]?.lessons).toEqual([expect.objectContaining({ requirementId: 'temp-merged', room: '301' })]);
+    expect(state.temporaryLessons).toEqual([merged]);
+    expect(state.removedLessons.find(item => item.lesson.id === 'partner')).toMatchObject({ reason: 'completed', previousReason: 'withdrawn' });
+    expect(state.removedLessons.find(item => item.lesson.id === 'first')?.reason).toBe('withdrawn');
+
+    useScheduleStore.getState().undo();
+    state = useScheduleStore.getState();
+    expect(state.schedule['5а'].Пн?.[1]?.lessons.map(item => item.id)).toEqual(['first', 'partner']);
+    expect(state.temporaryLessons).toEqual([]);
+    expect(state.removedLessons).toEqual([]);
+  });
 });

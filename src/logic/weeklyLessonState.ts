@@ -6,7 +6,6 @@ import type {
   RestorableLessonReason,
   ScheduledLesson,
 } from '@/types';
-import { getLessonKey } from './counting';
 
 export interface CompleteLessonParams {
   requirement: LessonRequirement;
@@ -23,11 +22,7 @@ export function getRequirementClassName(requirement: LessonRequirement): string 
 }
 
 export function getOffGridLessonKey(requirement: LessonRequirement, className: string): string {
-  return `${className}|${getLessonKey({
-    subject: requirement.subject,
-    teacher: requirement.teacher,
-    group: requirement.type === 'group' ? requirement.classOrGroup : undefined,
-  })}`;
+  return `${className}|${requirement.id}`;
 }
 
 function scheduledSnapshot(requirement: LessonRequirement, id: string): ScheduledLesson {

@@ -16,6 +16,7 @@ import { forEachSlotAt } from './traversal';
 import { isTeacherFree } from './validation';
 import { getUnscheduledLessons } from './counting';
 import { findRequirementForScheduledLesson } from './lessonRequirementMatching';
+import { getRequirementIdentityKey, getScheduledLessonIdentityKey } from './lessonIdentity';
 
 function getRoomClassesAtSlot(
   schedule: Schedule,
@@ -183,7 +184,20 @@ export interface AvailableLessonsResult {
 export interface ExcludeLesson {
   subject: string;
   teacher: string;
+  teacher2?: string;
   group?: string;
+}
+
+function toTeacherSet(value?: string | readonly string[]): Set<string> {
+  return new Set(value == null ? [] : typeof value === 'string' ? [value] : value);
+}
+
+function hasBlockedTeacher(
+  lesson: { teacher: string; teacher2?: string },
+  excluded: ReadonlySet<string>,
+  unavailable: ReadonlySet<string>,
+): boolean {
+  return [lesson.teacher, lesson.teacher2].some(name => !!name && (excluded.has(name) || unavailable.has(name)));
 }
 
 export function getAvailableLessonsForSlot(
@@ -193,7 +207,8 @@ export function getAvailableLessonsForSlot(
   className: string,
   day: Day,
   lessonNum: LessonNumber,
-  excludeLesson?: ExcludeLesson
+  excludeLesson?: ExcludeLesson,
+  unavailableTeachers: ReadonlySet<string> = new Set(),
 ): AvailableLessonsResult {
   const result: AvailableLessonsResult = {
     unscheduled: [],
@@ -201,6 +216,7 @@ export function getAvailableLessonsForSlot(
   };
 
   const seenKeys = new Set<string>();
+  const excludedTeachers = new Set([excludeLesson?.teacher, excludeLesson?.teacher2].filter(Boolean) as string[]);
 
   // Helper to check if a lesson matches the excluded lesson
   const isExcluded = (subject: string, teacher: string, group?: string) => {
@@ -217,16 +233,14 @@ export function getAvailableLessonsForSlot(
 
   for (const { requirement } of unscheduledList) {
     const group = requirement.type === 'group' ? requirement.classOrGroup : undefined;
-    const key = group
-      ? `${requirement.subject}|${requirement.teacher}|${group}`
-      : `${requirement.subject}|${requirement.teacher}`;
+    const key = getRequirementIdentityKey(requirement);
     if (seenKeys.has(key)) continue;
 
     // Skip if this is the excluded lesson
     if (isExcluded(requirement.subject, requirement.teacher, group)) continue;
 
     // Skip lessons from the same teacher being replaced (pointless replacement)
-    if (excludeLesson && requirement.teacher === excludeLesson.teacher) continue;
+    if (hasBlockedTeacher(requirement, excludedTeachers, unavailableTeachers)) continue;
 
     if (isTeacherFree(schedule, teachers, requirement.teacher, day, lessonNum, className)) {
       // Also check teacher2 if present
@@ -254,7 +268,7 @@ export function getAvailableLessonsForSlot(
           if (isExcluded(lesson.subject, lesson.teacher, lesson.group)) continue;
 
           // Skip lessons from the same teacher being replaced (pointless replacement)
-          if (excludeLesson && lesson.teacher === excludeLesson.teacher) continue;
+          if (hasBlockedTeacher(lesson, excludedTeachers, unavailableTeachers)) continue;
 
           if (isTeacherFree(schedule, teachers, lesson.teacher, day, lessonNum, className)) {
             // Also check teacher2 if present
@@ -262,9 +276,7 @@ export function getAvailableLessonsForSlot(
               continue;
             }
 
-            const key = lesson.group
-              ? `${lesson.subject}|${lesson.teacher}|${lesson.group}`
-              : `${lesson.subject}|${lesson.teacher}`;
+            const key = getScheduledLessonIdentityKey(className, lesson);
 
             // Mark as seen so it won't appear in unscheduled too
             seenKeys.add(key);
@@ -300,13 +312,15 @@ export function getSubstituteTeachers(
   day: Day,
   lessonNum: LessonNumber,
   excludeClass: string,
-  excludeTeacher?: string
+  excludeTeachers?: string | readonly string[],
+  unavailableTeachers: ReadonlySet<string> = new Set(),
 ): Teacher[] {
   const substitutes: Teacher[] = [];
+  const excluded = toTeacherSet(excludeTeachers);
 
   for (const teacher of Object.values(teachers)) {
     // Skip the teacher being replaced
-    if (excludeTeacher && teacher.name === excludeTeacher) continue;
+    if (excluded.has(teacher.name) || unavailableTeachers.has(teacher.name)) continue;
 
     // Check if teacher can teach this subject
     if (!teacher.subjects.includes(subject)) continue;
@@ -331,14 +345,16 @@ export function getFreeTeachersAtSlot(
   teachers: Record<string, Teacher>,
   day: Day,
   lessonNum: LessonNumber,
-  excludeTeacher?: string,
+  excludeTeachers?: string | readonly string[],
   substituteTeacherNames?: string[],
+  unavailableTeachers: ReadonlySet<string> = new Set(),
 ): Teacher[] {
   const excludeSet = new Set(substituteTeacherNames ?? []);
+  for (const name of toTeacherSet(excludeTeachers)) excludeSet.add(name);
   const result: Teacher[] = [];
 
   for (const teacher of Object.values(teachers)) {
-    if (excludeTeacher && teacher.name === excludeTeacher) continue;
+    if (unavailableTeachers.has(teacher.name)) continue;
     if (excludeSet.has(teacher.name)) continue;
     if (isTeacherFree(schedule, teachers, teacher.name, day, lessonNum, '')) {
       result.push(teacher);

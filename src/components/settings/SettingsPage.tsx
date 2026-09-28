@@ -298,7 +298,7 @@ export function SettingsPage() {
           <div className={styles.about}>
             <p><strong>Редактор школьного расписания</strong></p>
             <p>Версия {APP_VERSION}</p>
-            <p>Авторы: Минухин Д., Минухин В., Клаудия</p>
+            <p>Авторы: Минухин В., Минухин Д., Клаудиа, Codex</p>
             <p className={styles.muted}>
               React + TypeScript + Vite
             </p>

@@ -17,6 +17,7 @@ interface LessonSelectionListProps {
   currentLesson?: {
     subject: string;
     teacher: string;
+    teacher2?: string;
     group?: string;
   };
   onSelect: (lesson: LessonRequirement) => void;
@@ -35,9 +36,9 @@ interface LessonSelectionListProps {
   /** Callback when a union teacher is selected */
   onUnionSubstituteSelect?: (teacher: Teacher) => void;
   /** Co-teachers already teaching in the same slot (group partners) */
-  partnerTeachers?: { name: string; subject: string; room: string }[];
+  partnerTeachers?: { name: string; subject: string; room: string; lessonIndex: number }[];
   /** Callback when a partner teacher is clicked — opens AddTemporaryLessonModal with pre-filled data */
-  onPartnerSelect?: (teacher: string, subject: string) => void;
+  onPartnerSelect?: (teacher: string, subject: string, lessonIndex: number) => void;
 }
 
 export function LessonSelectionList({
@@ -60,6 +61,7 @@ export function LessonSelectionList({
 }: LessonSelectionListProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const removedLessons = useScheduleStore((state) => state.removedLessons);
+  const sickLeaves = useScheduleStore((state) => state.sickLeaves);
   const teachers = useDataStore((state) => state.teachers);
   const lessonRequirements = useDataStore((state) => state.lessonRequirements);
   const setHighlightedMovableTeacher = useUIStore((state) => state.setHighlightedMovableTeacher);
@@ -85,6 +87,7 @@ export function LessonSelectionList({
 
   const availableLessons = useMemo(() => {
     if (!isOpen) return { unscheduled: [], movable: [] };
+    const sickTeachers = new Set(sickLeaves.filter(mark => mark.day === day).map(mark => mark.teacher));
     return getAvailableLessonsForSlot(
       activeRequirements,
       schedule,
@@ -92,9 +95,10 @@ export function LessonSelectionList({
       className,
       day,
       lessonNum,
-      currentLesson
+      currentLesson,
+      sickTeachers,
     );
-  }, [isOpen, activeRequirements, schedule, teachers, className, day, lessonNum, currentLesson]);
+  }, [isOpen, activeRequirements, schedule, teachers, className, day, lessonNum, currentLesson, sickLeaves]);
 
   // Extract unique teacher names from movable lessons
   const movableTeachers = useMemo(() => {
@@ -204,7 +208,7 @@ export function LessonSelectionList({
               <button
                 key={partner.name}
                 className={`${styles.item} ${styles.substituteItem}`}
-                onClick={() => onPartnerSelect(partner.name, partner.subject)}
+                onClick={() => onPartnerSelect(partner.name, partner.subject, partner.lessonIndex)}
                 title="Создать занятие с этим учителем"
               >
                 <span className={styles.subject}>{partner.subject} {partner.name}</span>

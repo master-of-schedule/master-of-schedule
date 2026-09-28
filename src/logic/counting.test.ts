@@ -591,14 +591,14 @@ describe('mergeWithTemporaryLessons', () => {
     expect(result).toBe(reqs); // same reference, no copy
   });
 
-  it('increases countPerWeek when temporary lesson matches existing requirement', () => {
+  it('keeps matching temporary requirements distinct by ID', () => {
     const reqs = [createRequirement({ countPerWeek: 3 })];
     const temp = [createRequirement({ id: 'temp-1', countPerWeek: 1 })];
 
     const result = mergeWithTemporaryLessons(reqs, temp);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].countPerWeek).toBe(4);
+    expect(result).toHaveLength(2);
+    expect(result.map(item => item.id)).toEqual(['req-1', 'temp-1']);
   });
 
   it('does not mutate original requirements', () => {
@@ -667,9 +667,8 @@ describe('mergeWithTemporaryLessons', () => {
     // Should NOT throw TypeError: Cannot assign to read only property
     const result = mergeWithTemporaryLessons(reqs, [temp1, temp2]);
 
-    expect(result).toHaveLength(2); // original Math + merged Physics
-    const physics = result.find(r => r.subject === 'Физика');
-    expect(physics?.countPerWeek).toBe(2); // 1 + 1
+    expect(result).toHaveLength(3);
+    expect(result.filter(r => r.subject === 'Физика')).toHaveLength(2);
     // Original objects must not be mutated
     expect(temp1.countPerWeek).toBe(1);
     expect(temp2.countPerWeek).toBe(1);
@@ -684,10 +683,10 @@ describe('mergeWithTemporaryLessons', () => {
 
     const result = mergeWithTemporaryLessons(reqs, temp);
 
-    expect(result).toHaveLength(2);
-    expect(result[0].countPerWeek).toBe(4); // 3 + 1
-    expect(result[1].subject).toBe('Физика');
-    expect(result[1].countPerWeek).toBe(2);
+    expect(result).toHaveLength(3);
+    expect(result[0].countPerWeek).toBe(3);
+    expect(result[1].id).toBe('temp-1');
+    expect(result[2].subject).toBe('Физика');
   });
 });
 
@@ -742,10 +741,7 @@ describe('mergeWithTemporaryLessons + getUnscheduledLessons integration', () => 
     expect(physics?.remaining).toBe(2);
   });
 
-  it('merged temp entry uses original requirement ID, not temp ID (regression: Z22-2)', () => {
-    // Reproduces the bug: when a temp lesson matches an existing requirement, mergeWithTemporaryLessons
-    // puts the merged count on the original entry (original ID). UnscheduledPanel's "ensure
-    // visibility" loop must detect this by getLessonKey comparison, not by temp.id lookup.
+  it('preserves the temporary requirement ID when it matches a base requirement', () => {
     const schedule: Schedule = {
       '10а': {
         'Пн': {
@@ -765,18 +761,21 @@ describe('mergeWithTemporaryLessons + getUnscheduledLessons integration', () => 
     expect(unscheduled).toHaveLength(1);
     expect(unscheduled[0].remaining).toBe(1);
 
-    // Entry uses ORIGINAL requirement ID (not temp ID)
-    expect(unscheduled[0].requirement.id).toBe('orig-1');
-    expect(unscheduled[0].requirement.id).not.toBe('temp-1');
+    expect(unscheduled[0].requirement.id).toBe('temp-1');
+  });
 
-    // Therefore: checking list.some(item => item.id === 'temp-1') = false → fix needed
-    const tempFoundById = unscheduled.some(u => u.requirement.id === 'temp-1');
-    expect(tempFoundById).toBe(false);
+  it('does not let a lesson with another second teacher consume this requirement', () => {
+    const requirements = [
+      createRequirement({ id: 'pair-a', teacher2: 'Смирнова' }),
+      createRequirement({ id: 'pair-b', teacher2: 'Петрова' }),
+    ];
+    const schedule: Schedule = {
+      '10а': { Пн: { 1: { lessons: [createLesson({ requirementId: 'pair-a', teacher2: 'Смирнова' })] } } },
+    };
 
-    // getLessonKey correctly identifies the merged entry for the fix
-    const tempKey = getLessonKey({ subject: 'Математика', teacher: 'Иванова Т.С.' });
-    const originalKey = getLessonKey({ subject: unscheduled[0].requirement.subject, teacher: unscheduled[0].requirement.teacher });
-    expect(originalKey).toBe(tempKey);
+    const result = getUnscheduledLessons(requirements, schedule, '10а');
+    expect(result.find(item => item.requirement.id === 'pair-a')?.remaining).toBe(4);
+    expect(result.find(item => item.requirement.id === 'pair-b')?.remaining).toBe(5);
   });
 
   it('temporary lesson for different class does not affect current class', () => {

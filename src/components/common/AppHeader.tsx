@@ -158,7 +158,7 @@ export function AppHeader({ onCheckForUpdate }: AppHeaderProps) {
     <Modal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} title="О программе" size="small">
       <div className={styles.aboutContent}>
         <p className={styles.aboutVersion}>Версия {import.meta.env.VITE_APP_VERSION}</p>
-        <p className={styles.aboutAuthors}>Авторы: Минухин В., Минухин Д., Клаудиа</p>
+        <p className={styles.aboutAuthors}>Авторы: Минухин В., Минухин Д., Клаудиа, Codex</p>
         <Button variant="secondary" size="small" onClick={handleCheckForUpdate} disabled={isCheckingUpdate}>
           {isCheckingUpdate ? 'Проверяем...' : 'Проверить обновления'}
         </Button>

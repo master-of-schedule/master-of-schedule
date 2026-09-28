@@ -261,8 +261,6 @@ export async function duplicateVersion(
     generateId,
   );
 
-  // Acknowledged conflicts are not inherited: the new version starts fresh,
-  // requiring the user to acknowledge any ban violations on first open.
   return createVersion({
     name: newName,
     type: newType ?? source.type,
@@ -275,6 +273,7 @@ export async function duplicateVersion(
       lesson: { ...item.lesson },
     })),
     sickLeaves: source.sickLeaves?.map(item => ({ ...item })),
+    acknowledgedConflictKeys: source.acknowledgedConflictKeys?.slice(),
     comment: source.comment,
     mondayDate: newType === 'weekly' ? mondayDate : source.mondayDate,
     baseTemplateId: templateId,

@@ -18,6 +18,7 @@ interface ReplacementPickerProps {
   currentLesson?: {
     subject: string;
     teacher: string;
+    teacher2?: string;
     group?: string;
   };
 }

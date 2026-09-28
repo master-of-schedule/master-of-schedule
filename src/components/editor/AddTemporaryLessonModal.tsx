@@ -14,6 +14,7 @@ import { formStyles } from '@/components/common/formStyles';
 import { FormActions } from '@/components/common/FormActions';
 import { DatalistInput } from '@/components/common/DatalistInput';
 import { Button } from '@/components/common/Button';
+import { requirementsHaveSameIdentity } from '@/logic';
 
 interface AddTemporaryLessonModalProps {
   isOpen: boolean;
@@ -23,6 +24,10 @@ interface AddTemporaryLessonModalProps {
   initialTeacher?: string;
   /** Pre-fill subject field (e.g. when opening from partner flow) */
   initialSubject?: string;
+  /** Existing per-version requirement to edit in place. */
+  initialLesson?: LessonRequirement;
+  /** Return a validated draft without adding it to the store. */
+  deferCommit?: boolean;
   /** Called with the created requirement right before closing (partner merge flow) */
   onSaved?: (lesson: LessonRequirement) => void;
 }
@@ -31,6 +36,7 @@ interface AddTemporaryLessonModalProps {
 type ConfirmState =
   | { type: 'duplicate'; message: string }
   | { type: 'newSubject'; message: string; subjectToAdd: string }
+  | { type: 'missingCompensation'; message: string }
   | null;
 
 export function AddTemporaryLessonModal({
@@ -39,6 +45,8 @@ export function AddTemporaryLessonModal({
   currentClass,
   initialTeacher,
   initialSubject,
+  initialLesson,
+  deferCommit,
   onSaved,
 }: AddTemporaryLessonModalProps) {
   if (!isOpen) return null;
@@ -49,6 +57,8 @@ export function AddTemporaryLessonModal({
       currentClass={currentClass}
       initialTeacher={initialTeacher}
       initialSubject={initialSubject}
+      initialLesson={initialLesson}
+      deferCommit={deferCommit}
       onSaved={onSaved}
     />
   );
@@ -59,6 +69,8 @@ function AddTemporaryLessonModalContent({
   currentClass,
   initialTeacher,
   initialSubject,
+  initialLesson,
+  deferCommit,
   onSaved,
 }: Omit<AddTemporaryLessonModalProps, 'isOpen'>) {
   const teachers = useDataStore((state) => state.teachers);
@@ -68,16 +80,20 @@ function AddTemporaryLessonModalContent({
   const customSubjects = useDataStore((state) => state.customSubjects);
   const addCustomSubject = useDataStore((state) => state.addCustomSubject);
   const addTemporaryLesson = useScheduleStore((state) => state.addTemporaryLesson);
+  const updateTemporaryLesson = useScheduleStore((state) => state.updateTemporaryLesson);
   const temporaryLessons = useScheduleStore((state) => state.temporaryLessons);
   const versionType = useScheduleStore((state) => state.versionType);
 
-  const [teacher, setTeacher] = useState(initialTeacher ?? '');
-  const [teacher2, setTeacher2] = useState('');
-  const [className, setClassName] = useState(currentClass);
-  const [subject, setSubject] = useState(initialSubject ?? '');
-  const [count, setCount] = useState(1);
-  const [groupSuffix, setGroupSuffix] = useState('');
-  const [compensationType, setCompensationType] = useState<CompensationType>('none');
+  const initialGroupSuffix = initialLesson?.type === 'group'
+    ? initialLesson.classOrGroup.replace(`${initialLesson.className ?? currentClass} (`, '').replace(/\)$/, '')
+    : '';
+  const [teacher, setTeacher] = useState(initialLesson?.teacher ?? initialTeacher ?? '');
+  const [teacher2, setTeacher2] = useState(initialLesson?.teacher2 ?? '');
+  const [className, setClassName] = useState(initialLesson?.className ?? initialLesson?.classOrGroup ?? currentClass);
+  const [subject, setSubject] = useState(initialLesson?.subject ?? initialSubject ?? '');
+  const [count, setCount] = useState(initialLesson?.countPerWeek ?? 1);
+  const [groupSuffix, setGroupSuffix] = useState(initialGroupSuffix);
+  const [compensationType, setCompensationType] = useState<CompensationType>(initialLesson?.compensationType ?? 'none');
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
 
   // Build sorted teacher names for datalist
@@ -122,7 +138,7 @@ function AddTemporaryLessonModalContent({
     }
 
     const lesson: LessonRequirement = {
-      id: generateId('temp'),
+      id: initialLesson?.id ?? generateId('temp'),
       type: isGroup ? 'group' : 'class',
       classOrGroup,
       subject: trimmedSubject,
@@ -134,7 +150,10 @@ function AddTemporaryLessonModalContent({
       ...(compensationType !== 'none' ? { compensationType: compensationType as 'budget' | 'union' } : {}),
     };
 
-    addTemporaryLesson(lesson);
+    if (!deferCommit) {
+      if (initialLesson) updateTemporaryLesson(lesson);
+      else addTemporaryLesson(lesson);
+    }
 
     // Reset form
     setTeacher('');
@@ -146,7 +165,7 @@ function AddTemporaryLessonModalContent({
     setConfirmState(null);
     onSaved?.(lesson);
     onClose();
-  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, groups, addTemporaryLesson, onClose, onSaved, addCustomSubject]);
+  }, [className, subject, teacher, teacher2, count, groupSuffix, compensationType, teacherNameSet, groups, addTemporaryLesson, updateTemporaryLesson, initialLesson, deferCommit, onClose, onSaved, addCustomSubject]);
 
   const handleSave = useCallback(() => {
     if (!canSave) return;
@@ -156,6 +175,16 @@ function AddTemporaryLessonModalContent({
     const trimmedGroup = groupSuffix.trim();
     const isGroup = trimmedGroup.length > 0;
     const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+    const candidate: LessonRequirement = {
+      id: 'candidate',
+      type: isGroup ? 'group' : 'class',
+      classOrGroup,
+      ...(isGroup ? { className } : {}),
+      subject: trimmedSubject,
+      teacher: trimmedTeacher,
+      ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}),
+      countPerWeek: count,
+    };
 
     // Check for new subject first
     const subjectSet = new Set(existingSubjects);
@@ -169,12 +198,8 @@ function AddTemporaryLessonModalContent({
     }
 
     // Check for duplicate
-    const allLessons = [...lessonRequirements, ...temporaryLessons];
-    const duplicate = allLessons.find(
-      r => r.subject === trimmedSubject &&
-           r.teacher === trimmedTeacher &&
-           r.classOrGroup === classOrGroup
-    );
+    const allLessons = [...lessonRequirements, ...temporaryLessons].filter(item => item.id !== initialLesson?.id);
+    const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
     if (duplicate) {
       setConfirmState({
         type: 'duplicate',
@@ -183,8 +208,13 @@ function AddTemporaryLessonModalContent({
       return;
     }
 
+    if (versionType === 'weekly' && compensationType === 'none') {
+      setConfirmState({ type: 'missingCompensation', message: 'Тип оплаты не выбран. Сохранить как обычное дополнительное занятие без типа оплаты?' });
+      return;
+    }
+
     doAddLesson();
-  }, [canSave, className, subject, teacher, groupSuffix, existingSubjects, lessonRequirements, temporaryLessons, doAddLesson]);
+  }, [canSave, className, subject, teacher, teacher2, count, groupSuffix, compensationType, versionType, initialLesson, existingSubjects, lessonRequirements, temporaryLessons, doAddLesson]);
 
   // Handle confirm actions
   const handleConfirm = useCallback(() => {
@@ -198,13 +228,14 @@ function AddTemporaryLessonModalContent({
       const trimmedGroup = groupSuffix.trim();
       const isGroup = trimmedGroup.length > 0;
       const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+      const candidate: LessonRequirement = {
+        id: 'candidate', type: isGroup ? 'group' : 'class', classOrGroup,
+        ...(isGroup ? { className } : {}), subject: trimmedSubject, teacher: trimmedTeacher,
+        ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}), countPerWeek: count,
+      };
 
-      const allLessons = [...lessonRequirements, ...temporaryLessons];
-      const duplicate = allLessons.find(
-        r => r.subject === trimmedSubject &&
-             r.teacher === trimmedTeacher &&
-             r.classOrGroup === classOrGroup
-      );
+      const allLessons = [...lessonRequirements, ...temporaryLessons].filter(item => item.id !== initialLesson?.id);
+      const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
       if (duplicate) {
         setConfirmState({
           type: 'duplicate',
@@ -212,12 +243,16 @@ function AddTemporaryLessonModalContent({
         });
         return;
       }
+      if (versionType === 'weekly' && compensationType === 'none') {
+        setConfirmState({ type: 'missingCompensation', message: 'Тип оплаты не выбран. Сохранить как обычное дополнительное занятие без типа оплаты?' });
+        return;
+      }
       doAddLesson();
     } else {
       // duplicate confirmed
       doAddLesson();
     }
-  }, [confirmState, subject, teacher, groupSuffix, className, lessonRequirements, temporaryLessons, addCustomSubject, doAddLesson]);
+  }, [confirmState, subject, teacher, teacher2, count, groupSuffix, className, initialLesson, versionType, compensationType, lessonRequirements, temporaryLessons, addCustomSubject, doAddLesson]);
 
   const handleSkipNewSubject = useCallback(() => {
     // Don't add the subject, but still check for duplicate
@@ -226,13 +261,14 @@ function AddTemporaryLessonModalContent({
     const trimmedGroup = groupSuffix.trim();
     const isGroup = trimmedGroup.length > 0;
     const classOrGroup = isGroup ? `${className} (${trimmedGroup})` : className;
+    const candidate: LessonRequirement = {
+      id: 'candidate', type: isGroup ? 'group' : 'class', classOrGroup,
+      ...(isGroup ? { className } : {}), subject: trimmedSubject, teacher: trimmedTeacher,
+      ...(teacher2.trim() ? { teacher2: teacher2.trim() } : {}), countPerWeek: count,
+    };
 
-    const allLessons = [...lessonRequirements, ...temporaryLessons];
-    const duplicate = allLessons.find(
-      r => r.subject === trimmedSubject &&
-           r.teacher === trimmedTeacher &&
-           r.classOrGroup === classOrGroup
-    );
+    const allLessons = [...lessonRequirements, ...temporaryLessons].filter(item => item.id !== initialLesson?.id);
+    const duplicate = allLessons.find(r => requirementsHaveSameIdentity(r, candidate));
     if (duplicate) {
       setConfirmState({
         type: 'duplicate',
@@ -240,8 +276,12 @@ function AddTemporaryLessonModalContent({
       });
       return;
     }
+    if (versionType === 'weekly' && compensationType === 'none') {
+      setConfirmState({ type: 'missingCompensation', message: 'Тип оплаты не выбран. Сохранить как обычное дополнительное занятие без типа оплаты?' });
+      return;
+    }
     doAddLesson();
-  }, [subject, teacher, groupSuffix, className, lessonRequirements, temporaryLessons, doAddLesson]);
+  }, [subject, teacher, teacher2, count, groupSuffix, className, initialLesson, versionType, compensationType, lessonRequirements, temporaryLessons, doAddLesson]);
 
   // Reset form when modal opens
   const handleClose = useCallback(() => {
@@ -257,7 +297,7 @@ function AddTemporaryLessonModalContent({
   }, [currentClass, onClose]);
 
   return (
-    <Modal isOpen={true} onClose={handleClose} title="Добавить занятие" size="small">
+    <Modal isOpen={true} onClose={handleClose} title={initialLesson ? 'Редактировать занятие' : 'Добавить занятие'} size="small">
       <div className={formStyles.form}>
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-sm) 0', textAlign: 'center' }}>
           Временное занятие действует только в этой версии расписания
@@ -293,7 +333,7 @@ function AddTemporaryLessonModalContent({
                     Отмена
                   </Button>
                   <Button variant="primary" size="small" onClick={handleConfirm}>
-                    Добавить всё равно
+                    {confirmState.type === 'missingCompensation' ? 'Сохранить без типа' : 'Добавить всё равно'}
                   </Button>
                 </>
               )}
@@ -341,6 +381,7 @@ function AddTemporaryLessonModalContent({
             className={formStyles.input}
             value={className}
             onChange={(e) => setClassName(e.target.value)}
+            disabled={!!initialLesson}
           >
             {classes.map(cls => (
               <option key={cls.name} value={cls.name}>{cls.name}</option>
@@ -354,6 +395,7 @@ function AddTemporaryLessonModalContent({
             className={formStyles.input}
             value={groupSuffix}
             onChange={(e) => setGroupSuffix(e.target.value)}
+            disabled={!!initialLesson}
             placeholder="например, д"
             style={{ maxWidth: 150 }}
           />
@@ -385,7 +427,7 @@ function AddTemporaryLessonModalContent({
           onCancel={handleClose}
           onSave={handleSave}
           disabled={!canSave || !!confirmState}
-          saveLabel="Добавить"
+          saveLabel={initialLesson ? 'Сохранить' : 'Добавить'}
         />
       </div>
     </Modal>

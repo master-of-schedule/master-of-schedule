@@ -5,7 +5,7 @@
   <h1>РШР — Редактор школьного расписания</h1>
   <p>Два инструмента для составления и ведения расписания в общеобразовательной школе</p>
 
-  ![Версия](https://img.shields.io/badge/версия-3.41.3-teal)
+  ![Версия](https://img.shields.io/badge/версия-3.42.0-teal)
   ![Версия РН](https://img.shields.io/badge/РН-1.21.0-teal)
   ![Лицензия](https://img.shields.io/badge/лицензия-MIT-blue)
   ![Платформа](https://img.shields.io/badge/платформа-web%20%7C%20macOS%20%7C%20Windows-lightgrey)
@@ -14,6 +14,8 @@
   
 **[master-of-schedule.github.io](https://master-of-schedule.github.io)**
 </div>
+
+**Авторы:** Минухин В., Минухин Д., Клаудиа, Codex.
 
 ---
 
