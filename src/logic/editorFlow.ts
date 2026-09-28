@@ -122,6 +122,7 @@ export interface ReplacementDialogData {
   currentLesson?: {
     subject: string;
     teacher: string;
+    teacher2?: string;
     group?: string;
   };
 }

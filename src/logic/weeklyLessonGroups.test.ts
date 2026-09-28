@@ -79,17 +79,20 @@ describe('buildWeeklyLessonGroups', () => {
     expect(result.withdrawn).toEqual([]);
   });
 
-  it('separates a merged plus lesson from the ordinary remainder', () => {
+  it('keeps a plus lesson separate from an identical base requirement', () => {
     const original = requirement('base', 'Математика');
     const temporary = { ...original, id: 'temp', countPerWeek: 1 };
     const result = buildWeeklyLessonGroups(
-      [{ requirement: original, remaining: 2 }],
+      [
+        { requirement: original, remaining: 1 },
+        { requirement: temporary, remaining: 1 },
+      ],
       [],
       '5а',
       [temporary],
     );
 
-    expect(result.temporary[0]).toMatchObject({ requirement: { id: 'base' }, remaining: 1 });
+    expect(result.temporary[0]).toMatchObject({ requirement: { id: 'temp' }, remaining: 1 });
     expect(result.withdrawn[0]).toMatchObject({ requirement: { id: 'base' }, remaining: 1 });
   });
 

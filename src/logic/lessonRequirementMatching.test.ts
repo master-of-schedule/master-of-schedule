@@ -51,4 +51,17 @@ describe('findRequirementForScheduledLesson', () => {
 
     expect(result?.id).toBe('target');
   });
+
+  it('does not fall back to a requirement with a different second teacher', () => {
+    const requirements = [
+      req({ id: 'wrong', classOrGroup: '5-б', teacher2: 'Второй А' }),
+      req({ id: 'right', classOrGroup: '5-б', teacher2: 'Второй Б' }),
+    ];
+    const result = findRequirementForScheduledLesson(
+      requirements,
+      lesson({ requirementId: 'missing', teacher2: 'Второй Б' }),
+      '5-б',
+    );
+    expect(result?.id).toBe('right');
+  });
 });

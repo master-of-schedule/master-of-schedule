@@ -59,6 +59,7 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
   const selectLesson = useUIStore((state) => state.selectLesson);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<LessonRequirement | null>(null);
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>(CLOSED_CONTEXT_MENU);
 
   const mergedRequirements = useMemo(
@@ -138,6 +139,14 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
     }
     closeContextMenu();
   }, [ctxMenu, className, clearCompletedLessons, closeContextMenu]);
+
+  const handleEditTemporary = useCallback(() => {
+    if (ctxMenu.requirement && temporaryIds.has(ctxMenu.requirement.id)) {
+      setEditingLesson(ctxMenu.requirement);
+      setIsAddModalOpen(true);
+    }
+    closeContextMenu();
+  }, [ctxMenu.requirement, temporaryIds, closeContextMenu]);
 
   const groupedLessons = useMemo(() => {
     const groups = new Map<string, UnscheduledLesson[]>();
@@ -292,6 +301,9 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
 
       {isWeekly && (
         <ContextMenu isOpen={ctxMenu.isOpen} x={ctxMenu.x} y={ctxMenu.y} onClose={closeContextMenu}>
+          {ctxMenu.requirement && temporaryIds.has(ctxMenu.requirement.id) && (
+            <ContextMenuItem onClick={handleEditTemporary}>Редактировать</ContextMenuItem>
+          )}
           {ctxMenu.kind === 'completed' ? (
             <ContextMenuItem onClick={handleClearCompleted}>Снять отметку</ContextMenuItem>
           ) : (
@@ -308,8 +320,9 @@ export function UnscheduledPanel({ className }: UnscheduledPanelProps) {
 
       <AddTemporaryLessonModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => { setIsAddModalOpen(false); setEditingLesson(null); }}
         currentClass={className}
+        initialLesson={editingLesson ?? undefined}
       />
     </div>
   );

@@ -381,6 +381,21 @@ const createTestRequirements = (): LessonRequirement[] => [
 ];
 
 describe('getAvailableLessonsForSlot', () => {
+  it('excludes candidates containing either original teacher and teachers sick that day', () => {
+    const teachers = createTestTeachers();
+    teachers['Смирнова С.С.'] = { id: 't4', name: 'Смирнова С.С.', subjects: ['Биология'], bans: {} };
+    const requirements: LessonRequirement[] = [
+      { id: 'same-secondary', type: 'class', classOrGroup: '10а', subject: 'Физика', teacher: 'Петрова А.П.', teacher2: 'Иванова Т.С.', countPerWeek: 1 },
+      { id: 'sick-secondary', type: 'class', classOrGroup: '10а', subject: 'Биология', teacher: 'Сидорова М.К.', teacher2: 'Смирнова С.С.', countPerWeek: 1 },
+    ];
+    const result = getAvailableLessonsForSlot(
+      requirements, { '10а': {} }, teachers, '10а', 'Пн', 3,
+      { subject: 'Математика', teacher: 'Иванова Т.С.', teacher2: 'Петрова А.П.' },
+      new Set(['Смирнова С.С.']),
+    );
+    expect(result.unscheduled).toEqual([]);
+  });
+
   it('returns unscheduled lessons with free teachers', () => {
     const schedule: Schedule = {
       '10а': {
@@ -1142,6 +1157,15 @@ describe('getSubstituteTeachers', () => {
     expect(names).toContain('Петрова А.П.');
     expect(names).toContain('Рыбина А.А.');
   });
+
+  it('excludes both original teachers and teachers sick on this day', () => {
+    const teachers = createTeachersForSub();
+    const result = getSubstituteTeachers(
+      {}, teachers, 'Математика', 'Пн', 1, '10а',
+      ['Иванова Т.С.', 'Петрова А.П.'], new Set(['Рыбина А.А.']),
+    );
+    expect(result).toEqual([]);
+  });
 });
 
 describe('getFreeTeachersAtSlot', () => {
@@ -1183,6 +1207,15 @@ describe('getFreeTeachersAtSlot', () => {
     expect(names).toContain('Иванов');
     expect(names).not.toContain('Петров');
     expect(names).toContain('Сидоров');
+  });
+
+  it('excludes all original and sick teachers', () => {
+    const schedule: Schedule = {};
+    const teachers = { t1: makeTeacher('Иванов'), t2: makeTeacher('Петров'), t3: makeTeacher('Сидоров') };
+    const result = getFreeTeachersAtSlot(
+      schedule, teachers, 'Пн', 1, ['Иванов', 'Петров'], undefined, new Set(['Сидоров']),
+    );
+    expect(result).toEqual([]);
   });
 
   it('excludes teachers busy at the slot', () => {

@@ -7,6 +7,12 @@
 export { createScheduledLesson } from './createScheduledLesson';
 export { findRequirementForScheduledLesson } from './lessonRequirementMatching';
 export {
+  getRequirementIdentityKey,
+  getScheduledLessonIdentityKey,
+  requirementMatchesScheduledLesson,
+  requirementsHaveSameIdentity,
+} from './lessonIdentity';
+export {
   reduceEditorInteraction,
   reduceEditorDialog,
   getAssigningLesson,

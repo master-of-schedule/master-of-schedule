@@ -15,6 +15,7 @@ interface PartnerTeacher {
   name: string;
   subject: string;
   room: string;
+  lessonIndex: number;
 }
 
 interface ReplacementPanelProps {
@@ -24,13 +25,14 @@ interface ReplacementPanelProps {
   currentLesson?: {
     subject: string;
     teacher: string;
+    teacher2?: string;
     group?: string;
   };
   onSelect: (lesson: LessonRequirement) => void;
   onSubstituteSelect: (teacher: Teacher) => void;
   onUnionSubstituteSelect: (teacher: Teacher) => void;
   /** Called when user clicks a co-teacher (partner) in the same slot */
-  onPartnerSelect?: (teacher: string, subject: string) => void;
+  onPartnerSelect?: (teacher: string, subject: string, lessonIndex: number) => void;
   onClose: () => void;
 }
 
@@ -47,27 +49,37 @@ export function ReplacementPanel({
 }: ReplacementPanelProps) {
   const schedule = useScheduleStore((state) => state.schedule);
   const versionType = useScheduleStore((state) => state.versionType);
+  const sickLeaves = useScheduleStore((state) => state.sickLeaves);
   const teachers = useDataStore((state) => state.teachers);
+  const excludedTeachers = useMemo(
+    () => currentLesson ? [currentLesson.teacher, currentLesson.teacher2].filter(Boolean) as string[] : [],
+    [currentLesson],
+  );
+  const sickTeachers = useMemo(
+    () => new Set(sickLeaves.filter(mark => mark.day === day).map(mark => mark.teacher)),
+    [sickLeaves, day],
+  );
 
   const substituteTeachers = useMemo(() => {
     if (!currentLesson) return [];
-    return getSubstituteTeachers(schedule, teachers, currentLesson.subject, day, lessonNum, className, currentLesson.teacher);
-  }, [schedule, teachers, currentLesson, day, lessonNum, className]);
+    return getSubstituteTeachers(schedule, teachers, currentLesson.subject, day, lessonNum, className, excludedTeachers, sickTeachers);
+  }, [schedule, teachers, currentLesson, day, lessonNum, className, excludedTeachers, sickTeachers]);
 
   const unionTeachers = useMemo(() => {
     if (!currentLesson || versionType === 'template') return undefined;
     const substituteNames = substituteTeachers.map((t) => t.name);
-    return getFreeTeachersAtSlot(schedule, teachers, day, lessonNum, currentLesson.teacher, substituteNames);
-  }, [schedule, teachers, currentLesson, day, lessonNum, substituteTeachers, versionType]);
+    return getFreeTeachersAtSlot(schedule, teachers, day, lessonNum, excludedTeachers, substituteNames, sickTeachers);
+  }, [schedule, teachers, currentLesson, day, lessonNum, excludedTeachers, substituteTeachers, versionType, sickTeachers]);
 
   // Partner teachers: others already teaching in the same slot for the same class
   const partnerTeachers = useMemo<PartnerTeacher[]>(() => {
     if (!currentLesson || !onPartnerSelect) return [];
     const lessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
     return lessons
-      .filter(l => l.teacher !== currentLesson.teacher)
-      .map(l => ({ name: l.teacher, subject: l.subject, room: l.room }));
-  }, [schedule, className, day, lessonNum, currentLesson, onPartnerSelect]);
+      .map((lesson, lessonIndex) => ({ lesson, lessonIndex }))
+      .filter(({ lesson }) => ![lesson.teacher, lesson.teacher2].some(name => !!name && (excludedTeachers.includes(name) || sickTeachers.has(name))))
+      .map(({ lesson, lessonIndex }) => ({ name: lesson.teacher, subject: lesson.subject, room: lesson.room, lessonIndex }));
+  }, [schedule, className, day, lessonNum, currentLesson, onPartnerSelect, excludedTeachers, sickTeachers]);
 
   return (
     <div className={styles.panel}>

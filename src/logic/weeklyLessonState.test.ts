@@ -84,6 +84,19 @@ describe('weekly lesson occurrence transitions', () => {
 
     expect(result).toHaveLength(2);
     expect(result.every(item => item.reason === 'completed')).toBe(true);
-    expect(getCompletedCounts(result).get('5а|Математика|Учитель')).toBe(2);
+    expect(getCompletedCounts(result).get('5а|req-1')).toBe(2);
+  });
+
+  it('does not share completed state between requirements with similar content', () => {
+    const other = { ...requirement, id: 'req-2', teacher2: 'Другой учитель' };
+    const completed = completeLessonOccurrences(
+      [],
+      { requirement, className: '5а', removalIds: [], count: 1, implicitReason: 'withdrawn' },
+      () => 'completed-1',
+    );
+
+    const counts = getCompletedCounts(completed);
+    expect(counts.get('5а|req-1')).toBe(1);
+    expect(counts.get(`5а|${other.id}`)).toBeUndefined();
   });
 });
