@@ -46,6 +46,11 @@ describe('createScheduledLesson', () => {
     expect(a.id).not.toBe(b.id);
   });
 
+  it('uses a supplied stable id for restored or synthetic occurrences', () => {
+    const lesson = createScheduledLesson(baseReq, '-114-', { id: 'stable-occurrence-id' });
+    expect(lesson.id).toBe('stable-occurrence-id');
+  });
+
   it('sets group field for group-type requirement', () => {
     const lesson = createScheduledLesson(groupReq, '-114-');
     expect(lesson.group).toBe('10а-г1');
