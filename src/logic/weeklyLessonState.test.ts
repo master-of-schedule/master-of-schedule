@@ -59,6 +59,21 @@ describe('weekly lesson occurrence transitions', () => {
     expect(result[0].day).toBeUndefined();
   });
 
+  it('preserves compensation metadata when materializing a completed occurrence', () => {
+    const compensated = { ...requirement, compensationType: 'union' as const };
+    const result = completeLessonOccurrences(
+      [],
+      { requirement: compensated, className: '5а', removalIds: [], count: 1, implicitReason: 'temporary' },
+      () => 'new-id',
+    );
+
+    expect(result[0].lesson).toMatchObject({
+      id: 'completed-lesson-new-id',
+      isSubstitution: true,
+      isUnionSubstitution: true,
+    });
+  });
+
   it('reclassifies illness symmetrically without losing a completed state', () => {
     const sick = reclassifySickDayOccurrences([occurrence('r1')], 'Учитель', 'Пн', true);
     expect(sick[0].reason).toBe('sick');

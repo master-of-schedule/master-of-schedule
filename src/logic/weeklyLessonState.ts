@@ -4,8 +4,8 @@ import type {
   LessonStatus,
   RemovedLesson,
   RestorableLessonReason,
-  ScheduledLesson,
 } from '@/types';
+import { createScheduledLesson } from './createScheduledLesson';
 
 export interface CompleteLessonParams {
   requirement: LessonRequirement;
@@ -25,16 +25,8 @@ export function getOffGridLessonKey(requirement: LessonRequirement, className: s
   return `${className}|${requirement.id}`;
 }
 
-function scheduledSnapshot(requirement: LessonRequirement, id: string): ScheduledLesson {
-  return {
-    id: `completed-lesson-${id}`,
-    requirementId: requirement.id,
-    subject: requirement.subject,
-    teacher: requirement.teacher,
-    teacher2: requirement.teacher2,
-    room: '',
-    group: requirement.type === 'group' ? requirement.classOrGroup : undefined,
-  };
+function scheduledSnapshot(requirement: LessonRequirement, id: string) {
+  return createScheduledLesson(requirement, '', { id: `completed-lesson-${id}` });
 }
 
 /**

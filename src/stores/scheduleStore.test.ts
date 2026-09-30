@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useScheduleStore } from './scheduleStore';
 import type { ScheduledLesson, Day, LessonNumber, LessonRequirement, RemovedLesson } from '@/types';
+import { getReplacementEntries } from '@/logic/export-image-data';
 
 const mockIsReadOnly = { value: false };
 const mockRequirements: { value: LessonRequirement[] } = { value: [] };
@@ -1041,5 +1042,48 @@ describe('weekly removal categories', () => {
     expect(state.schedule['5а'].Пн?.[1]?.lessons.map(item => item.id)).toEqual(['first', 'partner']);
     expect(state.temporaryLessons).toEqual([]);
     expect(state.removedLessons).toEqual([]);
+  });
+
+  it.each([
+    { compensationType: 'budget' as const, expectedUnion: undefined },
+    { compensationType: 'union' as const, expectedUnion: true },
+  ])('preserves $compensationType compensation metadata in a partner merge and replacement list', ({ compensationType, expectedUnion }) => {
+    const original = makeLesson({ id: 'original', requirementId: 'req-original' });
+    useScheduleStore.getState().loadSchedule({
+      schedule: { '5а': { Пн: { 1: { lessons: [original] } } } },
+      versionId: 'weekly', versionType: 'weekly', versionName: 'Неделя',
+    });
+    const merged: LessonRequirement = {
+      id: `temp-${compensationType}`,
+      type: 'class',
+      classOrGroup: '5а',
+      subject: 'Объединённое',
+      teacher: 'Учитель 2',
+      countPerWeek: 1,
+      compensationType,
+    };
+
+    useScheduleStore.getState().mergePartnerLesson({
+      className: '5а', day: 'Пн', lessonNum: 1, partnerLessonIndex: 0, requirement: merged, room: '301',
+    });
+
+    const state = useScheduleStore.getState();
+    const placed = state.schedule['5а'].Пн?.[1]?.lessons[0];
+    expect(placed).toMatchObject({
+      requirementId: merged.id,
+      isSubstitution: true,
+      ...(expectedUnion ? { isUnionSubstitution: true } : {}),
+    });
+    if (!expectedUnion) expect(placed?.isUnionSubstitution).toBeUndefined();
+
+    const replacementEntries = getReplacementEntries(state.schedule, 'Пн');
+    expect(replacementEntries).toEqual([
+      expect.objectContaining({
+        className: '5а',
+        lessonNum: 1,
+        replacementTeacher: 'Учитель 2',
+        ...(expectedUnion ? { isUnionSubstitution: true } : {}),
+      }),
+    ]);
   });
 });
