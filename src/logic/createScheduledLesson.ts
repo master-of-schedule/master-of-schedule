@@ -6,14 +6,16 @@
  * then grep for any remaining direct object literals and update them too.
  * Document the total construction-site count in the commit message.
  *
- * Construction sites (5 total as of QI-9):
- *   EditorPage.tsx — bulk assign, single assign, paste copy, quick assign, move
+ * All production construction paths, including synthetic weekly-state snapshots,
+ * must go through this factory so newly added fields cannot be dropped by one flow.
  */
 
 import type { LessonRequirement, ScheduledLesson } from '@/types';
 import { generateId } from '@/utils/generateId';
 
 interface ScheduledLessonOptions {
+  /** Stable ID for restoring an existing/synthetic occurrence; generated when omitted. */
+  id?: string;
   /** Original teacher name (set when this is a substitution) */
   originalTeacher?: string;
   /** True when this lesson was placed bypassing bans/busy constraints */
@@ -37,7 +39,7 @@ export function createScheduledLesson(
   opts?: ScheduledLessonOptions,
 ): ScheduledLesson {
   const lesson: ScheduledLesson = {
-    id: generateId(),
+    id: opts?.id ?? generateId(),
     requirementId: req.id,
     subject: req.subject,
     teacher: req.teacher,

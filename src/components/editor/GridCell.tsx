@@ -6,6 +6,7 @@
 import { memo, useCallback } from 'react';
 import type { ScheduledLesson, Day, LessonNumber, CellStatusInfo } from '@/types';
 import { extractGroupIndex, formatRoom } from '@/utils/formatLesson';
+import { isReplacementLesson } from '@/logic/export-image-data';
 import styles from './GridCell.module.css';
 
 interface GridCellProps {
@@ -141,7 +142,7 @@ export const GridCell = memo(function GridCell({
               {lesson.teacher}{lesson.teacher2 ? ` / ${lesson.teacher2}` : ''}
             </span>
             <span className={styles.room}>{formatRoom(lesson.room)}</span>
-            {lesson.isSubstitution && <span className={styles.substitution}>(зам)</span>}
+            {isReplacementLesson(lesson) && <span className={styles.substitution}>(зам)</span>}
           </div>
         );
       })}

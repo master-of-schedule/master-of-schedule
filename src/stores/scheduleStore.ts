@@ -35,6 +35,7 @@ import {
   buildWeeklyLessonGroups,
   getUnscheduledLessons,
   getOffGridLessonKey,
+  createScheduledLesson,
 } from '@/logic';
 
 interface ScheduleState {
@@ -672,11 +673,9 @@ export const useScheduleStore = create<ScheduleState>()(
       const originals = state.schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
       if (!originals[partnerLessonIndex]) return;
       const schedule = cloneSchedule(state.schedule);
-      schedule[className][day]![lessonNum] = { lessons: [{
-        id: generateId(), requirementId: requirement.id, subject: requirement.subject,
-        teacher: requirement.teacher, teacher2: requirement.teacher2, room,
-        group: requirement.type === 'group' ? requirement.classOrGroup : undefined,
-      }] };
+      schedule[className][day]![lessonNum] = {
+        lessons: [createScheduledLesson(requirement, room)],
+      };
       const additions = originals.map((original, index) => {
         const reason = getAutomaticRemovalReason(state, original, day);
         const removed = makeRemovedLesson(state, { className, day, lessonNum }, original, reason);

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries } from './export-image-data';
+import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson, getChangedClassCellKeys } from './export-image-data';
 import type { ScheduledLesson, Schedule, Teacher } from '@/types';
 
 // ─── Fixtures ─────────────────────────────────────────────────
@@ -55,6 +55,16 @@ describe('isSlotChangedForExport', () => {
   it('returns false when both are empty', () => {
     expect(isSlotChangedForExport([], [])).toBe(false);
   });
+
+  it('keeps a class visible when only the replacement marker changed', () => {
+    const templateLesson = createLesson();
+    const compensated = createLesson({ isSubstitution: true, isUnionSubstitution: true });
+    const template: Schedule = { '6а': { Пн: { 3: { lessons: [templateLesson] } } } };
+    const schedule: Schedule = { '6а': { Пн: { 3: { lessons: [compensated] } } } };
+    expect(isSlotChangedForExport([compensated], [templateLesson])).toBe(true);
+    expect(getChangedClassCellKeys(schedule, template, ['6а'])).toContain('6а|Пн|3');
+    expect(getChangedClassesData(schedule, template, ['6а'], 'Пн').columns).toEqual(['6а']);
+  });
 });
 
 // ─── formatCellLessons ────────────────────────────────────────
@@ -91,6 +101,21 @@ describe('formatCellLessons', () => {
     expect(result).toContain('\n');
     const lines = result.split('\n');
     expect(lines).toHaveLength(2);
+  });
+
+  it('marks a compensated partner lesson in the classes image without an original teacher', () => {
+    const lesson = createLesson({ isSubstitution: true, isUnionSubstitution: true });
+    expect(isReplacementLesson(lesson)).toBe(true);
+    expect(formatCellLessons([lesson])).toBe('Математика Иванова Т.С. -114- *');
+    const schedule: Schedule = { '6а': { Пн: { 3: { lessons: [lesson] } } } };
+    expect(getReplacementEntries(schedule, 'Пн')).toEqual([
+      expect.objectContaining({ className: '6а', lessonNum: 3, isUnionSubstitution: true }),
+    ]);
+  });
+
+  it('recognizes a direct teacher substitution and leaves an ordinary lesson unmarked', () => {
+    expect(isReplacementLesson(createLesson({ originalTeacher: 'Другой учитель' }))).toBe(true);
+    expect(isReplacementLesson(createLesson())).toBe(false);
   });
 });
 
