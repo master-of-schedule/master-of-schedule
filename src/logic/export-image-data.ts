@@ -22,6 +22,11 @@ export function isSlotChangedForExport(
   return isSlotDifferentFromTemplate(current, template) || hasSlotRoomChange(current, template);
 }
 
+/** All replacement flows share this marker, including compensation without an original teacher. */
+export function isReplacementLesson(lesson: ScheduledLesson): boolean {
+  return Boolean(lesson.originalTeacher || lesson.isSubstitution);
+}
+
 /**
  * Format a cell's lessons into display text for the classes image.
  * Same format as TSV export: "Subject (group) Teacher -Room-"
@@ -37,6 +42,7 @@ export function formatCellLessons(lessons: ScheduledLesson[]): string {
     if (group) result += ` (${group})`;
     result += ` ${teacherStr}`;
     result += ` ${formatRoom(lesson.room)}`;
+    if (isReplacementLesson(lesson)) result += ' *';
     return result;
   }).join('\n');
 }
@@ -343,7 +349,7 @@ export function getReplacementEntries(
     for (const lessonNum of LESSON_NUMBERS) {
       const lessons = days[day]?.[lessonNum]?.lessons ?? [];
       for (const lesson of lessons) {
-        if (lesson.originalTeacher || lesson.isSubstitution) {
+        if (isReplacementLesson(lesson)) {
           entries.push({
             className,
             day,

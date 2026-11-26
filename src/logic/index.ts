@@ -125,6 +125,7 @@ export {
   getTeacherImageData,
   getAbsentTeachersData,
   getReplacementEntries,
+  isReplacementLesson,
   renderClassesImage,
   renderTeachersImage,
   renderAbsentImage,

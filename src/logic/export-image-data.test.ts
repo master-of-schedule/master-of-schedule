@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries } from './export-image-data';
+import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson } from './export-image-data';
 import type { ScheduledLesson, Schedule, Teacher } from '@/types';
 
 // ─── Fixtures ─────────────────────────────────────────────────
@@ -91,6 +91,21 @@ describe('formatCellLessons', () => {
     expect(result).toContain('\n');
     const lines = result.split('\n');
     expect(lines).toHaveLength(2);
+  });
+
+  it('marks a compensated partner lesson in the classes image without an original teacher', () => {
+    const lesson = createLesson({ isSubstitution: true, isUnionSubstitution: true });
+    expect(isReplacementLesson(lesson)).toBe(true);
+    expect(formatCellLessons([lesson])).toBe('Математика Иванова Т.С. -114- *');
+    const schedule: Schedule = { '6а': { Пн: { 3: { lessons: [lesson] } } } };
+    expect(getReplacementEntries(schedule, 'Пн')).toEqual([
+      expect.objectContaining({ className: '6а', lessonNum: 3, isUnionSubstitution: true }),
+    ]);
+  });
+
+  it('recognizes a direct teacher substitution and leaves an ordinary lesson unmarked', () => {
+    expect(isReplacementLesson(createLesson({ originalTeacher: 'Другой учитель' }))).toBe(true);
+    expect(isReplacementLesson(createLesson())).toBe(false);
   });
 });
 

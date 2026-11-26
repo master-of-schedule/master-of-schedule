@@ -23,6 +23,7 @@ export {
   getTeacherImageData,
   getAbsentTeachersData,
   getReplacementEntries,
+  isReplacementLesson,
 } from './export-image-data';
 
 import type { ClassesImageData, TeacherImageData, ReplacementEntry } from './export-image-data';

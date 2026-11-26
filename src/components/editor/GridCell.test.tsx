@@ -50,3 +50,18 @@ describe('GridCell modifier clicks', () => {
     expect(onAltClick).not.toHaveBeenCalled();
   });
 });
+
+describe('GridCell replacement marker', () => {
+  it('marks a replacement linked to its original teacher', () => {
+    render(
+      <GridCell
+        day="Пн" lessonNum={3}
+        lessons={[{ id: 'placed', requirementId: 'req', subject: 'Математика', teacher: 'Учитель 2', originalTeacher: 'Учитель 1', room: '101' }]}
+        status={{ status: 'available' }} isSelected={false} isHighlighted={false}
+        isMovableHighlighted={false} isFocused={false} onClick={vi.fn()}
+        onContextMenu={vi.fn()} onCtrlClick={vi.fn()}
+      />
+    );
+    expect(screen.getByText('(зам)')).toBeInTheDocument();
+  });
+});

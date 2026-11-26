@@ -12,7 +12,7 @@ import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
-import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability, runIndependentSaveTasks, type NamedSaveTask } from '@/logic';
+import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability, runIndependentSaveTasks, type NamedSaveTask } from '@/logic';
 import { buildTeacherScheduleMap, buildRoomScheduleMap } from '@/logic/exportMaps';
 import type { ScheduleEntry } from '@/logic/exportMaps';
 import { downloadJson, exportToJson, saveJsonStringToFolder } from '@/db';
@@ -201,7 +201,7 @@ export function ExportPage() {
       const teacherStr = lesson.teacher2 ? `${lesson.teacher} / ${lesson.teacher2}` : lesson.teacher;
       switch (activeView) {
         case 'classes':
-          return `${lesson.subject}${group ? ` (${group})` : ''} ${teacherStr} ${formatRoom(lesson.room)}${lesson.originalTeacher ? ' *' : ''}`;
+          return `${lesson.subject}${group ? ` (${group})` : ''} ${teacherStr} ${formatRoom(lesson.room)}${isReplacementLesson(lesson) ? ' *' : ''}`;
         case 'teachers':
           return `${lesson.subject}${group ? ` (${group})` : ''} ${className} ${formatRoom(lesson.room)}`;
         case 'rooms':
@@ -344,7 +344,7 @@ export function ExportPage() {
               const group = extractGroupIndex(lesson.group);
               const teacherStr = lesson.teacher2 ? `${lesson.teacher} / ${lesson.teacher2}` : lesson.teacher;
               const line = escapeHtml(`${lesson.subject}${group ? ` (${group})` : ''} ${teacherStr} ${formatRoom(lesson.room)}`);
-              return lesson.originalTeacher ? `<em>${line} *</em>` : line;
+              return isReplacementLesson(lesson) ? `<em>${line} *</em>` : line;
             }).join('<br>')
           : escapeHtml(formatCellText(entries)).replace(/\n/g, '<br>');
         html += `<td style="${CELL}${bg}${dayBorder}">${text}</td>`;
@@ -622,7 +622,7 @@ export function ExportPage() {
   const renderCellContent = useCallback((entries: ScheduleEntry[]) => {
     return entries.map(({ className, lesson }, i) => {
       const groupIndex = extractGroupIndex(lesson.group);
-      const isSubstitution = activeView === 'classes' && !!lesson.originalTeacher;
+      const isSubstitution = activeView === 'classes' && isReplacementLesson(lesson);
       return (
         <div key={i} className={styles.lessonEntry} style={isSubstitution ? { fontStyle: 'italic' } : undefined}>
           <span className={styles.subject}>
