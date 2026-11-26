@@ -126,6 +126,7 @@ export {
   getAbsentTeachersData,
   getReplacementEntries,
   isReplacementLesson,
+  getChangedClassCellKeys,
   renderClassesImage,
   renderTeachersImage,
   renderAbsentImage,

@@ -24,6 +24,7 @@ export {
   getAbsentTeachersData,
   getReplacementEntries,
   isReplacementLesson,
+  getChangedClassCellKeys,
 } from './export-image-data';
 
 import type { ClassesImageData, TeacherImageData, ReplacementEntry } from './export-image-data';

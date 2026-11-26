@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson } from './export-image-data';
+import { isSlotChangedForExport, formatCellLessons, getTeacherChangesOnDay, getTeacherImageData, getChangedClassesData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson, getChangedClassCellKeys } from './export-image-data';
 import type { ScheduledLesson, Schedule, Teacher } from '@/types';
 
 // ─── Fixtures ─────────────────────────────────────────────────
@@ -54,6 +54,16 @@ describe('isSlotChangedForExport', () => {
 
   it('returns false when both are empty', () => {
     expect(isSlotChangedForExport([], [])).toBe(false);
+  });
+
+  it('keeps a class visible when only the replacement marker changed', () => {
+    const templateLesson = createLesson();
+    const compensated = createLesson({ isSubstitution: true, isUnionSubstitution: true });
+    const template: Schedule = { '6а': { Пн: { 3: { lessons: [templateLesson] } } } };
+    const schedule: Schedule = { '6а': { Пн: { 3: { lessons: [compensated] } } } };
+    expect(isSlotChangedForExport([compensated], [templateLesson])).toBe(true);
+    expect(getChangedClassCellKeys(schedule, template, ['6а'])).toContain('6а|Пн|3');
+    expect(getChangedClassesData(schedule, template, ['6а'], 'Пн').columns).toEqual(['6а']);
   });
 });
 

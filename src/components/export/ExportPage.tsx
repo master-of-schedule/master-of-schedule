@@ -12,7 +12,7 @@ import { useScheduleStore, useDataStore, useUIStore } from '@/stores';
 import { useShallow } from 'zustand/react/shallow';
 import { DAYS, LESSON_NUMBERS } from '@/types';
 import type { Day, LessonNumber } from '@/types';
-import { computeChangedCells, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability, runIndependentSaveTasks, type NamedSaveTask } from '@/logic';
+import { getChangedClassCellKeys, computeTeacherChangedCells, getChangedClassesData, getTeacherChangesOnDay, getTeacherImageData, getAbsentTeachersData, getReplacementEntries, isReplacementLesson, renderClassesImage, renderTeachersImage, renderAbsentImage, buildReplacementsImage, downloadCanvasAsPng, saveCanvasPngToFolder, generatePartnerAvailability, runIndependentSaveTasks, type NamedSaveTask } from '@/logic';
 import { buildTeacherScheduleMap, buildRoomScheduleMap } from '@/logic/exportMaps';
 import type { ScheduleEntry } from '@/logic/exportMaps';
 import { downloadJson, exportToJson, saveJsonStringToFolder } from '@/db';
@@ -144,7 +144,7 @@ export function ExportPage() {
   const classNames = useMemo(() => classes.map(c => c.name), [classes]);
   const changedCells = useMemo(() => {
     if (!baseTemplateSchedule) return new Set<string>();
-    return computeChangedCells(schedule, baseTemplateSchedule, classNames);
+    return getChangedClassCellKeys(schedule, baseTemplateSchedule, classNames);
   }, [classNames, schedule, baseTemplateSchedule]);
 
   // Z28-2: Per-teacher changed cells — "teacherName|className|day|lessonNum".
