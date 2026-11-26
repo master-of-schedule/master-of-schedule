@@ -19,7 +19,39 @@ export function isSlotChangedForExport(
   current: ScheduledLesson[],
   template: ScheduledLesson[],
 ): boolean {
-  return isSlotDifferentFromTemplate(current, template) || hasSlotRoomChange(current, template);
+  if (isSlotDifferentFromTemplate(current, template) || hasSlotRoomChange(current, template)) return true;
+  const replacementSignature = (lesson: ScheduledLesson) =>
+    JSON.stringify([lesson.subject, lesson.teacher, lesson.teacher2, lesson.group, isReplacementLesson(lesson)]);
+  const currentMarkers = current.map(replacementSignature).sort();
+  const templateMarkers = template.map(replacementSignature).sort();
+  return currentMarkers.length !== templateMarkers.length ||
+    currentMarkers.some((signature, index) => signature !== templateMarkers[index]);
+}
+
+/** All replacement flows share this marker, including compensation without an original teacher. */
+export function isReplacementLesson(lesson: ScheduledLesson): boolean {
+  return Boolean(lesson.originalTeacher || lesson.isSubstitution);
+}
+
+/** Changed class cells for the export grid and its day filter. */
+export function getChangedClassCellKeys(
+  schedule: Schedule,
+  template: Schedule,
+  classNames: string[],
+): Set<string> {
+  const changed = new Set<string>();
+  for (const className of classNames) {
+    for (const day of Object.keys({ ...template[className], ...schedule[className] }) as Day[]) {
+      for (const lessonNum of LESSON_NUMBERS) {
+        const currentLessons = schedule[className]?.[day]?.[lessonNum]?.lessons ?? [];
+        const templateLessons = template[className]?.[day]?.[lessonNum]?.lessons ?? [];
+        if (isSlotChangedForExport(currentLessons, templateLessons)) {
+          changed.add(`${className}|${day}|${lessonNum}`);
+        }
+      }
+    }
+  }
+  return changed;
 }
 
 /**
@@ -37,6 +69,7 @@ export function formatCellLessons(lessons: ScheduledLesson[]): string {
     if (group) result += ` (${group})`;
     result += ` ${teacherStr}`;
     result += ` ${formatRoom(lesson.room)}`;
+    if (isReplacementLesson(lesson)) result += ' *';
     return result;
   }).join('\n');
 }
@@ -343,7 +376,7 @@ export function getReplacementEntries(
     for (const lessonNum of LESSON_NUMBERS) {
       const lessons = days[day]?.[lessonNum]?.lessons ?? [];
       for (const lesson of lessons) {
-        if (lesson.originalTeacher || lesson.isSubstitution) {
+        if (isReplacementLesson(lesson)) {
           entries.push({
             className,
             day,
